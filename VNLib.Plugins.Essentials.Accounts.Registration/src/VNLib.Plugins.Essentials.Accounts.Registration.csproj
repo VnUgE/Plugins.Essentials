@@ -40,7 +40,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\..\VNLib\Plugins\VNLib.Plugins.csproj" />
+    <ProjectReference Include="..\..\..\Emails.Transactional\Emails.Transactional.Client\Emails.Transactional.Client.csproj" />
     <ProjectReference Include="..\..\..\Extensions\VNLib.Plugins.Extensions.Data\VNLib.Plugins.Extensions.Data.csproj" />
     <ProjectReference Include="..\..\..\Extensions\VNLib.Plugins.Extensions.Loading.Sql\VNLib.Plugins.Extensions.Loading.Sql.csproj" />
     <ProjectReference Include="..\..\..\Extensions\VNLib.Plugins.Extensions.Loading\VNLib.Plugins.Extensions.Loading.csproj" />
