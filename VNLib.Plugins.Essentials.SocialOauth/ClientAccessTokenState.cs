@@ -31,8 +31,6 @@ using VNLib.Utils.Memory;
 using VNLib.Utils.Memory.Caching;
 using VNLib.Plugins.Essentials.Accounts;
 
-#nullable enable
-
 namespace VNLib.Plugins.Essentials.SocialOauth
 {
     public sealed class OAuthAccessState : IOAuthAccessState, ICacheable, INonce
@@ -68,7 +66,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth
 
         DateTime ICacheable.Expires { get; set; }
         bool IEquatable<ICacheable>.Equals(ICacheable? other) => GetHashCode() == other?.GetHashCode();
-        public override int GetHashCode() => Token!.GetHashCode();
+        public override int GetHashCode() => Token!.GetHashCode(StringComparison.Ordinal);
         void ICacheable.Evicted()
         {
             Memory.UnsafeZeroMemory(Nonce);

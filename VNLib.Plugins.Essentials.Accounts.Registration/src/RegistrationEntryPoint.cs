@@ -25,6 +25,7 @@
 using VNLib.Utils.Logging;
 
 using VNLib.Plugins.Extensions.Loading;
+using VNLib.Plugins.Extensions.Loading.Sql;
 using VNLib.Plugins.Extensions.Loading.Routing;
 using VNLib.Plugins.Essentials.Accounts.Registration.Endpoints;
 
@@ -40,7 +41,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration
             {
                 //Route reg endpoint
                 this.Route<RegistrationEntpoint>();
-                
+
                 Log.Information("Plugin loaded");
             }
             catch(KeyNotFoundException kne)
@@ -48,7 +49,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration
                 Log.Error("Missing required configuration variables: {ex}", kne.Message);
             }
         }
-
+        
         protected override void OnUnLoad()
         {
             Log.Information("Plugin unloaded");

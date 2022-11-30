@@ -34,9 +34,9 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
 {
     internal class MFAConfig
     {
-        public byte[]? MFASecret { get; set; } = null;
+        public byte[]? MFASecret { get; set; }
 
-        public bool TOTPEnabled { get; } = false;
+        public bool TOTPEnabled { get; }
         public string? IssuerName { get; }
         public TimeSpan TOTPPeriod { get; }
         public HashAlg TOTPAlg { get; }

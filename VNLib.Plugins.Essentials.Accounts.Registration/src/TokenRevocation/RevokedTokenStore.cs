@@ -41,7 +41,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.TokenRevocation
 
         public async Task<bool> IsRevokedAsync(string token, CancellationToken cancellation)
         {
-            await using RevocationContext context = new (Options);
+            await using RegistrationContext context = new (Options);
             await context.OpenTransactionAsync(cancellation);
 
             //Select any that match tokens
@@ -55,7 +55,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.TokenRevocation
 
         public async Task RevokeAsync(string token, CancellationToken cancellation)
         {
-            await using RevocationContext context = new (Options);
+            await using RegistrationContext context = new (Options);
             await context.OpenTransactionAsync(cancellation);
 
             //Add to table
@@ -80,7 +80,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.TokenRevocation
         {
             DateTime expiredBefore = DateTime.UtcNow.Subtract(validFor);
 
-            await using RevocationContext context = new (Options);
+            await using RegistrationContext context = new (Options);
             await context.OpenTransactionAsync(cancellation);
 
             //Select any that match tokens

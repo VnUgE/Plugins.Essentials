@@ -140,7 +140,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth.Endpoints
 
             if (!profResponse.IsSuccessful || profResponse.Data == null || profResponse.Data.ID < 100)
             {
-                Log.Debug("Client attempted a github login but GH responded with status code {code}", profResponse.StatusCode);
+                Log.Debug("Github login data attempt responded with status code {code}", profResponse.StatusCode);
                 return null;
             }
 
@@ -173,9 +173,11 @@ namespace VNLib.Plugins.Essentials.SocialOauth.Endpoints
                     //Capture the first primary email address and make sure its verified
                     if (email.Primary && email.Verified)
                     {
-                        accountData ??= new();
-                        //store email on current profile
-                        accountData.EmailAddress = email.Email;
+                        accountData = new()
+                        {
+                            //store email on current profile
+                            EmailAddress = email.Email
+                        };
                         goto Continue;
                     }
                 }
@@ -184,7 +186,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth.Endpoints
             }
             else
             {
-                Log.Debug("Client attempted a github login but GH responded with status code {code}", getEmailResponse.StatusCode);
+                Log.Debug("Github account data request failed but GH responded with status code {code}", getEmailResponse.StatusCode);
                 return null;
             }
         Continue:
@@ -196,7 +198,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth.Endpoints
             RestResponse<GithubProfile> profResponse =  await client.Resource.ExecuteAsync<GithubProfile>(request, cancellationToken);
             if (!profResponse.IsSuccessful || profResponse.Data == null)
             {
-                Log.Debug("Client attempted a github login but GH responded with status code {code}", profResponse.StatusCode);
+                Log.Debug("Github account data request failed but GH responded with status code {code}", profResponse.StatusCode);
                 return null;
             }
 

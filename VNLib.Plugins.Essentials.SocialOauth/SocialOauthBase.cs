@@ -51,8 +51,6 @@ using VNLib.Plugins.Essentials.Extensions;
 using VNLib.Plugins.Extensions.Validation;
 using VNLib.Plugins.Essentials.SocialOauth.Validators;
 
-#nullable enable
-
 namespace VNLib.Plugins.Essentials.SocialOauth
 {
 
@@ -91,7 +89,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth
         private readonly IValidator<string> NonceValidator;
         private readonly IValidator<AccountData> AccountDataValidator;
 
-        public SocialOauthBase()
+        protected SocialOauthBase()
         {
             ClaimStore = new(StringComparer.OrdinalIgnoreCase);
             AuthorizationStore = new(StringComparer.OrdinalIgnoreCase);

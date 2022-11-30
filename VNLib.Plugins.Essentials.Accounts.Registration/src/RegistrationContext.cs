@@ -25,14 +25,15 @@
 using Microsoft.EntityFrameworkCore;
 
 using VNLib.Plugins.Extensions.Data;
+using VNLib.Plugins.Essentials.Accounts.Registration.TokenRevocation;
 
-namespace VNLib.Plugins.Essentials.Accounts.Registration.TokenRevocation
+namespace VNLib.Plugins.Essentials.Accounts.Registration
 {
-    internal class RevocationContext : TransactionalDbContext
+    internal class RegistrationContext : TransactionalDbContext
     {
         public DbSet<RevokedToken> RevokedRegistrationTokens { get; set; }
         
-        public RevocationContext(DbContextOptions options) : base(options)
+        public RegistrationContext(DbContextOptions options) : base(options)
         {}
     }
 }

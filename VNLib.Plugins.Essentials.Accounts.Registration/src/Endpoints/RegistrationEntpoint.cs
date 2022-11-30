@@ -102,7 +102,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
 
                 _ = ts.Result ?? throw new KeyNotFoundException("Missing required key 'reg_sig_key' in 'registration' configuration");
                 return Convert.FromBase64String(ts.Result);
-            });
+            }, TaskScheduler.Default);
 
             //Register timeout for cleanup
             _ = plugin.ScheduleInterval(this, TimeSpan.FromSeconds(60));

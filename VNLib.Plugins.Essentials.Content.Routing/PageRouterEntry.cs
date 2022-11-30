@@ -58,7 +58,7 @@ namespace VNLib.Plugins.Essentials.Content.Routing
 
         protected override void ProcessHostCommand(string cmd)
         {
-            if(cmd.Contains("reset"))
+            if(cmd.Contains("reset", StringComparison.OrdinalIgnoreCase))
             {
                 PageRouter?.ResetRoutes();
                 Log.Information("Routing table reset");

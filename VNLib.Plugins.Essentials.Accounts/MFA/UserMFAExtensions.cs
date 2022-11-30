@@ -228,18 +228,12 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
                     MFAConfig mfa = new(conf);
 
                     //Recover secret from config and dangerous 'lazy load'
-                    _ = pbase.TryGetSecretAsync("mfa_secret").ContinueWith(t => {
-
-                        if(t.IsFaulted)
-                        {
-                            pbase.Log.Error(t.Exception!.InnerException, "Failed to load MFA signing secret");
-                        }
-                        else
-                        {
-                            mfa.MFASecret = t.Result != null ? Convert.FromBase64String(t.Result) : null;
-                        }
+                    _ = pbase.DeferTask(async () =>
+                    {
+                        string? secret = await pbase.TryGetSecretAsync("mfa_secret");
+                        mfa.MFASecret = secret != null ? Convert.FromBase64String(secret) : null;
                     });
-
+                    
                     return mfa;
                 }
                 //Return new lazy for 

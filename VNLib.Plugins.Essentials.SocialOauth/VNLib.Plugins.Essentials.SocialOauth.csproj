@@ -7,8 +7,7 @@
     <Version>1.0.1.5</Version>
     <Copyright>Copyright © 2022 Vaughn Nugent</Copyright>
     <PackageProjectUrl>https://www.vaughnnugent.com/resources</PackageProjectUrl>
-    <AssemblyName>SocialOauth</AssemblyName>
-    <Platforms>AnyCPU;x64</Platforms>
+    <AssemblyName>SocialOauth</AssemblyName>    
   </PropertyGroup>
 
   <ItemGroup>
@@ -28,6 +27,9 @@
   <PropertyGroup>
     <!--Enable dynamic loading-->
     <EnableDynamicLoading>true</EnableDynamicLoading>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>False</GenerateDocumentationFile>
+    <AnalysisLevel>latest-all</AnalysisLevel>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\VNLib\Essentials\VNLib.Plugins.Essentials.csproj" />

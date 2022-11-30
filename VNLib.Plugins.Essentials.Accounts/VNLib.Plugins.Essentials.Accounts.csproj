@@ -5,13 +5,11 @@
     <RootNamespace>VNLib.Plugins.Essentials.Accounts</RootNamespace>
     <Copyright>Copyright © 2022 Vaughn Nugent</Copyright>
     <Authors>Vaughn Nugent</Authors>
-    <AssemblyVersion>1.0.1.2</AssemblyVersion>
-    <FileVersion>1.0.1.2</FileVersion>
     <AssemblyName>Accounts</AssemblyName>
-    <Platforms>AnyCPU;x64</Platforms>
+    
     <PackageId>VNLib.Plugins.Essentials.Accounts</PackageId>
-    <Version>1.0.1</Version>
-    <PackageProjectUrl>www.vaughnnugent.com/resources</PackageProjectUrl>
+    <Version>1.0.1.5</Version>
+    <PackageProjectUrl>https://www.vaughnnugent.com/resources</PackageProjectUrl>
   </PropertyGroup>
 
 
@@ -20,6 +18,13 @@
     <!--Enable dynamic loading-->
     <EnableDynamicLoading>true</EnableDynamicLoading>
     <Nullable>enable</Nullable>
+    <AnalysisLevel>latest-all</AnalysisLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <Deterministic>False</Deterministic>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <Deterministic>False</Deterministic>
   </PropertyGroup>
 
   <ItemGroup>
