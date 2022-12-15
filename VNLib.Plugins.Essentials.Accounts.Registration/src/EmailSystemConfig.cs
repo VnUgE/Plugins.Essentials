@@ -65,17 +65,18 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration
 
             
             //Load oauth secrets from vault
-            Task<string?> oauth2ClientID = pbase.TryGetSecretAsync("oauth2_client_id");
-            Task<string?> oauth2Password = pbase.TryGetSecretAsync("oauth2_client_secret");
+            Task<SecretResult?> oauth2ClientID = pbase.TryGetSecretAsync("oauth2_client_id");
+            Task<SecretResult?> oauth2Password = pbase.TryGetSecretAsync("oauth2_client_secret");
 
             //Lazy cred loaded, tasks should be loaded before this method will ever get called
             Credential lazyCredentialGet()
             {
                 //Load the results 
-                string cliendId = oauth2ClientID.Result ?? throw new KeyNotFoundException("Missing required oauth2 client id");
-                string password = oauth2Password.Result ?? throw new KeyNotFoundException("Missing required oauth2 client secret");
+                SecretResult cliendId = oauth2ClientID.Result ?? throw new KeyNotFoundException("Missing required oauth2 client id");
+                SecretResult password = oauth2Password.Result ?? throw new KeyNotFoundException("Missing required oauth2 client secret");
 
-                return Credential.Create(cliendId, password);
+                //Creat credential
+                return Credential.Create(cliendId.Result, password.Result);
             }
 
 
@@ -113,6 +114,8 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration
             {
                 authenticator.Dispose();
                 RestClientPool.Dispose();
+                oauth2ClientID.Dispose();
+                oauth2Password.Dispose();
             }
 
             //register password cleanup

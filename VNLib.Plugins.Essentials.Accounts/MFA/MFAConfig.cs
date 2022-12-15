@@ -29,12 +29,13 @@ using System.Collections.Generic;
 
 using VNLib.Hashing;
 using VNLib.Utils.Extensions;
+using VNLib.Hashing.IdentityUtility;
 
 namespace VNLib.Plugins.Essentials.Accounts.MFA
 {
     internal class MFAConfig
     {
-        public byte[]? MFASecret { get; set; }
+        public ReadOnlyJsonWebKey? MFASecret { get; set; }
 
         public bool TOTPEnabled { get; }
         public string? IssuerName { get; }

@@ -39,7 +39,6 @@ using VNLib.Plugins.Essentials.Accounts;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Users;
 
-#nullable enable
 
 namespace VNLib.Plugins.Essentials.SocialOauth.Endpoints
 {
@@ -50,26 +49,33 @@ namespace VNLib.Plugins.Essentials.SocialOauth.Endpoints
 
         public DiscordOauth(PluginBase plugin, IReadOnlyDictionary<string, JsonElement> config) : base()
         {
-            //Get id/secret
-            Task<string?> secret = plugin.TryGetSecretAsync("discord_client_secret");
-            Task<string?> clientId = plugin.TryGetSecretAsync("discord_client_id");
-
-            //Wait sync
-            Task.WaitAll(secret, clientId);
-
             Config = new("discord", config)
             {
-                //get gh client secret and id
-                ClientID = clientId.Result ?? throw new KeyNotFoundException("Missing Discord client id from config or vault"),
-                ClientSecret = secret.Result ?? throw new KeyNotFoundException("Missing the Discord client secret from config or vault"),
-
                 Passwords = plugin.GetPasswords(),
                 Users = plugin.GetUserManager(),
             };
 
             InitPathAndLog(Config.EndpointPath, plugin.Log);
+
+            //Load secrets
+            _ = plugin.DeferTask(async () =>
+            {
+                //Get id/secret
+                Task<SecretResult?> clientIdTask = plugin.TryGetSecretAsync("discord_client_id");
+                Task<SecretResult?> secretTask = plugin.TryGetSecretAsync("discord_client_secret");
+
+                await Task.WhenAll(secretTask, clientIdTask);
+
+                using SecretResult? secret = await secretTask;
+                using SecretResult? clientId = await clientIdTask;
+
+                Config.ClientID = clientId?.Result.ToString() ?? throw new KeyNotFoundException("Missing Discord client id from config or vault");
+                Config.ClientSecret = secret?.Result.ToString() ?? throw new KeyNotFoundException("Missing the Discord client secret from config or vault");
+
+            }, 100);
         }
 
+        
         private static string GetUserIdFromPlatform(string userName)
         {
             return ManagedHash.ComputeHash($"discord|{userName}", HashAlg.SHA1, HashEncodingMode.Hexadecimal);

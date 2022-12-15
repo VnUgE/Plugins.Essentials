@@ -34,12 +34,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 {
     [ConfigurationName("logout_endpoint")]
     internal class LogoutEndpoint : ProtectedWebEndpoint
-    {        
-        //Use default ep protection (most strict)
-        
-        ///<inheritdoc/>
-        protected override ProtectionSettings EndpointProtectionSettings { get; } = new();
-
+    {
         
         public LogoutEndpoint(PluginBase pbase, IReadOnlyDictionary<string, JsonElement> config)
         {

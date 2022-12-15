@@ -34,7 +34,6 @@ using System.Runtime.CompilerServices;
 using VNLib.Hashing;
 using VNLib.Utils;
 using VNLib.Utils.Memory;
-using VNLib.Utils.Logging;
 using VNLib.Utils.Extensions;
 using VNLib.Hashing.IdentityUtility;
 using VNLib.Plugins.Essentials.Users;
@@ -122,16 +121,6 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
 
         private static bool VerifyTOTP(uint totpCode, ReadOnlySpan<byte> userSecret, MFAConfig config)
         {
-            //Calc hash size for allocating bufffer
-            int hashSize = config.TOTPAlg switch
-            {
-                HashAlg.MD5 => (160 / 8),
-                HashAlg.SHA1 => (160 / 8),
-                HashAlg.SHA512 => (512 / 8),
-                HashAlg.SHA384 => (384 / 8),
-                HashAlg.SHA256 => (256 / 8),
-                _ => throw new ArgumentException("Invalid hash algorithm"),
-            };
             //A basic attempt at a constant time TOTP verification, run the calculation a fixed number of times, regardless of the resutls
             bool codeMatches = false;
 
@@ -140,7 +129,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
             //Start the current window with the minimum window
             int currenStep = -config.TOTPTimeWindowSteps;
             Span<byte> stepBuffer = stackalloc byte[sizeof(long)];
-            Span<byte> hashBuffer = stackalloc byte[hashSize];
+            Span<byte> hashBuffer = stackalloc byte[(int)config.TOTPAlg];
             //Run the loop at least once to allow a 0 step tight window
             do
             {
@@ -159,7 +148,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
                 //try to compute the hash of the time step
                 if (result < 1)
                 {
-                    throw new OutOfMemoryException("Failed to compute TOTP time step hash because the buffer was too small");
+                    throw new InternalBufferTooSmallException("Failed to compute TOTP time step hash because the buffer was too small");
                 }
                 //Hash bytes
                 ReadOnlySpan<byte> hash = hashBuffer[..(int)result];
@@ -230,9 +219,10 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
                     //Recover secret from config and dangerous 'lazy load'
                     _ = pbase.DeferTask(async () =>
                     {
-                        string? secret = await pbase.TryGetSecretAsync("mfa_secret");
-                        mfa.MFASecret = secret != null ? Convert.FromBase64String(secret) : null;
-                    });
+                        using SecretResult? secret = await pbase.TryGetSecretAsync("mfa_secret");
+                        mfa.MFASecret = secret != null ? secret.GetJsonWebKey() : null;
+                        
+                    },50);
                     
                     return mfa;
                 }
@@ -276,12 +266,6 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
         #endregion
 
         #region webauthn
-       
-        private static readonly IReadOnlyDictionary<string, string> JWTHeader = new Dictionary<string, string>
-        {
-            { "alg", "HS384" },
-            { "typ" , "JWT"}
-        };
 
         #endregion
 
@@ -294,10 +278,10 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
         /// <param name="upgrade">The recovered upgrade</param>
         /// <param name="base64sessionSig">The stored base64 encoded signature from the session that requested an upgrade</param>
         /// <returns>True if the upgrade was verified, not expired, and was recovered from the signed message, false otherwise</returns>
-        public static bool RecoverUpgrade(this MFAConfig config, string upgradeJwtString, string base64sessionSig, [NotNullWhen(true)] out MFAUpgrade? upgrade)
+        public static bool RecoverUpgrade(this MFAConfig config, ReadOnlySpan<char> upgradeJwtString, ReadOnlySpan<char> base64sessionSig, [NotNullWhen(true)] out MFAUpgrade? upgrade)
         {
             //Verifies a jwt stored signature against the actual signature
-            static bool VerifyStoredSig(string base64string, ReadOnlySpan<byte> signature)
+            static bool VerifyStoredSig(ReadOnlySpan<char> base64string, ReadOnlySpan<byte> signature)
             {
                 using UnsafeMemoryHandle<byte> buffer = Memory.UnsafeAlloc<byte>(base64string.Length, true);
                 //Recover base64
@@ -310,15 +294,13 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
             _ = config.MFASecret ?? throw new InvalidOperationException("MFA config is missing required upgrade signing key");
 
             upgrade = null;
+            
             //Parse jwt
             using JsonWebToken jwt = JsonWebToken.Parse(upgradeJwtString);
-            //Verify the upgrade jwt
-            using (HMACSHA384 hmac = new(config.MFASecret))
+            
+            if (!jwt.VerifyFromJwk(config.MFASecret))
             {
-                if (!jwt.Verify(hmac))
-                {
-                    return false;
-                }
+                return false;
             }
 
             if(!VerifyStoredSig(base64sessionSig, jwt.SignatureData))
@@ -382,13 +364,13 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
             return null;
         }
 
-        private static Tuple<string, string> GetUpgradeMessage(MFAUpgrade upgrade, byte[] secret, TimeSpan expires)
+        private static Tuple<string, string> GetUpgradeMessage(MFAUpgrade upgrade, ReadOnlyJsonWebKey secret, TimeSpan expires)
         {
             //Add some random entropy to the upgrade message, to help prevent forgery
             string entropy = RandomHash.GetRandomBase32(16);
             //Init jwt
             using JsonWebToken upgradeJwt = new();
-            upgradeJwt.WriteHeader(JWTHeader);
+            upgradeJwt.WriteHeader(secret.JwtHeader);
             //Write claims
             upgradeJwt.InitPayloadClaim()
                 .AddClaim("iat", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
@@ -397,11 +379,10 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
                 .AddClaim("expires", expires.TotalSeconds)
                 .AddClaim("a", entropy)
                 .CommitClaims();
-            //Sign
-            using (HMACSHA384 hmc = new(secret))
-            {
-                upgradeJwt.Sign(hmc);
-            }
+            
+            //Sign with jwk
+            upgradeJwt.SignFromJwk(secret);
+            
             //compile and return jwt upgrade
             return new(upgradeJwt.Compile(), Convert.ToBase64String(upgradeJwt.SignatureData));
         }

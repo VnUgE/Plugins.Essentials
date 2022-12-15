@@ -32,7 +32,7 @@
     <AnalysisLevel>latest-all</AnalysisLevel>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\VNLib\Essentials\VNLib.Plugins.Essentials.csproj" />
+    <ProjectReference Include="..\..\..\VNLib\Essentials\src\VNLib.Plugins.Essentials.csproj" />
     <ProjectReference Include="..\..\Extensions\VNLib.Plugins.Extensions.Loading\VNLib.Plugins.Extensions.Loading.csproj" />
     <ProjectReference Include="..\..\Extensions\VNLib.Plugins.Extensions.Validation\VNLib.Plugins.Extensions.Validation.csproj" />
     <ProjectReference Include="..\..\PluginBase\VNLib.Plugins.PluginBase.csproj" />

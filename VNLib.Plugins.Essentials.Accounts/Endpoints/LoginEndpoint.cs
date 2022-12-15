@@ -68,9 +68,6 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
         private readonly uint MaxFailedLogins;
         private readonly TimeSpan FailedCountTimeout;
 
-        ///<inheritdoc/>
-        protected override ProtectionSettings EndpointProtectionSettings { get; } = new();
-
         public LoginEndpoint(PluginBase pbase, IReadOnlyDictionary<string, JsonElement> config)
         {
             string? path = config["path"].GetString();
@@ -298,14 +295,18 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 return VfReturnType.VirtualSkip;
             }
 
-            //Wipe session signature
-            entity.Session.MfaUpgradeSignature(null);
+            bool locked = UserLoginLocked(user);
 
             //Make sure the account has not been locked out
-            if (!webm.Assert(!UserLoginLocked(user), LOCKED_ACCOUNT_MESSAGE))
+            if (!webm.Assert(locked == false, LOCKED_ACCOUNT_MESSAGE))
             {
                 //process mfa login
                 LoginMfa(entity, user, request, upgrade, webm);
+            }
+            else
+            {
+                //Locked, so clear stored signature
+                entity.Session.MfaUpgradeSignature(null);
             }
       
             //Update user on clean process
@@ -338,7 +339,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                         //Valid, complete                         
                     }
                     break;
-                case MFAType.GPG:
+                case MFAType.PGP:
                     { }
                     break;
                 default:
@@ -347,6 +348,10 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                     }
                     return;
             }
+
+            //Wipe session signature
+            entity.Session.MfaUpgradeSignature(null);
+
             //build login message from upgrade
             LoginMessage loginMessage = new()
             {

@@ -100,8 +100,9 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
             //Begin the async op to get the signature key from the vault
             RegSignatureKey = plugin.TryGetSecretAsync("reg_sig_key").ContinueWith((ts) => {
 
-                _ = ts.Result ?? throw new KeyNotFoundException("Missing required key 'reg_sig_key' in 'registration' configuration");
-                return Convert.FromBase64String(ts.Result);
+                using SecretResult? sr = ts.Result ?? throw new KeyNotFoundException("Missing required key 'reg_sig_key' in 'registration' configuration");
+                return ts.Result.GetFromBase64();
+                
             }, TaskScheduler.Default);
 
             //Register timeout for cleanup

@@ -29,9 +29,7 @@ using System.Collections.Generic;
 using VNLib.Utils.Extensions;
 using VNLib.Plugins.Essentials.Users;
 using VNLib.Plugins.Essentials.Accounts;
-using VNLib.Net.Rest.Client;
 
-#nullable enable
 
 namespace VNLib.Plugins.Essentials.SocialOauth
 {
@@ -61,15 +59,13 @@ namespace VNLib.Plugins.Essentials.SocialOauth
             NonceByteSize = config["nonce_size"].GetUInt32();
             RandomPasswordSize = config["password_size"].GetInt32();
         }
+      
 
-
-        public RestClientPool ClientPool { get; }
-
-        public string ClientID { get; init; }
+        public string ClientID { get; set; } = string.Empty;
        
-        public string ClientSecret { get; init; }
+        public string ClientSecret { get; set; } = string.Empty;
 
-       
+
         /// <summary>
         /// The user-account origin value. Specifies that the user account
         /// was created outside of the local account system
@@ -96,7 +92,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth
         /// <summary>
         /// The user store to create/get users from
         /// </summary>     
-        public IUserManager Users { get; init; }
+        public IUserManager Users { get; init; } 
       
         public PasswordHashing Passwords { get; init; }
 

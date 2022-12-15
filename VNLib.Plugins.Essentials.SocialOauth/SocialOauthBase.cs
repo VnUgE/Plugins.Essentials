@@ -75,7 +75,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth
              * Disable cross site checking because the OAuth2 flow requires
              * cross site when redirecting the client back
              */
-            CrossSiteDenied = false
+            DisableCrossSiteDenied = true
         };
 
         /// <summary>
@@ -283,7 +283,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth
                     return VfReturnType.VirtualSkip;
                 }
                 //Try to get the claim from the state parameter
-                if (ClaimStore.TryGetOrEvictRecord(state, out LoginClaim claim) < 1)
+                if (ClaimStore.TryGetOrEvictRecord(state, out LoginClaim? claim) < 1)
                 {
                     entity.Redirect(RedirectType.Temporary, $"{Path}?result=expired");
                     return VfReturnType.VirtualSkip;
@@ -361,7 +361,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth
                 return VfReturnType.VirtualSkip;
             }
             //Recover the access token
-            if (AuthorizationStore.TryGetOrEvictRecord(base32Nonce!, out OAuthAccessState token) < 1)
+            if (AuthorizationStore.TryGetOrEvictRecord(base32Nonce!, out OAuthAccessState? token) < 1)
             {
                 webm.Result = AUTH_ERROR_MESSAGE;
                 entity.CloseResponse(webm);

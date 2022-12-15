@@ -40,46 +40,51 @@ using VNLib.Plugins.Essentials.Accounts;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Users;
 
-#nullable enable
-
 namespace VNLib.Plugins.Essentials.SocialOauth.Endpoints
 {
 
     [ConfigurationName("auth0")]
-    internal class Auth0 : SocialOauthBase
+    internal sealed class Auth0 : SocialOauthBase
     {
+
         protected override OauthClientConfig Config { get; }
 
 
-        private readonly Task<JsonDocument> RsaCertificate;
+        private readonly Task<JsonDocument> Auth0VerificationJwk;
 
-        public Auth0(PluginBase plugin, IReadOnlyDictionary<string, JsonElement> config)
+        public Auth0(PluginBase plugin, IReadOnlyDictionary<string, JsonElement> config) : base()
         {
-            //Get id/secret
-            Task<string?> secret = plugin.TryGetSecretAsync("auth0_client_secret");
-            Task<string?> clientId = plugin.TryGetSecretAsync("auth0_client_id");
-
-            //Wait sync
-            Task.WaitAll(secret, clientId);
-
-            Config = new("auth0", config)
-            {
-                //get gh client secret and id
-                ClientID = clientId.Result ?? throw new KeyNotFoundException("Missing Auth0 client id from config or vault"),
-                ClientSecret = secret.Result ?? throw new KeyNotFoundException("Missing Auth0 client secret from config or vault"),
-
-                Passwords = plugin.GetPasswords(),
-                Users = plugin.GetUserManager(),
-            };
-
             string keyUrl = config["key_url"].GetString() ?? throw new KeyNotFoundException("Missing Auth0 'key_url' from config");
 
             Uri keyUri = new(keyUrl);
 
             //Get certificate on background thread
-            RsaCertificate = Task.Run(() => GetRsaCertificate(keyUri));
+            Auth0VerificationJwk = Task.Run(() => GetRsaCertificate(keyUri));
+
+            Config = new("auth0", config)
+            {
+                Passwords = plugin.GetPasswords(),
+                Users = plugin.GetUserManager(),
+            };
 
             InitPathAndLog(Config.EndpointPath, plugin.Log);
+
+            //Load secrets
+            _ = plugin.DeferTask(async () =>
+            {
+                //Get id/secret
+                Task<SecretResult?> secretTask = plugin.TryGetSecretAsync("auth0_client_secret");
+                Task<SecretResult?> clientIdTask = plugin.TryGetSecretAsync("auth0_client_id");
+
+                await Task.WhenAll(secretTask, clientIdTask);
+
+                using SecretResult? secret = await secretTask;
+                using SecretResult? clientId = await clientIdTask;
+
+                Config.ClientID = clientId?.Result.ToString() ?? throw new KeyNotFoundException("Missing Auth0 client id from config or vault");
+                Config.ClientSecret = secret?.Result.ToString() ?? throw new KeyNotFoundException("Missing the Auth0 client secret from config or vault");
+               
+            }, 100);
         }
 
 
@@ -154,7 +159,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth.Endpoints
             using JsonWebToken jwt = JsonWebToken.Parse(clientAccess.IdToken);
 
             //Verify the token against the first signing key
-            if (!jwt.VerifyFromJwk(RsaCertificate.Result.RootElement.GetProperty("keys").EnumerateArray().First()))
+            if (!jwt.VerifyFromJwk(Auth0VerificationJwk.Result.RootElement.GetProperty("keys").EnumerateArray().First()))
             {
                 return EmptyLoginData;
             }

@@ -40,7 +40,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\VNLib\Essentials\VNLib.Plugins.Essentials.csproj" />
+    <ProjectReference Include="..\..\..\VNLib\Essentials\src\VNLib.Plugins.Essentials.csproj" />
     <ProjectReference Include="..\..\Extensions\VNLib.Plugins.Extensions.Loading.Sql\VNLib.Plugins.Extensions.Loading.Sql.csproj" />
     <ProjectReference Include="..\..\Extensions\VNLib.Plugins.Extensions.Validation\VNLib.Plugins.Extensions.Validation.csproj" />
     <ProjectReference Include="..\..\PluginBase\VNLib.Plugins.PluginBase.csproj" />
