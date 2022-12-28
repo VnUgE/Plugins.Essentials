@@ -113,7 +113,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration
 
             reqVal.RuleFor(static s => s.ClientId)
                 .NotEmpty()
-                .IllegalCharacters()
+                .AlphaNumericOnly()
                 .Length(1, 100);
 
             //Convert to universal time before validating

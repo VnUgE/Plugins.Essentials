@@ -29,7 +29,6 @@ using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text.Json.Serialization;
 using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
 
 using VNLib.Hashing;
 using VNLib.Utils;
@@ -138,7 +137,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
                 //calculate the time step
                 long timeStep = (long)Math.Floor(window.ToUnixTimeSeconds() / config.TOTPPeriod.TotalSeconds);
                 //try to compute the hash
-                _ = BitConverter.TryWriteBytes(stepBuffer, timeStep) ? 0 : throw new Exception("Failed to format TOTP time step");
+                _ = BitConverter.TryWriteBytes(stepBuffer, timeStep) ? 0 : throw new InternalBufferTooSmallException("Failed to format TOTP time step");
                 //If platform is little endian, reverse the byte order
                 if (BitConverter.IsLittleEndian)
                 {
@@ -188,8 +187,6 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
 
         const string MFA_CONFIG_KEY = "mfa";
 
-        private static readonly ConditionalWeakTable<PluginBase, Lazy<MFAConfig?>> _lazyMfaConfigs = new();
-
         /// <summary>
         /// Gets the plugins ambient <see cref="PasswordHashing"/> if loaded, or loads it if required. This class will
         /// be unloaded when the plugin us unloaded.
@@ -201,38 +198,31 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
         /// <exception cref="ObjectDisposedException"></exception>
         public static MFAConfig? GetMfaConfig(this PluginBase plugin)
         {
-            static Lazy<MFAConfig?> LoadMfaConfig(PluginBase pbase)
+            static MFAConfig? LoadMfaConfig(PluginBase pbase)
             {
-                //Lazy load func
-                MFAConfig? Load()
+                //Try to get the configuration object
+                IReadOnlyDictionary<string, JsonElement>? conf = pbase.TryGetConfig(MFA_CONFIG_KEY);
+
+                if (conf == null)
                 {
-                    //Try to get the configuration object
-                    IReadOnlyDictionary<string, JsonElement>? conf = pbase.TryGetConfig(MFA_CONFIG_KEY);
-
-                    if (conf == null)
-                    {
-                        return null;
-                    }
-                    //Init mfa config
-                    MFAConfig mfa = new(conf);
-
-                    //Recover secret from config and dangerous 'lazy load'
-                    _ = pbase.DeferTask(async () =>
-                    {
-                        using SecretResult? secret = await pbase.TryGetSecretAsync("mfa_secret");
-                        mfa.MFASecret = secret != null ? secret.GetJsonWebKey() : null;
-                        
-                    },50);
-                    
-                    return mfa;
+                    return null;
                 }
-                //Return new lazy for 
-                return new(Load);
+                //Init mfa config
+                MFAConfig mfa = new(conf);
+
+                //Recover secret from config and dangerous 'lazy load'
+                _ = pbase.DeferTask(async () =>
+                {
+                    mfa.MFASecret = await pbase.TryGetSecretAsync("mfa_secret").ToJsonWebKey();
+
+                }, 50);
+
+                return mfa;
             }
             
             plugin.ThrowIfUnloaded();
             //Get/load the passwords one time only
-            return _lazyMfaConfigs.GetValue(plugin, LoadMfaConfig).Value;
+            return LoadingExtensions.GetOrCreateSingleton(plugin, LoadMfaConfig);
         }
 
         #endregion

@@ -106,7 +106,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
             }, TaskScheduler.Default);
 
             //Register timeout for cleanup
-            _ = plugin.ScheduleInterval(this, TimeSpan.FromSeconds(60));
+            plugin.ScheduleInterval(this, TimeSpan.FromSeconds(60));
         }
 
         private static IValidator<string> GetJwtValidator()

@@ -7,7 +7,9 @@
     <Version>1.0.1.5</Version>
     <Copyright>Copyright © 2022 Vaughn Nugent</Copyright>
     <PackageProjectUrl>https://www.vaughnnugent.com/resources</PackageProjectUrl>
-    <AssemblyName>SocialOauth</AssemblyName>    
+    <AssemblyName>SocialOauth</AssemblyName>
+    <SignAssembly>True</SignAssembly>
+    <AssemblyOriginatorKeyFile>\\vaughnnugent.com\Internal\Folder Redirection\vman\Documents\Programming\Software\StrongNameingKey.snk</AssemblyOriginatorKeyFile>
   </PropertyGroup>
 
   <ItemGroup>

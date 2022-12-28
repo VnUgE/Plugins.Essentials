@@ -10,6 +10,8 @@
     <PackageId>VNLib.Plugins.Essentials.Accounts</PackageId>
     <Version>1.0.1.5</Version>
     <PackageProjectUrl>https://www.vaughnnugent.com/resources</PackageProjectUrl>
+    <SignAssembly>True</SignAssembly>
+    <AssemblyOriginatorKeyFile>\\vaughnnugent.com\Internal\Folder Redirection\vman\Documents\Programming\Software\StrongNameingKey.snk</AssemblyOriginatorKeyFile>
   </PropertyGroup>
 
 

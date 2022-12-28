@@ -14,6 +14,8 @@
     <AssemblyVersion>1.0.0.1</AssemblyVersion>
     <AssemblyName>Essentials.EmailRegistration</AssemblyName>
     <CheckForOverflowUnderflow>False</CheckForOverflowUnderflow>
+    <SignAssembly>True</SignAssembly>
+    <AssemblyOriginatorKeyFile>\\vaughnnugent.com\Internal\Folder Redirection\vman\Documents\Programming\Software\StrongNameingKey.snk</AssemblyOriginatorKeyFile>
   </PropertyGroup>
 
   <!-- Resolve nuget dll files and store them in the output dir -->

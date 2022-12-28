@@ -38,8 +38,6 @@ using VNLib.Plugins.Extensions.Loading.Events;
 using VNLib.Plugins.Essentials.Content.Routing.Model;
 using static VNLib.Plugins.Essentials.Accounts.AccountManager;
 
-#nullable enable
-
 namespace VNLib.Plugins.Essentials.Content.Routing
 {
     internal class Router : IPageRouter, IIntervalScheduleable
@@ -53,7 +51,7 @@ namespace VNLib.Plugins.Essentials.Content.Routing
         public Router(PluginBase plugin)
         {
             Store = new(plugin.GetContextOptions());
-            _ = plugin.ScheduleInterval(this, TimeSpan.FromSeconds(30));
+            plugin.ScheduleInterval(this, TimeSpan.FromSeconds(30));
             RouteTable = new();
         }
 
