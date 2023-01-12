@@ -39,7 +39,6 @@ using VNLib.Plugins.Essentials.Accounts;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Users;
 
-
 namespace VNLib.Plugins.Essentials.SocialOauth.Endpoints
 {
     [ConfigurationName("discord")]

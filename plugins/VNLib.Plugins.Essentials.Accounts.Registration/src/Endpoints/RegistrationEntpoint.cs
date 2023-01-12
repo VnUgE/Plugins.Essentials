@@ -25,8 +25,6 @@
 using System;
 using System.Net;
 using System.Text.Json;
-using System.Threading.Tasks;
-using System.Security.Cryptography;
 
 using FluentValidation;
 
@@ -38,7 +36,6 @@ using VNLib.Utils.Memory;
 using VNLib.Utils.Logging;
 using VNLib.Utils.Extensions;
 using VNLib.Hashing.IdentityUtility;
-using VNLib.Net.Rest.Client;
 using VNLib.Net.Rest.Client.OAuth2;
 using VNLib.Plugins.Essentials.Users;
 using VNLib.Plugins.Essentials.Endpoints;
@@ -48,6 +45,7 @@ using VNLib.Plugins.Extensions.Loading.Sql;
 using VNLib.Plugins.Extensions.Loading.Events;
 using VNLib.Plugins.Extensions.Loading.Users;
 using VNLib.Plugins.Extensions.Validation;
+using VNLib.Plugins.Extentions.TransactionalEmail;
 using VNLib.Plugins.Essentials.Accounts.Registration.TokenRevocation;
 using static VNLib.Plugins.Essentials.Accounts.AccountManager;
 
@@ -65,15 +63,13 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
 
         const string FAILED_AUTH_ERR = "Your registration does not exist, you should try to regisiter again.";
         const string REG_ERR_MESSAGE = "Please check your email inbox.";
-
-        private HMAC SigAlg => new HMACSHA256(RegSignatureKey.Result);
        
         private readonly IUserManager Users;
         private readonly IValidator<string> RegJwtValdidator;
         private readonly PasswordHashing Passwords;
         private readonly RevokedTokenStore RevokedTokens;
-        private readonly EmailSystemConfig Emails;
-        private readonly Task<byte[]> RegSignatureKey;
+        private readonly TransactionalEmailConfig Emails;
+        private readonly Task<ReadOnlyJsonWebKey> RegSignatureKey;
         private readonly TimeSpan RegExpiresSec;
 
         /// <summary>
@@ -95,15 +91,10 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
             Passwords = plugin.GetPasswords();
             Users = plugin.GetUserManager();
             RevokedTokens = new(plugin.GetContextOptions());
-            Emails = new(plugin);
+            Emails = plugin.GetEmailConfig();
 
             //Begin the async op to get the signature key from the vault
-            RegSignatureKey = plugin.TryGetSecretAsync("reg_sig_key").ContinueWith((ts) => {
-
-                using SecretResult? sr = ts.Result ?? throw new KeyNotFoundException("Missing required key 'reg_sig_key' in 'registration' configuration");
-                return ts.Result.GetFromBase64();
-                
-            }, TaskScheduler.Default);
+            RegSignatureKey = plugin.TryGetSecretAsync("reg_sig_key").ToJsonWebKey(true);
 
             //Register timeout for cleanup
             plugin.ScheduleInterval(this, TimeSpan.FromSeconds(60));
@@ -181,15 +172,12 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
                 //get jwt
                 using JsonWebToken jwt = JsonWebToken.Parse(regJwt);
                 //verify signature
-                using (HMAC hmac = SigAlg)
-                {
-                    bool verified = jwt.Verify(hmac);
+                bool verified = jwt.VerifyFromJwk(RegSignatureKey.Result);
 
-                    if (webm.Assert(verified, FAILED_AUTH_ERR))
-                    {
-                        entity.CloseResponse(webm);
-                        return VfReturnType.VirtualSkip;
-                    }
+                if (webm.Assert(verified, FAILED_AUTH_ERR))
+                {
+                    entity.CloseResponse(webm);
+                    return VfReturnType.VirtualSkip;
                 }
 
                 //recover iat and email address
@@ -252,13 +240,6 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
             entity.CloseResponse(webm);
             return VfReturnType.VirtualSkip;
         } 
-      
-
-        private static readonly IReadOnlyDictionary<string, string> JWT_HEADER = new Dictionary<string, string>()
-        {
-            { "typ", "JWT" },
-            { "alg", "HS256" }
-        };
 
         protected override async ValueTask<VfReturnType> PutAsync(HttpEntity entity)
         {
@@ -301,8 +282,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
             string jwtData;
             using (JsonWebToken emailJwt = new())
             {
-                
-                emailJwt.WriteHeader(JWT_HEADER);
+                emailJwt.WriteHeader(RegSignatureKey.Result.JwtHeader);
 
                 //Init new claim stack, include the same iat time, nonce for entropy, and descriptor storage id
                 emailJwt.InitPayloadClaim(3)
@@ -312,10 +292,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
                     .CommitClaims();
 
                 //sign the jwt
-                using (HMAC hmac = SigAlg)
-                {
-                    emailJwt.Sign(hmac);
-                }
+                emailJwt.SignFromJwk(RegSignatureKey.Result);
                 //Compile to encoded string
                 jwtData = emailJwt.Compile();
             }
@@ -343,18 +320,17 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
             try
             {
                 //Get a new registration template
-                EmailTransactionRequest emailTemplate = Emails.GetRegistrationMessage();
+                EmailTransactionRequest emailTemplate = Emails.GetTemplateRequest("Registration");
                 //Add the user's to address
                 emailTemplate.AddToAddress(emailAddress);
                 emailTemplate.AddVariable("username", emailAddress);
                 //Set the security code variable string
                 emailTemplate.AddVariable("reg_url", url);
                 emailTemplate.AddVariable("date", DateTimeOffset.UtcNow.ToString("f"));
-                
-                //Get a new client contract
-                using ClientContract client = Emails.RestClientPool.Lease();
+              
                 //Send the email
-                TransactionResult result = await client.Resource.SendEmailAsync(emailTemplate);
+                TransactionResult result = await Emails.SendEmailAsync(emailTemplate);
+                
                 if (!result.Success)
                 {
                     Log.Debug("Registration email failed to send, SMTP status code: {smtp}", result.SmtpStatus);

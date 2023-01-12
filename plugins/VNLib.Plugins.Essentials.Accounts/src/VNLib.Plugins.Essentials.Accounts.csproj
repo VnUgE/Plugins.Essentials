@@ -38,14 +38,14 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="FluentValidation" Version="11.3.0" />
+    <PackageReference Include="FluentValidation" Version="11.4.0" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\VNLib\Essentials\src\VNLib.Plugins.Essentials.csproj" />
-    <ProjectReference Include="..\..\Extensions\VNLib.Plugins.Extensions.Loading.Sql\VNLib.Plugins.Extensions.Loading.Sql.csproj" />
-    <ProjectReference Include="..\..\Extensions\VNLib.Plugins.Extensions.Validation\VNLib.Plugins.Extensions.Validation.csproj" />
-    <ProjectReference Include="..\..\PluginBase\VNLib.Plugins.PluginBase.csproj" />
+    <ProjectReference Include="..\..\..\..\..\core\lib\Plugins.Essentials\src\VNLib.Plugins.Essentials.csproj" />
+    <ProjectReference Include="..\..\..\..\..\core\lib\Utils\src\VNLib.Utils.csproj" />
+    <ProjectReference Include="..\..\..\..\Extensions\lib\VNLib.Plugins.Extensions.Loading\src\VNLib.Plugins.Extensions.Loading.csproj" />
+    <ProjectReference Include="..\..\..\..\Extensions\lib\VNLib.Plugins.Extensions.Validation\src\VNLib.Plugins.Extensions.Validation.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -55,7 +55,7 @@
   </ItemGroup>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="start xcopy &quot;$(TargetDir)&quot; &quot;F:\Programming\Web Plugins\DevPlugins\$(TargetName)&quot; /E /Y /R" />
+    <Exec Command="start xcopy &quot;$(TargetDir)&quot; &quot;F:\Programming\vnlib\devplugins\$(TargetName)&quot; /E /Y /R" />
   </Target>
 
 </Project>

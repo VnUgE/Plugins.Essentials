@@ -36,10 +36,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Extensions\VNLib.Plugins.Extensions.Data\VNLib.Plugins.Extensions.Data.csproj" />
-    <ProjectReference Include="..\..\Extensions\VNLib.Plugins.Extensions.Loading.Sql\VNLib.Plugins.Extensions.Loading.Sql.csproj" />
-    <ProjectReference Include="..\..\Extensions\VNLib.Plugins.Extensions.Loading\VNLib.Plugins.Extensions.Loading.csproj" />
-    <ProjectReference Include="..\..\PluginBase\VNLib.Plugins.PluginBase.csproj" />
+    <ProjectReference Include="..\..\..\..\..\core\lib\Plugins.PluginBase\src\VNLib.Plugins.PluginBase.csproj" />
+    <ProjectReference Include="..\..\..\..\Extensions\lib\VNLib.Plugins.Extensions.Data\src\VNLib.Plugins.Extensions.Data.csproj" />
+    <ProjectReference Include="..\..\..\..\Extensions\lib\VNLib.Plugins.Extensions.Loading.Sql\src\VNLib.Plugins.Extensions.Loading.Sql.csproj" />
+    <ProjectReference Include="..\..\..\..\Extensions\lib\VNLib.Plugins.Extensions.Loading\src\VNLib.Plugins.Extensions.Loading.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -49,7 +49,7 @@
   </ItemGroup>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="start xcopy &quot;$(TargetDir)&quot; &quot;F:\Programming\Web Plugins\DevPlugins\$(TargetName)&quot; /E /Y /R" />
+    <Exec Command="start xcopy &quot;$(TargetDir)&quot; &quot;F:\Programming\vnlib\devplugins\$(TargetName)&quot; /E /Y /R" />
   </Target>
 
 </Project>
