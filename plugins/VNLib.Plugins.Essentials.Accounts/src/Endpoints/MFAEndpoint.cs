@@ -162,11 +162,13 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                         //generate a new secret (passing the buffer which will get copied to an array because the pw bytes can be modified during encryption)
                         byte[] secretBuffer = user.MFAGenreateTOTPSecret(MultiFactor);
                         //Alloc output buffer
-                        UnsafeMemoryHandle<byte> outputBuffer = Memory.UnsafeAlloc<byte>(4096, true);
+                        UnsafeMemoryHandle<byte> outputBuffer = MemoryUtil.UnsafeAlloc<byte>(4096, true);
+                        
                         try
                         {
                             //Encrypt the secret for the client
                             ERRNO count = entity.Session.TryEncryptClientData(secretBuffer, outputBuffer.Span);
+                            
                             if (!count)
                             {
                                 webm.Result = "There was an error updating your credentials";
@@ -174,6 +176,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                                 Log.Warn("TOTP secret encryption failed, for requested user {uid}", entity.Session.UserID);
                                 break;
                             }
+                            
                             webm.Result = new TOTPUpdateMessage()
                             {
                                 Issuer = MultiFactor.IssuerName,
@@ -183,6 +186,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                                 //Convert the secret to base64 string to send to client
                                 Base64EncSecret = Convert.ToBase64String(outputBuffer.Span[..(int)count])
                             };
+                            
                             //set success flag
                             webm.Success = true;
                         }

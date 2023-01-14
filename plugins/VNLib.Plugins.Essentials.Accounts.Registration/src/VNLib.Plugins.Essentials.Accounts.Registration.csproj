@@ -36,7 +36,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\..\core\lib\Plugins.Essentials\src\VNLib.Plugins.Essentials.csproj" />
     <ProjectReference Include="..\..\..\..\Emails.Transactional\lib\Emails.Transactional.Client\src\Emails.Transactional.Client.csproj" />
-    <ProjectReference Include="..\..\..\..\Emails.Transactional\lib\Emails.Transactional.Extensions\src\VNLib.Plugins.Extentions.TransactionalEmail.csproj" />
+    <ProjectReference Include="..\..\..\..\Emails.Transactional\lib\Emails.Transactional.Extensions\src\Emails.Transactional.Client.Extensions.csproj" />
     <ProjectReference Include="..\..\..\..\Extensions\lib\VNLib.Plugins.Extensions.Data\src\VNLib.Plugins.Extensions.Data.csproj" />
     <ProjectReference Include="..\..\..\..\Extensions\lib\VNLib.Plugins.Extensions.Loading.Sql\src\VNLib.Plugins.Extensions.Loading.Sql.csproj" />
     <ProjectReference Include="..\..\..\..\Extensions\lib\VNLib.Plugins.Extensions.Loading\src\VNLib.Plugins.Extensions.Loading.csproj" />

@@ -26,7 +26,7 @@ using System.Collections.Generic;
 
 using VNLib.Plugins.Essentials.Content.Routing.Model;
 
-using static VNLib.Plugins.Essentials.Accounts.AccountManager;
+using static VNLib.Plugins.Essentials.Accounts.AccountUtil;
 
 namespace VNLib.Plugins.Essentials.Content.Routing
 {

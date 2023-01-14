@@ -74,8 +74,8 @@ namespace VNLib.Plugins.Essentials.SocialOauth
         void ICacheable.Evicted() 
         {
             //Zero secrets on eviction
-            Memory.UnsafeZeroMemory(State);
-            Memory.UnsafeZeroMemory(_rawKey);
+            MemoryUtil.UnsafeZeroMemory(State);
+            MemoryUtil.UnsafeZeroMemory(_rawKey);
         }
     }
 }

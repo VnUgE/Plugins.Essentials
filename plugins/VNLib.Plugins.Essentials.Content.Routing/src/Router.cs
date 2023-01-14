@@ -36,7 +36,7 @@ using VNLib.Utils.Logging;
 using VNLib.Plugins.Extensions.Loading.Sql;
 using VNLib.Plugins.Extensions.Loading.Events;
 using VNLib.Plugins.Essentials.Content.Routing.Model;
-using static VNLib.Plugins.Essentials.Accounts.AccountManager;
+using static VNLib.Plugins.Essentials.Accounts.AccountUtil;
 
 namespace VNLib.Plugins.Essentials.Content.Routing
 {

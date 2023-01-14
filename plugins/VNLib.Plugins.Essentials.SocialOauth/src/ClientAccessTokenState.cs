@@ -69,7 +69,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth
         public override int GetHashCode() => Token!.GetHashCode(StringComparison.Ordinal);
         void ICacheable.Evicted()
         {
-            Memory.UnsafeZeroMemory(Nonce);
+            MemoryUtil.UnsafeZeroMemory(Nonce);
         }
 
         void INonce.ComputeNonce(Span<byte> buffer)

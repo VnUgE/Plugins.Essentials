@@ -27,14 +27,19 @@ using System.Net;
 using System.Text.Json;
 using System.Collections.Generic;
 
+using VNLib.Utils.Extensions;
 using VNLib.Plugins.Essentials.Endpoints;
+using VNLib.Plugins.Essentials.Extensions;
 using VNLib.Plugins.Extensions.Loading;
+
 
 namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 {
     [ConfigurationName("keepalive_endpoint")]
     internal sealed class KeepAliveEndpoint : ProtectedWebEndpoint
     {
+        readonly TimeSpan tokenRegenTime;
+
         /*
          * Endpoint does not use a log, so IniPathAndLog is never called
          * and path verification happens verbosly 
@@ -42,6 +47,8 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
         public KeepAliveEndpoint(PluginBase pbase, IReadOnlyDictionary<string, JsonElement> config)
         {
             string? path = config["path"].GetString();
+
+            tokenRegenTime = config["token_refresh_sec"].GetTimeSpan(TimeParseType.Seconds);
 
             InitPathAndLog(path, pbase.Log);
         }
@@ -56,6 +63,24 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
         //Allow post to update user's credentials
         protected override VfReturnType Post(HttpEntity entity)
         {
+            //Get the last token update
+            DateTimeOffset lastTokenUpdate = entity.Session.LastTokenUpgrade();
+
+            //See if its expired
+            if (lastTokenUpdate.Add(tokenRegenTime) < entity.RequestedTimeUtc)
+            {
+                //if so updaet token
+                WebMessage webm = new()
+                {
+                    Token = entity.RegenerateClientToken(),
+                    Success = true
+                };
+                
+                //Send the update message to the client
+                entity.CloseResponse(webm);
+                return VfReturnType.VirtualSkip;
+            }
+
             //Return okay
             entity.CloseResponse(HttpStatusCode.OK);
             return VfReturnType.VirtualSkip;

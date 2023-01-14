@@ -47,7 +47,7 @@ using VNLib.Plugins.Extensions.Loading.Users;
 using VNLib.Plugins.Extensions.Validation;
 using VNLib.Plugins.Extentions.TransactionalEmail;
 using VNLib.Plugins.Essentials.Accounts.Registration.TokenRevocation;
-using static VNLib.Plugins.Essentials.Accounts.AccountManager;
+using static VNLib.Plugins.Essentials.Accounts.AccountUtil;
 
 
 namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
@@ -73,7 +73,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
         private readonly TimeSpan RegExpiresSec;
 
         /// <summary>
-        /// Creates back-end functionality for a "registration" or "sign-up" page that integrates with the <see cref="AccountManager"/> plugin
+        /// Creates back-end functionality for a "registration" or "sign-up" page that integrates with the <see cref="AccountUtil"/> plugin
         /// </summary>
         /// <param name="Path">The path identifier</param>
         /// <exception cref="ArgumentException"></exception>
@@ -186,7 +186,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
                 DateTimeOffset iat = DateTimeOffset.FromUnixTimeSeconds(reg.RootElement.GetProperty("iat").GetInt64());
 
                 //Verify IAT against expiration at second resolution
-                if (webm.Assert(iat.Add(RegExpiresSec) > DateTimeOffset.UtcNow, FAILED_AUTH_ERR))
+                if (webm.Assert(iat.Add(RegExpiresSec) > entity.RequestedTimeUtc, FAILED_AUTH_ERR))
                 {
                     entity.CloseResponse(webm);
                     return VfReturnType.VirtualSkip;
@@ -273,7 +273,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
             }
           
             //Get exact timestamp
-            DateTimeOffset timeStamp = DateTimeOffset.UtcNow;
+            DateTimeOffset timeStamp = entity.RequestedTimeUtc;
 
             //generate random nonce for entropy
             string entropy = EntropyNonce;

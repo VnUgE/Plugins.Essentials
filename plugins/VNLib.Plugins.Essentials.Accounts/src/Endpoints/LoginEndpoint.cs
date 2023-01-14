@@ -44,7 +44,7 @@ using VNLib.Plugins.Essentials.Accounts.Validators;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Users;
 using static VNLib.Plugins.Essentials.Statics;
-using static VNLib.Plugins.Essentials.Accounts.AccountManager;
+using static VNLib.Plugins.Essentials.Accounts.AccountUtil;
 
 
 namespace VNLib.Plugins.Essentials.Accounts.Endpoints
@@ -378,11 +378,14 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
         private static string EncryptSecret(string pubKey, byte[] secret)
         {
             //Alloc buffer for secret
-            using IMemoryHandle<byte> buffer = Memory.SafeAlloc<byte>(4096);
+            using IMemoryHandle<byte> buffer = MemoryUtil.SafeAlloc<byte>(4096);
+            
             //Try to encrypt the data
             ERRNO count = TryEncryptClientData(pubKey, secret, buffer.Span);
+
             //Clear secret
             RandomHash.GetRandomBytes(secret);
+            
             //Convert to base64 string
             return Convert.ToBase64String(buffer.Span[..(int)count]);
         }
@@ -391,11 +394,13 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
         {
             //Recover last counter value
             TimestampedCounter flc = user.FailedLoginCount();
+            
             if(flc.Count < MaxFailedLogins)
             {
                 //Period exceeded
                 return false;
             }
+            
             //See if the flc timeout period has expired
             if (flc.LastModified.Add(FailedCountTimeout) < DateTimeOffset.UtcNow)
             {
@@ -403,6 +408,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 user.FailedLoginCount(0);
                 return false;
             }
+            
             //Count has been exceeded, and has not timed out yet
             return true;
         }

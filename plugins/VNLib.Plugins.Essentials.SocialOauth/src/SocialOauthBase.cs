@@ -238,7 +238,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth
             void ICacheable.Evicted()
             {
                 //Erase nonce
-                Memory.UnsafeZeroMemory(RawNonce);
+                MemoryUtil.UnsafeZeroMemory(RawNonce);
             }
 
             public override bool Equals(object? obj)
@@ -422,11 +422,11 @@ namespace VNLib.Plugins.Essentials.SocialOauth
                 //Generate a new random passowrd incase the user wants to use a local account to log in sometime in the future
                 PrivateString passhash = Config.Passwords.Hash(randomPass);
                 //overwite the password bytes
-                Memory.InitializeBlock(randomPass.AsSpan());
+                MemoryUtil.InitializeBlock(randomPass.AsSpan());
                 try
                 {
                     //Create the user with the specified email address, minimum privilage level, and an empty password
-                    user = await Config.Users.CreateUserAsync(userLogin.UserId!, userAccount.EmailAddress, AccountManager.MINIMUM_LEVEL, passhash, entity.EventCancellation);
+                    user = await Config.Users.CreateUserAsync(userLogin.UserId!, userAccount.EmailAddress, AccountUtil.MINIMUM_LEVEL, passhash, entity.EventCancellation);
                     //Set active status
                     user.Status = UserStatus.Active;
                     //Store the new profile
@@ -570,7 +570,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth
         private string BuildUrl(string base32Nonce, string pubKey, ReadOnlySpan<char> scheme, ReadOnlySpan<char> redirectAuthority, Encoding enc)
         {
             //Char buffer for base32 and url building
-            using UnsafeMemoryHandle<byte> buffer = Memory.UnsafeAlloc<byte>(8192, true);
+            using UnsafeMemoryHandle<byte> buffer = MemoryUtil.UnsafeAlloc<byte>(8192, true);
             //get bin buffer slice
             Span<byte> binBuffer = buffer.Span[1024..];
             
@@ -609,7 +609,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth
             //Encode the url to binary
             int byteCount = enc.GetBytes(url, encodingBuffer);
             //Encrypt the binary
-            ERRNO count = AccountManager.TryEncryptClientData(pubKey, encodingBuffer[..byteCount], in encryptionBuffer);
+            ERRNO count = AccountUtil.TryEncryptClientData(pubKey, encodingBuffer[..byteCount], in encryptionBuffer);
             //base64 encode the encrypted
             return Convert.ToBase64String(encryptionBuffer[0..(int)count]);
         }

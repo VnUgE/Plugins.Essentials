@@ -110,18 +110,18 @@ namespace VNLib.Plugins.Essentials.Accounts
                                 return;
                             }
                             string username = args[uid + 1].Trim();
-                            string randomUserId = AccountManager.GetRandomUserId();
+                            string randomUserId = AccountUtil.GetRandomUserId();
                             //Password as privatestring DANGEROUS to refs
                             using (PrivateString password = (PrivateString)args[pwd + 1].Trim()!)
                             {
                                 //Hash the password
                                 using PrivateString passHash = Passwords.Hash(password);
                                 //Create the user
-                                using IUser user = await Users.CreateUserAsync(randomUserId, username, AccountManager.MINIMUM_LEVEL, passHash);                                
+                                using IUser user = await Users.CreateUserAsync(randomUserId, username, AccountUtil.MINIMUM_LEVEL, passHash);                                
                                 //Set active flag
                                 user.Status = UserStatus.Active;
                                 //Set local account
-                                user.SetAccountOrigin(AccountManager.LOCAL_ACCOUNT_ORIGIN);
+                                user.SetAccountOrigin(AccountUtil.LOCAL_ACCOUNT_ORIGIN);
 
                                 await user.ReleaseAsync();
                             }

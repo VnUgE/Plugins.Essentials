@@ -112,7 +112,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
                 return false;
             }
             //Alloc buffer with zero o
-            using UnsafeMemoryHandle<byte> buffer = Memory.UnsafeAlloc<byte>(base32Secret.Length, true);
+            using UnsafeMemoryHandle<byte> buffer = MemoryUtil.UnsafeAlloc<byte>(base32Secret.Length, true);
             ERRNO count = VnEncoding.TryFromBase32Chars(base32Secret, buffer);
             //Verify the TOTP using the decrypted secret
             return count && VerifyTOTP(code, buffer.AsSpan(0, count), config);
@@ -273,9 +273,11 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
             //Verifies a jwt stored signature against the actual signature
             static bool VerifyStoredSig(ReadOnlySpan<char> base64string, ReadOnlySpan<byte> signature)
             {
-                using UnsafeMemoryHandle<byte> buffer = Memory.UnsafeAlloc<byte>(base64string.Length, true);
+                using UnsafeMemoryHandle<byte> buffer = MemoryUtil.UnsafeAlloc<byte>(base64string.Length, true);
+
                 //Recover base64
                 ERRNO count = VnEncoding.TryFromBase64Chars(base64string, buffer.Span);
+                
                 //Compare
                 return CryptographicOperations.FixedTimeEquals(signature, buffer.Span[..(int)count]);
             }
@@ -300,8 +302,10 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
             
             //get request body
             using JsonDocument doc = jwt.GetPayload();
+            
             //Recover issued at time
             DateTimeOffset iat = DateTimeOffset.FromUnixTimeMilliseconds(doc.RootElement.GetProperty("iat").GetInt64());
+
             //Verify its not timed out
             if (iat.Add(config.UpgradeValidFor) < DateTimeOffset.UtcNow)
             {
