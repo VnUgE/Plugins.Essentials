@@ -1,15 +1,18 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <Nullable>enable</Nullable>
     <TargetFramework>net6.0</TargetFramework>
     <Authors>Vaughn Nugent</Authors>
     <Product>SocialOauth</Product>
     <Version>1.0.1.5</Version>
-    <Copyright>Copyright © 2022 Vaughn Nugent</Copyright>
+    <Copyright>Copyright © 2023 Vaughn Nugent</Copyright>
     <PackageProjectUrl>https://www.vaughnnugent.com/resources</PackageProjectUrl>
     <AssemblyName>SocialOauth</AssemblyName>
     <SignAssembly>True</SignAssembly>
+    <GenerateDocumentationFile>False</GenerateDocumentationFile>
     <AssemblyOriginatorKeyFile>\\vaughnnugent.com\Internal\Folder Redirection\vman\Documents\Programming\Software\StrongNameingKey.snk</AssemblyOriginatorKeyFile>
+    <AnalysisLevel>latest-all</AnalysisLevel>
   </PropertyGroup>
 
   <ItemGroup>
@@ -27,9 +30,7 @@
   <PropertyGroup>
     <!--Enable dynamic loading-->
     <EnableDynamicLoading>true</EnableDynamicLoading>
-    <Nullable>enable</Nullable>
-    <GenerateDocumentationFile>False</GenerateDocumentationFile>
-    <AnalysisLevel>latest-all</AnalysisLevel>
+    <CopyLocalFileLockAssemblies></CopyLocalFileLockAssemblies>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\..\core\lib\Net.Rest.Client\src\VNLib.Net.Rest.Client.csproj" />
@@ -39,14 +40,8 @@
     <ProjectReference Include="..\..\..\..\Extensions\lib\VNLib.Plugins.Extensions.Validation\src\VNLib.Plugins.Extensions.Validation.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <None Update="SocialOauth.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
-
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="start xcopy &quot;$(TargetDir)&quot; &quot;F:\Programming\vnlib\devplugins\$(TargetName)&quot; /E /Y /R" />
+    <Exec Command="start xcopy &quot;$(TargetDir)&quot; &quot;..\..\..\..\..\devplugins\$(TargetName)&quot; /E /Y /R" />
   </Target>
 
 </Project>

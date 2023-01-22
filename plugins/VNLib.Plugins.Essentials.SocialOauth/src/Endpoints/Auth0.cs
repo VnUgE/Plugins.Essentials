@@ -50,7 +50,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth.Endpoints
         protected override OauthClientConfig Config { get; }
 
 
-        private readonly Task<JsonDocument> Auth0VerificationJwk;
+        private readonly Task<ReadOnlyJsonWebKey[]> Auth0VerificationJwk;
 
         public Auth0(PluginBase plugin, IReadOnlyDictionary<string, JsonElement> config) : base()
         {
@@ -88,7 +88,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth.Endpoints
         }
 
 
-        private async Task<JsonDocument> GetRsaCertificate(Uri certUri)
+        private async Task<ReadOnlyJsonWebKey[]> GetRsaCertificate(Uri certUri)
         {
             try
             {
@@ -98,13 +98,27 @@ namespace VNLib.Plugins.Essentials.SocialOauth.Endpoints
                 keyRequest.AddHeader("Accept", "application/json");
 
                 //rent client from pool
-                using ClientContract client = ClientPool.Lease();
-
-                RestResponse response = await client.Resource.ExecuteAsync(keyRequest);
+                RestResponse response;
+                
+                using (ClientContract client = ClientPool.Lease())
+                {
+                    response = await client.Resource.ExecuteAsync(keyRequest);
+                }
 
                 response.ThrowIfError();
 
-                return JsonDocument.Parse(response.RawBytes);
+                //Get response as doc
+                using JsonDocument doc = JsonDocument.Parse(response.RawBytes);
+
+                //Create a new jwk from each key element in the response
+                ReadOnlyJsonWebKey[] keys = doc.RootElement.GetProperty("keys")
+                                            .EnumerateArray()
+                                            .Select(static k => new ReadOnlyJsonWebKey(k))
+                                            .ToArray();
+
+                Log.Debug("Found {count} Auth0 signing keys", keys.Length);
+
+                return keys;
             }
             catch (Exception e)
             {
@@ -159,7 +173,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth.Endpoints
             using JsonWebToken jwt = JsonWebToken.Parse(clientAccess.IdToken);
 
             //Verify the token against the first signing key
-            if (!jwt.VerifyFromJwk(Auth0VerificationJwk.Result.RootElement.GetProperty("keys").EnumerateArray().First()))
+            if (!jwt.VerifyFromJwk(Auth0VerificationJwk.Result[0]))
             {
                 return EmptyLoginData;
             }

@@ -139,6 +139,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth
             {
                 return false;
             }
+            
             /*
              * Cross site checking is disabled because we need to allow cross site
              * for OAuth2 redirect flows
@@ -147,12 +148,9 @@ namespace VNLib.Plugins.Essentials.SocialOauth
             {
                 return false;
             }
+            
             //Make sure the user is not logged in
-            if(entity.LoginCookieMatches() || entity.TokenMatches())
-            {
-                return false;
-            }
-            return true;
+            return !(entity.LoginCookieMatches() || entity.TokenMatches());
         }
 
         /// <summary>
@@ -219,7 +217,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth
         /// <returns></returns>
         protected abstract Task<UserLoginData?> GetLoginDataAsync(IOAuthAccessState clientAccess, CancellationToken cancellation);
 
-        class LoginClaim : ICacheable, INonce
+        sealed class LoginClaim : ICacheable, INonce
         {
             [JsonPropertyName("public_key")]
             public string? PublicKey { get; set; }
@@ -282,12 +280,14 @@ namespace VNLib.Plugins.Essentials.SocialOauth
                     entity.Redirect(RedirectType.Temporary, $"{Path}?result=bad_sec");
                     return VfReturnType.VirtualSkip;
                 }
+                
                 //Try to get the claim from the state parameter
                 if (ClaimStore.TryGetOrEvictRecord(state, out LoginClaim? claim) < 1)
                 {
                     entity.Redirect(RedirectType.Temporary, $"{Path}?result=expired");
                     return VfReturnType.VirtualSkip;
                 }
+                
                 //Lock on the claim to prevent replay
                 lock (claim)
                 {
@@ -302,17 +302,21 @@ namespace VNLib.Plugins.Essentials.SocialOauth
                         return VfReturnType.VirtualSkip;
                     }
                 }
+                
                 //Exchange the OAuth code for a token (application specific)
                 OAuthAccessState? token = await ExchangeCodeForTokenAsync(entity, code, entity.EventCancellation);
+                
                 //Token may be null
                 if(token == null)
                 {
                     entity.Redirect(RedirectType.Temporary, $"{Path}?result=invalid");
                     return VfReturnType.VirtualSkip;
                 }
+                
                 //Store claim info
                 token.PublicKey = claim.PublicKey;
                 token.ClientId = claim.ClientId;
+                
                 //Generate the new nonce
                 string nonce = token.ComputeNonce((int)Config.NonceByteSize);
                 //Collect expired records
@@ -323,6 +327,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth
                 entity.Redirect(RedirectType.Temporary, $"{Path}?result=authorized&nonce={nonce}");
                 return VfReturnType.VirtualSkip;
             }
+            
             //Check to see if there was an error code set
             if (entity.QueryArgs.TryGetNonEmptyValue("error", out string? errorCode))
             {
@@ -330,6 +335,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth
                 entity.Redirect(RedirectType.Temporary, $"{Path}?result=error");
                 return VfReturnType.VirtualSkip;
             }
+            
             return VfReturnType.ProcessAsFile;
         }
 
@@ -340,13 +346,16 @@ namespace VNLib.Plugins.Essentials.SocialOauth
         protected override async ValueTask<VfReturnType> PostAsync(HttpEntity entity)
         {
             ValErrWebMessage webm = new();
+            
             //Get the finalization message
             using JsonDocument? request = await entity.GetJsonFromFileAsync();
+            
             if (webm.Assert(request != null, "Request message is required"))
             {
                 entity.CloseResponseJson(HttpStatusCode.BadRequest, webm);
                 return VfReturnType.VirtualSkip;
             }
+            
             //Recover the nonce
             string? base32Nonce = request.RootElement.GetPropString("nonce");
             if(webm.Assert(base32Nonce != null, message: "Nonce parameter is required"))
@@ -354,12 +363,14 @@ namespace VNLib.Plugins.Essentials.SocialOauth
                 entity.CloseResponseJson(HttpStatusCode.UnprocessableEntity, webm);
                 return VfReturnType.VirtualSkip;
             }
+            
             //Validate nonce
             if (!NonceValidator.Validate(base32Nonce, webm))
             {
                 entity.CloseResponseJson(HttpStatusCode.UnprocessableEntity, webm);
                 return VfReturnType.VirtualSkip;
             }
+            
             //Recover the access token
             if (AuthorizationStore.TryGetOrEvictRecord(base32Nonce!, out OAuthAccessState? token) < 1)
             {
@@ -367,6 +378,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth
                 entity.CloseResponse(webm);
                 return VfReturnType.VirtualSkip;
             }
+            
             bool valid;
             //Valid token, now verify the nonce within the locked context
             lock (token)
@@ -375,6 +387,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth
                 //Evict (wipes nonce)
                 AuthorizationStore.EvictRecord(base32Nonce!);
             }
+            
             if (webm.Assert(valid, AUTH_ERROR_MESSAGE))
             {
                 entity.CloseResponse(webm);
@@ -546,12 +559,16 @@ namespace VNLib.Plugins.Essentials.SocialOauth
             
             //Cleanup old records
             ClaimStore.CollectRecords();
+            
             //Set nonce
             string base32Nonce = claim.ComputeNonce((int)Config.NonceByteSize);
+            
             //build the redirect url
             webm.Result = BuildUrl(base32Nonce, claim.PublicKey!, entity.IsSecure ? "https" : "http", entity.Server.RequestUri.Authority, entity.Server.Encoding);
+            
             //Store the claim
             ClaimStore.StoreRecord(base32Nonce, claim, Config.LoginNonceLifetime);
+            
             webm.Success = true;
             //Response
             entity.CloseResponse(webm);
@@ -573,11 +590,12 @@ namespace VNLib.Plugins.Essentials.SocialOauth
             using UnsafeMemoryHandle<byte> buffer = MemoryUtil.UnsafeAlloc<byte>(8192, true);
             //get bin buffer slice
             Span<byte> binBuffer = buffer.Span[1024..];
+            Span<byte> charBuffer = buffer.Span[..1024];
             
             ReadOnlySpan<char> url;
             {
                 //Get char buffer slice and cast to char
-                Span<char> charBuf = MemoryMarshal.Cast<byte, char>(buffer.Span[..1024]);
+                Span<char> charBuf = MemoryMarshal.Cast<byte, char>(charBuffer);
                 //buffer writer for easier syntax
                 ForwardOnlyWriter<char> writer = new(charBuf);
                 //first build the redirect url to re-encode it
