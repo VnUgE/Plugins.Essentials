@@ -211,7 +211,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
                 MFAConfig mfa = new(conf);
 
                 //Recover secret from config and dangerous 'lazy load'
-                _ = pbase.DeferTask(async () =>
+                _ = pbase.ObserveTask(async () =>
                 {
                     mfa.MFASecret = await pbase.TryGetSecretAsync("mfa_secret").ToJsonWebKey();
 

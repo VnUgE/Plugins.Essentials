@@ -57,7 +57,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth.Endpoints
             InitPathAndLog(Config.EndpointPath, plugin.Log);
 
             //Load secrets
-            _ = plugin.DeferTask(async () =>
+            _ = plugin.ObserveTask(async () =>
             {
                 //Get id/secret
                 Task<SecretResult?> clientIdTask = plugin.TryGetSecretAsync("discord_client_id");

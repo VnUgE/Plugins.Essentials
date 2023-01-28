@@ -66,16 +66,19 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             ValErrWebMessage webm = new();
             //get the request body
             using JsonDocument? request = await entity.GetJsonFromFileAsync();
+
             if (request == null)
             {
                 webm.Result = "No request specified";
                 entity.CloseResponseJson(HttpStatusCode.BadRequest, webm);
                 return VfReturnType.VirtualSkip;
             }
+
             //get the user's old password
             using PrivateString? currentPass = (PrivateString?)request.RootElement.GetPropString("current");
             //Get password as a private string
             using PrivateString? newPass = (PrivateString?)request.RootElement.GetPropString("new_password");
+
             if (PrivateString.IsNullOrEmpty(currentPass))
             {
                 webm.Result = "You must specifiy your current password.";
@@ -88,6 +91,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 entity.CloseResponseJson(HttpStatusCode.UnprocessableEntity, webm);
                 return VfReturnType.VirtualSkip;
             }
+
             //Test the password against minimum
             if (!AccountValidations.PasswordValidator.Validate((string)newPass, webm))
             {
@@ -99,6 +103,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 entity.CloseResponse(webm);
                 return VfReturnType.VirtualSkip;
             }
+
             //get the user's entry in the table
             using IUser?  user = await Users.GetUserAndPassFromIDAsync(entity.Session.UserID);
             if(webm.Assert(user != null, "An error has occured, please log-out and try again"))
