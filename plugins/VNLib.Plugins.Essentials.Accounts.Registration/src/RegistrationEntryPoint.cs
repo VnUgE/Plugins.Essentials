@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2022 Vaughn Nugent
+* Copyright (c) 2023 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts.Registration
@@ -25,7 +25,6 @@
 using VNLib.Utils.Logging;
 
 using VNLib.Plugins.Extensions.Loading;
-using VNLib.Plugins.Extensions.Loading.Sql;
 using VNLib.Plugins.Extensions.Loading.Routing;
 using VNLib.Plugins.Essentials.Accounts.Registration.Endpoints;
 
@@ -37,18 +36,11 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration
 
         protected override void OnLoad()
         {
-            try
-            {
                 //Route reg endpoint
                 this.Route<RegistrationEntpoint>();
 
                 Log.Information("Plugin loaded");
             }
-            catch(KeyNotFoundException kne)
-            {
-                Log.Error("Missing required configuration variables: {ex}", kne.Message);
-            }
-        }
         
         protected override void OnUnLoad()
         {

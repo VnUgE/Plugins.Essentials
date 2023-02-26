@@ -7,17 +7,15 @@
     <RootNamespace>VNLib.Plugins.Essentials.Accounts.Registration</RootNamespace>
     <AssemblyName>Essentials.EmailRegistration</AssemblyName>
     <GenerateDocumentationFile>False</GenerateDocumentationFile>
-    <Copyright>Copyright © 2023 Vaughn Nugent</Copyright>
-    <PackageProjectUrl>https://www.vaughnnugent.com/resources</PackageProjectUrl>
-    <ProduceReferenceAssembly>False</ProduceReferenceAssembly>
-    <SignAssembly>False</SignAssembly>
-    <AssemblyVersion>1.0.0.1</AssemblyVersion>
     <AnalysisLevel>latest-all</AnalysisLevel>
+    
+    <!--Enable dynamic loading-->
+    <EnableDynamicLoading>true</EnableDynamicLoading>
   </PropertyGroup>
 
   <PropertyGroup>
     <Title>VNLib.Plugins.Essentials.Accounts.Registration</Title>
-    <PackageId>VNLib.Net.Http</PackageId>
+    <PackageId>VNLib.Plugins.Essentials.Accounts.Registration</PackageId>
     <Authors>Vaughn Nugent</Authors>
     <Company>Vaughn Nugent</Company>
     <Product>Essentials email registration plugin</Product>
@@ -29,11 +27,6 @@
     <RepositoryUrl>https://github.com/VnUgE/Plugins.Essentials/tree/master/plugins/VNLib.Plugins.Essentials.Accounts.Registration</RepositoryUrl>
   </PropertyGroup>
 
-  <!-- Resolve nuget dll files and store them in the output dir -->
-  <PropertyGroup>
-    <!--Enable dynamic loading-->
-    <EnableDynamicLoading>true</EnableDynamicLoading>
-  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
     <Deterministic>False</Deterministic>
   </PropertyGroup>
