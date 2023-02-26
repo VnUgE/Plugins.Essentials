@@ -5,17 +5,17 @@
     <TargetFramework>net6.0</TargetFramework>
     <RootNamespace>VNLib.Plugins.Essentials.Accounts</RootNamespace>
     <AssemblyName>Essentials.Accounts</AssemblyName>
-    <PackageId>VNLib.Plugins.Essentials.Accounts</PackageId>
-    <Version>1.0.1.5</Version>
-    <SignAssembly>True</SignAssembly>
-    <AssemblyOriginatorKeyFile>\\vaughnnugent.com\Internal\Folder Redirection\vman\Documents\Programming\Software\StrongNameingKey.snk</AssemblyOriginatorKeyFile>
     <AnalysisLevel>latest-all</AnalysisLevel>
   </PropertyGroup>
 
   <PropertyGroup>
-    <Copyright>Copyright © 2023 Vaughn Nugent</Copyright>
+    <PackageId>VNLib.Plugins.Essentials.Accounts</PackageId>
     <Authors>Vaughn Nugent</Authors>
-    <PackageProjectUrl>https://www.vaughnnugent.com/resources</PackageProjectUrl>
+    <Company>Vaughn Nugent</Company>
+    <Product>essentials user accounts an web authentication plugin</Product>
+    <Copyright>Copyright © 2023 Vaughn Nugent</Copyright>
+    <PackageProjectUrl>https://www.vaughnnugent.com/resources/software/modules/Plugins.Essentials</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/VnUgE/Plugins.Essentials/tree/master/plugins/VNLib.Plugins.Essentials.Accounts</RepositoryUrl>
     <Description>
       Essentials.Accounts dynamically loadable IPlugin library for working with user accounts.
     </Description>
@@ -42,7 +42,7 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="FluentValidation" Version="11.4.0" />
+    <PackageReference Include="FluentValidation" Version="11.5.1" />
   </ItemGroup>
 
   <ItemGroup>

@@ -3,18 +3,28 @@
   <PropertyGroup>
     <Nullable>enable</Nullable>
     <TargetFramework>net6.0</TargetFramework>
-    <Authors>Vaughn Nugent</Authors>
-    <Product>SocialOauth</Product>
-    <Version>1.0.1.5</Version>
-    <Copyright>Copyright © 2023 Vaughn Nugent</Copyright>
-    <PackageProjectUrl>https://www.vaughnnugent.com/resources</PackageProjectUrl>
+    <RootNamespace>VNLib.Plugins.Essentials.SocialOauth</RootNamespace>
     <AssemblyName>SocialOauth</AssemblyName>
-    <SignAssembly>True</SignAssembly>
-    <GenerateDocumentationFile>False</GenerateDocumentationFile>
-    <AssemblyOriginatorKeyFile>\\vaughnnugent.com\Internal\Folder Redirection\vman\Documents\Programming\Software\StrongNameingKey.snk</AssemblyOriginatorKeyFile>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
     <AnalysisLevel>latest-all</AnalysisLevel>
+    <NeutralLanguage>en-US</NeutralLanguage>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <PackageId>VNLib.Plugins.Essentials.SocialOauth</PackageId>
+    <Authors>Vaughn Nugent</Authors>
+    <Company>Vaughn Nugent</Company>
+    <Product>A basic external OAuth2 authentication plugin.</Product>
+    <Copyright>Copyright © 2023 Vaughn Nugent</Copyright>
+    <PackageProjectUrl>https://www.vaughnnugent.com/resources/software/modules/Plugins.Essentials</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/VnUgE/Plugins.Essentials/tree/master/plugins/VNLib.Plugins.Essentials.SocialOauth</RepositoryUrl>
+    <Description>
+      Essentials framework plugin for common OAuth2 web-based client authentication. Currently implements GitHub, Discord, and Auth0
+      authentication flows.
+    </Description>
+  </PropertyGroup>
+  
   <ItemGroup>
     <PackageReference Include="ErrorProne.NET.CoreAnalyzers" Version="0.1.2">
       <PrivateAssets>all</PrivateAssets>
@@ -26,12 +36,6 @@
     </PackageReference>
   </ItemGroup>
 
-  <!-- Resolve nuget dll files and store them in the output dir -->
-  <PropertyGroup>
-    <!--Enable dynamic loading-->
-    <EnableDynamicLoading>true</EnableDynamicLoading>
-    <CopyLocalFileLockAssemblies></CopyLocalFileLockAssemblies>
-  </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\..\core\lib\Net.Rest.Client\src\VNLib.Net.Rest.Client.csproj" />
     <ProjectReference Include="..\..\..\..\..\core\lib\Plugins.Essentials\src\VNLib.Plugins.Essentials.csproj" />

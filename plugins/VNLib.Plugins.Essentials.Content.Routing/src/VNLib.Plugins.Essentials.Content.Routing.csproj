@@ -3,21 +3,27 @@
   <PropertyGroup>
     <Nullable>enable</Nullable>
     <TargetFramework>net6.0</TargetFramework>
-    <Authors>Vaughn Nugent</Authors>
-    <Version>1.0.1.1</Version>
-    <Copyright>Copyright © 2023 Vaughn Nugent</Copyright>
-    <PackageProjectUrl>https://www.vaughnnugent.com</PackageProjectUrl>
+    <RootNamespace>VNLib.Plugins.Essentials.Content.Routing</RootNamespace>
     <AssemblyName>PageRouter</AssemblyName>
-    <SignAssembly>True</SignAssembly>
-    <AssemblyOriginatorKeyFile>\\vaughnnugent.com\Internal\Folder Redirection\vman\Documents\Programming\Software\StrongNameingKey.snk</AssemblyOriginatorKeyFile>
+    <NeutralLanguage>en-US</NeutralLanguage>
     <AnalysisLevel>latest-all</AnalysisLevel>
-  </PropertyGroup>
-
-  <!-- Resolve nuget dll files and store them in the output dir -->
-  <PropertyGroup>
     <!--Enable dynamic loading-->
     <EnableDynamicLoading>true</EnableDynamicLoading>
   </PropertyGroup>
+
+  <PropertyGroup>
+    <PackageId>VNLib.Net.Http</PackageId>
+    <Authors>Vaughn Nugent</Authors>
+    <Company>Vaughn Nugent</Company>
+    <Product>Essentials SQL backed dynamic page router</Product>
+    <Description>
+      An essetials framework IPageRouter dynamic page routing implementation
+    </Description>
+    <Copyright>Copyright © 2023 Vaughn Nugent</Copyright>
+    <PackageProjectUrl>https://www.vaughnnugent.com/resources/software/modules/Plugins.Essentials</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/VnUgE/Plugins.Essentials/tree/master/plugins/VNLib.Plugins.Essentials.Content.Routing</RepositoryUrl>
+  </PropertyGroup>
+
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
     <Deterministic>False</Deterministic>
   </PropertyGroup>

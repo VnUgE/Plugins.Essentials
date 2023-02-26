@@ -4,19 +4,29 @@
     <TargetFramework>net6.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <RootNamespace>VNLib.Plugins.Essentials.Accounts.Registration</RootNamespace>
+    <AssemblyName>Essentials.EmailRegistration</AssemblyName>
     <GenerateDocumentationFile>False</GenerateDocumentationFile>
-    <Title>VNLib.Plugins.Essentials.Accounts.Registration</Title>
-    <Authors>Vaughn Nugent</Authors>
     <Copyright>Copyright © 2023 Vaughn Nugent</Copyright>
     <PackageProjectUrl>https://www.vaughnnugent.com/resources</PackageProjectUrl>
     <ProduceReferenceAssembly>False</ProduceReferenceAssembly>
     <SignAssembly>False</SignAssembly>
     <AssemblyVersion>1.0.0.1</AssemblyVersion>
-    <AssemblyName>Essentials.EmailRegistration</AssemblyName>
-    <CheckForOverflowUnderflow>False</CheckForOverflowUnderflow>
-    <SignAssembly>True</SignAssembly>
-    <AssemblyOriginatorKeyFile>\\vaughnnugent.com\Internal\Folder Redirection\vman\Documents\Programming\Software\StrongNameingKey.snk</AssemblyOriginatorKeyFile>
     <AnalysisLevel>latest-all</AnalysisLevel>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Title>VNLib.Plugins.Essentials.Accounts.Registration</Title>
+    <PackageId>VNLib.Net.Http</PackageId>
+    <Authors>Vaughn Nugent</Authors>
+    <Company>Vaughn Nugent</Company>
+    <Product>Essentials email registration plugin</Product>
+    <Description>
+      *An essentials plugin that provides endpoints for registering, local user accounts via transactional emails
+    </Description>
+    <Copyright>Copyright © 2023 Vaughn Nugent</Copyright>
+    <PackageProjectUrl>https://www.vaughnnugent.com/resources/software/modules/Plugins.Essentials</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/VnUgE/Plugins.Essentials/tree/master/plugins/VNLib.Plugins.Essentials.Accounts.Registration</RepositoryUrl>
   </PropertyGroup>
 
   <!-- Resolve nuget dll files and store them in the output dir -->
@@ -31,7 +41,7 @@
     <Deterministic>False</Deterministic>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="FluentValidation" Version="11.4.0" />
+    <PackageReference Include="FluentValidation" Version="11.5.1" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\..\core\lib\Plugins.Essentials\src\VNLib.Plugins.Essentials.csproj" />
