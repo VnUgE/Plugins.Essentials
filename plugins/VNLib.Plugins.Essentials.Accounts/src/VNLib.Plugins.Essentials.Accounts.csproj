@@ -6,13 +6,14 @@
     <RootNamespace>VNLib.Plugins.Essentials.Accounts</RootNamespace>
     <AssemblyName>Essentials.Accounts</AssemblyName>
     <AnalysisLevel>latest-all</AnalysisLevel>
+    <NeutralLanguage>en-US</NeutralLanguage>
   </PropertyGroup>
 
   <PropertyGroup>
     <PackageId>VNLib.Plugins.Essentials.Accounts</PackageId>
     <Authors>Vaughn Nugent</Authors>
     <Company>Vaughn Nugent</Company>
-    <Product>essentials user accounts an web authentication plugin</Product>
+    <Product>Essentials user accounts an web authentication plugin</Product>
     <Copyright>Copyright © 2023 Vaughn Nugent</Copyright>
     <PackageProjectUrl>https://www.vaughnnugent.com/resources/software/modules/Plugins.Essentials</PackageProjectUrl>
     <RepositoryUrl>https://github.com/VnUgE/Plugins.Essentials/tree/master/plugins/VNLib.Plugins.Essentials.Accounts</RepositoryUrl>
