@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2022 Vaughn Nugent
+* Copyright (c) 2023 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
@@ -24,8 +24,6 @@
 
 using System;
 using System.Net;
-using System.Text.Json;
-using System.Collections.Generic;
 
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Essentials.Endpoints;
@@ -36,7 +34,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
     internal class LogoutEndpoint : ProtectedWebEndpoint
     {
         
-        public LogoutEndpoint(PluginBase pbase, IReadOnlyDictionary<string, JsonElement> config)
+        public LogoutEndpoint(PluginBase pbase, IConfigScope config)
         {
             string? path = config["path"].GetString();
             InitPathAndLog(path, pbase.Log);

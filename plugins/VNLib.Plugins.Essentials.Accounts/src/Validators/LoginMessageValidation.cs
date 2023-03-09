@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2022 Vaughn Nugent
+* Copyright (c) 2023 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
@@ -35,7 +35,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Validators
     {
         public LoginMessageValidation()
         {
-            RuleFor(static t => t.ClientID)
+            RuleFor(static t => t.ClientId)
                 .Length(min: 10, max: 100)
                 .WithMessage(errorMessage: "Your browser is not sending required security information");
 

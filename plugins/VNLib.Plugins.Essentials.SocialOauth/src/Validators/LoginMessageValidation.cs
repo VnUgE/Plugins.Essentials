@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2022 Vaughn Nugent
+* Copyright (c) 2023 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.SocialOauth
@@ -40,12 +40,16 @@ namespace VNLib.Plugins.Essentials.SocialOauth.Validators
          */
         public LoginMessageValidation()
         {
-            RuleFor(t => t.ClientID)
+            RuleFor(t => t.ClientId)
                 .Length(10, 50)
-                 .WithMessage("Your browser is not sending required security information");
+                .WithMessage("Your browser is not sending required security information")
+                .IllegalCharacters()
+                .WithMessage("Your browser is not sending required security information");
 
             RuleFor(t => t.ClientPublicKey)
-             .NotEmpty()
+             .Length (50, 1000)
+             .WithMessage("Your browser is not sending required security information")
+             .IllegalCharacters()
              .WithMessage("Your browser is not sending required security information");
 
             //Password is only used for nonce tokens
@@ -53,8 +57,9 @@ namespace VNLib.Plugins.Essentials.SocialOauth.Validators
 
             RuleFor(t => t.LocalLanguage)
                 .NotEmpty()
+                .WithMessage("Your language is not supported")
+                .AlphaNumericOnly()
                 .WithMessage("Your language is not supported");
-            RuleFor(t => t.LocalLanguage).AlphaNumericOnly();
         }
     }
 }

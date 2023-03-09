@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2022 Vaughn Nugent
+* Copyright (c) 2023 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.SocialOauth
@@ -24,7 +24,6 @@
 
 using System;
 using System.Linq;
-using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -32,13 +31,13 @@ using System.Collections.Generic;
 
 using RestSharp;
 
-using VNLib.Net.Rest.Client;
 using VNLib.Hashing;
 using VNLib.Hashing.IdentityUtility;
 using VNLib.Utils.Logging;
+using VNLib.Net.Rest.Client;
 using VNLib.Plugins.Essentials.Accounts;
 using VNLib.Plugins.Extensions.Loading;
-using VNLib.Plugins.Extensions.Loading.Users;
+
 
 namespace VNLib.Plugins.Essentials.SocialOauth.Endpoints
 {
@@ -46,13 +45,9 @@ namespace VNLib.Plugins.Essentials.SocialOauth.Endpoints
     [ConfigurationName("auth0")]
     internal sealed class Auth0 : SocialOauthBase
     {
-
-        protected override OauthClientConfig Config { get; }
-
-
         private readonly Task<ReadOnlyJsonWebKey[]> Auth0VerificationJwk;
 
-        public Auth0(PluginBase plugin, IReadOnlyDictionary<string, JsonElement> config) : base()
+        public Auth0(PluginBase plugin, IConfigScope config) : base(plugin, config)
         {
             string keyUrl = config["key_url"].GetString() ?? throw new KeyNotFoundException("Missing Auth0 'key_url' from config");
 
@@ -60,31 +55,6 @@ namespace VNLib.Plugins.Essentials.SocialOauth.Endpoints
 
             //Get certificate on background thread
             Auth0VerificationJwk = Task.Run(() => GetRsaCertificate(keyUri));
-
-            Config = new("auth0", config)
-            {
-                Passwords = plugin.GetPasswords(),
-                Users = plugin.GetUserManager(),
-            };
-
-            InitPathAndLog(Config.EndpointPath, plugin.Log);
-
-            //Load secrets
-            _ = plugin.ObserveTask(async () =>
-            {
-                //Get id/secret
-                Task<SecretResult?> secretTask = plugin.TryGetSecretAsync("auth0_client_secret");
-                Task<SecretResult?> clientIdTask = plugin.TryGetSecretAsync("auth0_client_id");
-
-                await Task.WhenAll(secretTask, clientIdTask);
-
-                using SecretResult? secret = await secretTask;
-                using SecretResult? clientId = await clientIdTask;
-
-                Config.ClientID = clientId?.Result.ToString() ?? throw new KeyNotFoundException("Missing Auth0 client id from config or vault");
-                Config.ClientSecret = secret?.Result.ToString() ?? throw new KeyNotFoundException("Missing the Auth0 client secret from config or vault");
-               
-            }, 100);
         }
 
 

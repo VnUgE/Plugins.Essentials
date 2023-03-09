@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2022 Vaughn Nugent
+* Copyright (c) 2023 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
@@ -24,9 +24,8 @@
 
 using System;
 using System.Net;
-using System.Text.Json;
 using System.Threading.Tasks;
-using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 using FluentValidation;
 
@@ -38,9 +37,21 @@ using VNLib.Plugins.Extensions.Validation;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Users;
 using VNLib.Plugins.Essentials.Endpoints;
+using VNLib.Plugins.Essentials.Accounts.MFA;
+
 
 namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 {
+
+    /*
+     * SECURITY NOTES:
+     * 
+     * If no MFA configuration is loaded for this plugin, users will
+     * be permitted to change passwords without thier 2nd factor. 
+     * 
+     * This decision was made to allow users with MFA enabled from a previous
+     * config to change their passwords rather than deny them the ability.
+     */
 
     /// <summary>
     /// Password reset for user's that are logged in and know 
@@ -50,82 +61,114 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
     internal sealed class PasswordChangeEndpoint : ProtectedWebEndpoint
     {
         private readonly IUserManager Users;
-        private readonly PasswordHashing Passwords;
+        private readonly IPasswordHashingProvider Passwords;
+        private readonly MFAConfig? mFAConfig;
+        private readonly IValidator<PasswordResetMesage> ResetMessValidator;
 
-        public PasswordChangeEndpoint(PluginBase pbase, IReadOnlyDictionary<string, JsonElement> config)
+        public PasswordChangeEndpoint(PluginBase pbase, IConfigScope config)
         {
             string? path = config["path"].GetString();
             InitPathAndLog(path, pbase.Log);
 
-            Users = pbase.GetUserManager();
+            Users = pbase.GetOrCreateSingleton<UserManager>();
             Passwords = pbase.GetPasswords();
+            ResetMessValidator = GetMessageValidator();
+            mFAConfig = pbase.GetConfigElement<MFAConfig>();
         }
+
+        private static IValidator<PasswordResetMesage> GetMessageValidator()
+        {
+            InlineValidator<PasswordResetMesage> rules = new();
+
+            rules.RuleFor(static pw => pw.Current)
+                .NotEmpty()
+                .WithMessage("You must specify your current password")
+                .Length(8, 100);
+
+            //Use centralized password validator for new passwords
+            rules.RuleFor(static pw => pw.NewPassword)
+                .NotEmpty()
+                .NotEqual(static pm => pm.Current)
+                .WithMessage("Your new password may not equal your new current password")
+                .SetValidator(AccountValidations.PasswordValidator!);
+
+            return rules;
+        }
+
+        /*
+         * If mfa config
+         */
 
         protected override async ValueTask<VfReturnType> PostAsync(HttpEntity entity)
         {
             ValErrWebMessage webm = new();
             //get the request body
-            using JsonDocument? request = await entity.GetJsonFromFileAsync();
+            using PasswordResetMesage? pwReset = await entity.GetJsonFromFileAsync<PasswordResetMesage>();
 
-            if (request == null)
+            if (webm.Assert(pwReset != null, "No request specified"))
             {
-                webm.Result = "No request specified";
                 entity.CloseResponseJson(HttpStatusCode.BadRequest, webm);
                 return VfReturnType.VirtualSkip;
             }
 
-            //get the user's old password
-            using PrivateString? currentPass = (PrivateString?)request.RootElement.GetPropString("current");
-            //Get password as a private string
-            using PrivateString? newPass = (PrivateString?)request.RootElement.GetPropString("new_password");
-
-            if (PrivateString.IsNullOrEmpty(currentPass))
-            {
-                webm.Result = "You must specifiy your current password.";
-                entity.CloseResponseJson(HttpStatusCode.UnprocessableEntity, webm);
-                return VfReturnType.VirtualSkip;
-            }
-            if (PrivateString.IsNullOrEmpty(newPass))
-            {
-                webm.Result = "You must specifiy a new password.";
-                entity.CloseResponseJson(HttpStatusCode.UnprocessableEntity, webm);
-                return VfReturnType.VirtualSkip;
-            }
-
-            //Test the password against minimum
-            if (!AccountValidations.PasswordValidator.Validate((string)newPass, webm))
-            {
-                entity.CloseResponse(webm);
-                return VfReturnType.VirtualSkip;
-            }
-            if (webm.Assert(!currentPass.Equals(newPass), "Passwords cannot be the same."))
+            //Validate
+            if(!ResetMessValidator.Validate(pwReset, webm))
             {
                 entity.CloseResponse(webm);
                 return VfReturnType.VirtualSkip;
             }
 
             //get the user's entry in the table
-            using IUser?  user = await Users.GetUserAndPassFromIDAsync(entity.Session.UserID);
+            using IUser? user = await Users.GetUserAndPassFromIDAsync(entity.Session.UserID);
+
             if(webm.Assert(user != null, "An error has occured, please log-out and try again"))
             {
                 entity.CloseResponse(webm);
                 return VfReturnType.VirtualSkip;
             }
+
             //Make sure the account's origin is a local profile
             if (webm.Assert(user.IsLocalAccount(), "External accounts cannot be modified"))
             {
                 entity.CloseResponse(webm);
                 return VfReturnType.VirtualSkip;
             }
+
             //Verify the user's old password
-            if (!Passwords.Verify(user.PassHash, currentPass))
+            if (!Passwords.Verify(user.PassHash, pwReset.Current.AsSpan()))
             {
                 webm.Result = "Please check your current password";
                 entity.CloseResponse(webm);
                 return VfReturnType.VirtualSkip;
             }
+
+            //Check if totp is enabled
+            if (user.MFATotpEnabled())
+            {
+                if(mFAConfig != null)
+                {
+                    //TOTP code is required
+                    if(webm.Assert(pwReset.TotpCode.HasValue, "TOTP is enabled on this user account, you must enter your TOTP code."))
+                    {
+                        entity.CloseResponse(webm);
+                        return VfReturnType.VirtualSkip;
+                    }
+
+                    //Veriy totp code
+                    bool verified = mFAConfig.VerifyTOTP(user, pwReset.TotpCode.Value);
+
+                    if (webm.Assert(verified, "Please check your TOTP code and try again"))
+                    {
+                        entity.CloseResponse(webm);
+                        return VfReturnType.VirtualSkip;
+                    }
+                }
+                //continue
+            }
+
             //Hash the user's new password
-            using PrivateString newPassHash = Passwords.Hash(newPass);
+            using PrivateString newPassHash = Passwords.Hash(pwReset.NewPassword.AsSpan());
+
             //Update the user's password
             if (!await Users.UpdatePassAsync(user, newPassHash))
             {
@@ -134,12 +177,39 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 entity.CloseResponse(webm);
                 return VfReturnType.VirtualSkip;
             }
+
+            //Publish to user database
             await user.ReleaseAsync();
+
             //delete the user's MFA entry so they can re-enable it
             webm.Result = "Your password has been updated";
             webm.Success = true;
             entity.CloseResponse(webm);
             return VfReturnType.VirtualSkip;
+        }
+
+        private sealed class PasswordResetMesage : PrivateStringManager
+        {
+            public PasswordResetMesage() : base(2)
+            {
+            }
+
+            [JsonPropertyName("current")]
+            public string? Current
+            {
+                get => this[0];
+                set => this[0] = value;
+            }
+
+            [JsonPropertyName("new_password")]
+            public string? NewPassword
+            {
+                get => this[1];
+                set => this[1] = value;
+            }
+
+            [JsonPropertyName("totp_code")]
+            public uint? TotpCode { get; set; }
         }
     }
 }

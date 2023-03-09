@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2022 Vaughn Nugent
+* Copyright (c) 2023 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.SocialOauth
@@ -23,31 +23,36 @@
 */
 
 using System;
-using System.Text.Json;
+using System.Threading.Tasks;
 using System.Collections.Generic;
 
 using VNLib.Utils.Extensions;
 using VNLib.Plugins.Essentials.Users;
 using VNLib.Plugins.Essentials.Accounts;
-
+using VNLib.Plugins.Extensions.Loading;
+using VNLib.Plugins.Extensions.Loading.Users;
 
 namespace VNLib.Plugins.Essentials.SocialOauth
 {
 
-    public sealed class OauthClientConfig
+    public sealed class OauthClientConfig : IAsyncConfigurable
     {
+        private readonly string ConfigName;
 
-        public OauthClientConfig(string configName, IReadOnlyDictionary<string, JsonElement> config)
+
+        public OauthClientConfig(PluginBase plugin, IConfigScope config)
         {
-            EndpointPath = config["path"].GetString() ?? throw new KeyNotFoundException($"Missing required key 'path' in config {configName}");
+            ConfigName = config.ScopeName;
+
+            EndpointPath = config["path"].GetString() ?? throw new KeyNotFoundException($"Missing required key 'path' in config {ConfigName}");
 
             //Set discord account origin
-            AccountOrigin = config["account_origin"].GetString() ?? throw new KeyNotFoundException($"Missing required key 'account_origin' in config {configName}");
+            AccountOrigin = config["account_origin"].GetString() ?? throw new KeyNotFoundException($"Missing required key 'account_origin' in config {ConfigName}");
            
             //Get the auth and token urls
-            string authUrl = config["authorization_url"].GetString() ?? throw new KeyNotFoundException($"Missing required key 'authorization_url' in config {configName}");
-            string tokenUrl = config["token_url"].GetString() ?? throw new KeyNotFoundException($"Missing required key 'token_url' in config {configName}");
-            string userUrl = config["user_data_url"].GetString() ?? throw new KeyNotFoundException($"Missing required key 'user_data_url' in config {configName}");
+            string authUrl = config["authorization_url"].GetString() ?? throw new KeyNotFoundException($"Missing required key 'authorization_url' in config {ConfigName}");
+            string tokenUrl = config["token_url"].GetString() ?? throw new KeyNotFoundException($"Missing required key 'token_url' in config {ConfigName}");
+            string userUrl = config["user_data_url"].GetString() ?? throw new KeyNotFoundException($"Missing required key 'user_data_url' in config {ConfigName}");
             //Create the uris 
             AccessCodeUrl = new(authUrl);
             AccessTokenUrl = new(tokenUrl);
@@ -58,12 +63,31 @@ namespace VNLib.Plugins.Essentials.SocialOauth
             LoginNonceLifetime = config["valid_for_sec"].GetTimeSpan(TimeParseType.Seconds);
             NonceByteSize = config["nonce_size"].GetUInt32();
             RandomPasswordSize = config["password_size"].GetInt32();
-        }
-      
+            InitClaimValidFor = config["claim_valid_for_sec"].GetTimeSpan(TimeParseType.Seconds);
 
-        public string ClientID { get; set; } = string.Empty;
+            Users = plugin.GetOrCreateSingleton<UserManager>();
+            Passwords = plugin.GetPasswords();
+        }
+
+        public async Task ConfigureServiceAsync(PluginBase plugin)
+        {
+            //Get id/secret
+            Task<SecretResult?> clientIdTask = plugin.TryGetSecretAsync($"{ConfigName}_client_id");
+            Task<SecretResult?> secretTask = plugin.TryGetSecretAsync($"{ConfigName}_client_secret");
+
+            await Task.WhenAll(secretTask, clientIdTask);
+
+            using SecretResult? secret = await secretTask;
+            using SecretResult? clientId = await clientIdTask;
+
+            ClientID = clientId?.Result.ToString() ?? throw new KeyNotFoundException($"Missing {ConfigName} client id from config or vault");
+            ClientSecret = secret?.Result.ToString() ?? throw new KeyNotFoundException($"Missing the {ConfigName} client secret from config or vault");
+        }
+
+
+        public string ClientID { get; private set; } = string.Empty;
        
-        public string ClientSecret { get; set; } = string.Empty;
+        public string ClientSecret { get; private set; } = string.Empty;
 
 
         /// <summary>
@@ -92,9 +116,9 @@ namespace VNLib.Plugins.Essentials.SocialOauth
         /// <summary>
         /// The user store to create/get users from
         /// </summary>     
-        public IUserManager Users { get; init; } 
+        public IUserManager Users { get; } 
       
-        public PasswordHashing Passwords { get; init; }
+        public IPasswordHashingProvider Passwords { get; }
 
         /// <summary>
         /// The endpoint route/path
@@ -122,5 +146,10 @@ namespace VNLib.Plugins.Essentials.SocialOauth
         /// The size (in bytes) of the random password generated for new users
         /// </summary>
         public int RandomPasswordSize { get; }
+
+        /// <summary>
+        /// The initial time the login claim is valid for
+        /// </summary>
+        public TimeSpan InitClaimValidFor { get; }
     }
 }

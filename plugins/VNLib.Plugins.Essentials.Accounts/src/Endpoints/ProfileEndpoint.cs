@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2022 Vaughn Nugent
+* Copyright (c) 2023 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
@@ -24,9 +24,7 @@
 
 using System;
 using System.Net;
-using System.Text.Json;
 using System.Threading.Tasks;
-using System.Collections.Generic;
 
 using VNLib.Utils.Logging;
 using VNLib.Plugins.Essentials.Users;
@@ -48,13 +46,13 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
     {
         private readonly IUserManager Users;
         
-        public ProfileEndpoint(PluginBase pbase, IReadOnlyDictionary<string, JsonElement> config)
+        public ProfileEndpoint(PluginBase pbase, IConfigScope config)
         {
             string? path = config["path"].GetString();
             
             InitPathAndLog(path, pbase.Log);
             //Store user system
-            Users = pbase.GetUserManager();
+            Users = pbase.GetOrCreateSingleton<UserManager>();
         }
 
         protected override async ValueTask<VfReturnType> GetAsync(HttpEntity entity)

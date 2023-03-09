@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2022 Vaughn Nugent
+* Copyright (c) 2023 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
@@ -24,8 +24,6 @@
 
 using System;
 using System.Net;
-using System.Text.Json;
-using System.Collections.Generic;
 
 using VNLib.Utils.Extensions;
 using VNLib.Plugins.Essentials.Endpoints;
@@ -44,7 +42,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
          * Endpoint does not use a log, so IniPathAndLog is never called
          * and path verification happens verbosly 
          */
-        public KeepAliveEndpoint(PluginBase pbase, IReadOnlyDictionary<string, JsonElement> config)
+        public KeepAliveEndpoint(PluginBase pbase, IConfigScope config)
         {
             string? path = config["path"].GetString();
 
@@ -63,18 +61,18 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
         //Allow post to update user's credentials
         protected override VfReturnType Post(HttpEntity entity)
         {
-            //Get the last token update
-            DateTimeOffset lastTokenUpdate = entity.Session.LastTokenUpgrade();
-
-            //See if its expired
-            if (lastTokenUpdate.Add(tokenRegenTime) < entity.RequestedTimeUtc)
+            //See if its time to regenreate the client's auth status
+            if (entity.Session.Created.Add(tokenRegenTime) < entity.RequestedTimeUtc)
             {
-                //if so updaet token
                 WebMessage webm = new()
                 {
-                    Token = entity.RegenerateClientToken(),
                     Success = true
                 };
+
+                //reauthorize the client
+                entity.ReAuthorizeClient(webm);
+
+                webm.Success = true;
                 
                 //Send the update message to the client
                 entity.CloseResponse(webm);

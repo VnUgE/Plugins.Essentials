@@ -36,11 +36,11 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration
 
         protected override void OnLoad()
         {
-                //Route reg endpoint
-                this.Route<RegistrationEntpoint>();
+            //Route reg endpoint
+            this.Route<RegistrationEntpoint>();
 
-                Log.Information("Plugin loaded");
-            }
+            Log.Information("Plugin loaded");
+        }
         
         protected override void OnUnLoad()
         {

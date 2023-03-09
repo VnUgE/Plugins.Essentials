@@ -1,12 +1,12 @@
 ﻿/*
-* Copyright (c) 2022 Vaughn Nugent
+* Copyright (c) 2023 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.SocialOauth
-* File: ClientAccessTokenState.cs 
+* File: OAuthAccessState.cs 
 *
-* ClientAccessTokenState.cs is part of VNLib.Plugins.Essentials.SocialOauth which is part of the larger 
-* VNLib collection of libraries and utilities.
+* OAuthAccessState.cs is part of VNLib.Plugins.Essentials.SocialOauth which 
+* is part of the larger VNLib collection of libraries and utilities.
 *
 * VNLib.Plugins.Essentials.SocialOauth is free software: you can redistribute it and/or modify 
 * it under the terms of the GNU Affero General Public License as 
@@ -23,17 +23,11 @@
 */
 
 using System;
-using System.Security.Cryptography;
 using System.Text.Json.Serialization;
-
-using VNLib.Hashing;
-using VNLib.Utils.Memory;
-using VNLib.Utils.Memory.Caching;
-using VNLib.Plugins.Essentials.Accounts;
 
 namespace VNLib.Plugins.Essentials.SocialOauth
 {
-    public sealed class OAuthAccessState : IOAuthAccessState, ICacheable, INonce
+    public sealed class OAuthAccessState : IOAuthAccessState
     {
         ///<inheritdoc/>
         [JsonPropertyName("access_token")]
@@ -50,36 +44,5 @@ namespace VNLib.Plugins.Essentials.SocialOauth
         ///<inheritdoc/>
         [JsonPropertyName("id_token")]
         public string? IdToken { get; set; }
-        
-        //Ignore the public key and client ids
-        [JsonIgnore]
-        internal string? PublicKey { get; set; }
-        [JsonIgnore]
-        internal string? ClientId { get; set; }
-
-        /// <summary>
-        /// A random nonce generated when the access state is created and 
-        /// deleted when then access token is evicted.
-        /// </summary>
-        [JsonIgnore]
-        internal ReadOnlyMemory<byte> Nonce { get; private set; }
-
-        DateTime ICacheable.Expires { get; set; }
-        bool IEquatable<ICacheable>.Equals(ICacheable? other) => GetHashCode() == other?.GetHashCode();
-        public override int GetHashCode() => Token!.GetHashCode(StringComparison.Ordinal);
-        void ICacheable.Evicted()
-        {
-            MemoryUtil.UnsafeZeroMemory(Nonce);
-        }
-
-        void INonce.ComputeNonce(Span<byte> buffer)
-        {
-            //Compute nonce
-            RandomHash.GetRandomBytes(buffer);
-            //Copy and store
-            Nonce = buffer.ToArray();
-        }
-
-        bool INonce.VerifyNonce(ReadOnlySpan<byte> nonceBytes) => CryptographicOperations.FixedTimeEquals(Nonce.Span, nonceBytes);
     }
 }

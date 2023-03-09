@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2022 Vaughn Nugent
+* Copyright (c) 2023 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
@@ -37,7 +37,6 @@ using VNLib.Utils.Extensions;
 using VNLib.Hashing.IdentityUtility;
 using VNLib.Plugins.Essentials.Users;
 using VNLib.Plugins.Essentials.Sessions;
-using VNLib.Plugins.Extensions.Loading;
 
 namespace VNLib.Plugins.Essentials.Accounts.MFA
 {
@@ -73,8 +72,14 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
         /// </summary>
         /// <param name="user"></param>
         /// <param name="secret">The base32 encoded TOTP secret</param>
-        public static void MFASetTOTPSecret(this IUser user, string? secret) => user[TOTP_KEY_ENTRY] = secret!;        
-     
+        public static void MFASetTOTPSecret(this IUser user, string? secret) => user[TOTP_KEY_ENTRY] = secret!;
+
+        /// <summary>
+        /// Determines if the user account has TOTP enabled
+        /// </summary>
+        /// <param name="user"></param>
+        /// <returns>True if the user has totp enabled, false otherwise</returns>
+        public static bool MFATotpEnabled(this IUser user) => !string.IsNullOrWhiteSpace(user[TOTP_KEY_ENTRY]);
 
         /// <summary>
         /// Generates/overwrites the current user's TOTP secret entry and returns a 
@@ -85,8 +90,9 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
         /// <exception cref="OutOfMemoryException"></exception>
         public static byte[] MFAGenreateTOTPSecret(this IUser user, MFAConfig config)
         {
+            _ = config.TOTPConfig ?? throw new NotSupportedException("The loaded configuration does not support TOTP");
             //Generate a random key
-            byte[] newSecret = RandomHash.GetRandomBytes(config.TOTPSecretBytes);
+            byte[] newSecret = RandomHash.GetRandomBytes(config.TOTPConfig.TOTPSecretBytes);
             //Store secret in user storage
             user.MFASetTOTPSecret(VnEncoding.ToBase32String(newSecret, false));
             //return the raw secret bytes
@@ -107,7 +113,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
         {
             //Get the base32 TOTP secret for the user and make sure its actually set
             string base32Secret = user.MFAGetTOTPSecret();
-            if (string.IsNullOrWhiteSpace(base32Secret))
+            if (!config.TOTPEnabled || string.IsNullOrWhiteSpace(base32Secret))
             {
                 return false;
             }
@@ -115,10 +121,10 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
             using UnsafeMemoryHandle<byte> buffer = MemoryUtil.UnsafeAlloc<byte>(base32Secret.Length, true);
             ERRNO count = VnEncoding.TryFromBase32Chars(base32Secret, buffer);
             //Verify the TOTP using the decrypted secret
-            return count && VerifyTOTP(code, buffer.AsSpan(0, count), config);
+            return count && VerifyTOTP(code, buffer.AsSpan(0, count), config.TOTPConfig);
         }
 
-        private static bool VerifyTOTP(uint totpCode, ReadOnlySpan<byte> userSecret, MFAConfig config)
+        private static bool VerifyTOTP(uint totpCode, ReadOnlySpan<byte> userSecret, TOTPConfig config)
         {
             //A basic attempt at a constant time TOTP verification, run the calculation a fixed number of times, regardless of the resutls
             bool codeMatches = false;
@@ -160,7 +166,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
             return codeMatches;
         }
 
-        private static uint CalcTOTPCode(ReadOnlySpan<byte> hash, MFAConfig config)
+        private static uint CalcTOTPCode(ReadOnlySpan<byte> hash, TOTPConfig config)
         {
             //Calculate the offset, RFC defines, the lower 4 bits of the last byte in the hash output
             byte offset = (byte)(hash[^1] & 0x0Fu);
@@ -179,50 +185,6 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
             //calculate the modulus value
             TOTPCode %= (uint)Math.Pow(10, config.TOTPDigits);
             return TOTPCode;
-        }
-
-        #endregion
-
-        #region loading
-
-        const string MFA_CONFIG_KEY = "mfa";
-
-        /// <summary>
-        /// Gets the plugins ambient <see cref="PasswordHashing"/> if loaded, or loads it if required. This class will
-        /// be unloaded when the plugin us unloaded.
-        /// </summary>
-        /// <param name="plugin"></param>
-        /// <returns>The ambient <see cref="PasswordHashing"/></returns>
-        /// <exception cref="OverflowException"></exception>
-        /// <exception cref="KeyNotFoundException"></exception>
-        /// <exception cref="ObjectDisposedException"></exception>
-        public static MFAConfig? GetMfaConfig(this PluginBase plugin)
-        {
-            static MFAConfig? LoadMfaConfig(PluginBase pbase)
-            {
-                //Try to get the configuration object
-                IReadOnlyDictionary<string, JsonElement>? conf = pbase.TryGetConfig(MFA_CONFIG_KEY);
-
-                if (conf == null)
-                {
-                    return null;
-                }
-                //Init mfa config
-                MFAConfig mfa = new(conf);
-
-                //Recover secret from config and dangerous 'lazy load'
-                _ = pbase.ObserveTask(async () =>
-                {
-                    mfa.MFASecret = await pbase.TryGetSecretAsync("mfa_secret").ToJsonWebKey();
-
-                }, 50);
-
-                return mfa;
-            }
-            
-            plugin.ThrowIfUnloaded();
-            //Get/load the passwords one time only
-            return LoadingExtensions.GetOrCreateSingleton(plugin, LoadMfaConfig);
         }
 
         #endregion
@@ -259,6 +221,20 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
 
         #endregion
 
+        private static HMAC GetSigningAlg(byte[] key) => new HMACSHA256(key);
+
+        private static ReadOnlyMemory<byte> UpgradeHeader { get; } = CompileJwtHeader();
+
+        private static byte[] CompileJwtHeader()
+        {
+            Dictionary<string, string> header = new()
+            {
+                { "alg","HS256" },
+                { "typ", "JWT" }
+            };
+            return JsonSerializer.SerializeToUtf8Bytes(header);
+        }
+
         /// <summary>
         /// Recovers a signed MFA upgrade JWT and verifies its authenticity, and confrims its not expired,
         /// then recovers the upgrade mssage
@@ -266,39 +242,31 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
         /// <param name="config"></param>
         /// <param name="upgradeJwtString">The signed JWT upgrade message</param>
         /// <param name="upgrade">The recovered upgrade</param>
-        /// <param name="base64sessionSig">The stored base64 encoded signature from the session that requested an upgrade</param>
+        /// <param name="base32Secret">The stored base64 encoded signature from the session that requested an upgrade</param>
         /// <returns>True if the upgrade was verified, not expired, and was recovered from the signed message, false otherwise</returns>
-        public static bool RecoverUpgrade(this MFAConfig config, ReadOnlySpan<char> upgradeJwtString, ReadOnlySpan<char> base64sessionSig, [NotNullWhen(true)] out MFAUpgrade? upgrade)
+        public static MFAUpgrade? RecoverUpgrade(this MFAConfig config, string upgradeJwtString, string base32Secret)
         {
-            //Verifies a jwt stored signature against the actual signature
-            static bool VerifyStoredSig(ReadOnlySpan<char> base64string, ReadOnlySpan<byte> signature)
-            {
-                using UnsafeMemoryHandle<byte> buffer = MemoryUtil.UnsafeAlloc<byte>(base64string.Length, true);
-
-                //Recover base64
-                ERRNO count = VnEncoding.TryFromBase64Chars(base64string, buffer.Span);
-                
-                //Compare
-                return CryptographicOperations.FixedTimeEquals(signature, buffer.Span[..(int)count]);
-            }
-
-            //Verify config secret
-            _ = config.MFASecret ?? throw new InvalidOperationException("MFA config is missing required upgrade signing key");
-
-            upgrade = null;
-            
             //Parse jwt
             using JsonWebToken jwt = JsonWebToken.Parse(upgradeJwtString);
-            
-            if (!jwt.VerifyFromJwk(config.MFASecret))
-            {
-                return false;
-            }
 
-            if(!VerifyStoredSig(base64sessionSig, jwt.SignatureData))
+            //Recover the secret key
+            byte[] secret = VnEncoding.FromBase32String(base32Secret)!;
+            try
             {
-                return false;
+                //Verify the 
+                using HMAC hmac = GetSigningAlg(secret);
+
+                if (!jwt.Verify(hmac))
+                {
+                    return null;
+                }
             }
+            finally
+            {
+                //Erase secret
+                MemoryUtil.InitializeBlock(secret.AsSpan());
+            }
+            //Valid
             
             //get request body
             using JsonDocument doc = jwt.GetPayload();
@@ -310,12 +278,11 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
             if (iat.Add(config.UpgradeValidFor) < DateTimeOffset.UtcNow)
             {
                 //expired
-                return false;
+                return null;
             }
 
             //Recover the upgrade message
-            upgrade = doc.RootElement.GetProperty("upgrade").Deserialize<MFAUpgrade>();
-            return upgrade != null;
+            return doc.RootElement.GetProperty("upgrade").Deserialize<MFAUpgrade>();
         }
 
 
@@ -325,7 +292,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
         /// <param name="login">The message from the user requesting the login</param>
         /// <returns>A signed upgrade message the client will pass back to the server after the MFA verification</returns>
         /// <exception cref="InvalidOperationException"></exception>
-        public static Tuple<string, string>? MFAGetUpgradeIfEnabled(this IUser user, MFAConfig? conf, LoginMessage login, string pwClientData)
+        public static Tuple<string, string>? MFAGetUpgradeIfEnabled(this IUser user, MFAConfig? conf, LoginMessage login)
         {
             //Webauthn config
 
@@ -336,8 +303,6 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
             //Check totp entry
             if (!string.IsNullOrWhiteSpace(base32Secret))
             {
-                //Verify config secret
-                _ = conf?.MFASecret ?? throw new InvalidOperationException("MFA config is missing required upgrade signing key");
                 
                 //setup the upgrade
                 MFAUpgrade upgrade = new()
@@ -346,43 +311,50 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
                     Type = MFAType.TOTP,
                     //Store login message details
                     UserName = login.UserName,
-                    ClientID = login.ClientID,
+                    ClientID = login.ClientId,
                     Base64PubKey = login.ClientPublicKey,
                     ClientLocalLanguage = login.LocalLanguage,
-                    PwClientData = pwClientData
                 };
 
                 //Init jwt for upgrade
-                return GetUpgradeMessage(upgrade, conf.MFASecret, conf.UpgradeValidFor);
+                return GetUpgradeMessage(upgrade, conf);
             }
             return null;
         }
 
-        private static Tuple<string, string> GetUpgradeMessage(MFAUpgrade upgrade, ReadOnlyJsonWebKey secret, TimeSpan expires)
+        private static Tuple<string, string> GetUpgradeMessage(MFAUpgrade upgrade, MFAConfig config)
         {
             //Add some random entropy to the upgrade message, to help prevent forgery
-            string entropy = RandomHash.GetRandomBase32(16);
+            string entropy = RandomHash.GetRandomBase32(config.NonceLenBytes);
             //Init jwt
             using JsonWebToken upgradeJwt = new();
-            upgradeJwt.WriteHeader(secret.JwtHeader);
+            //Add header
+            upgradeJwt.WriteHeader(UpgradeHeader.Span);
             //Write claims
             upgradeJwt.InitPayloadClaim()
                 .AddClaim("iat", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
                 .AddClaim("upgrade", upgrade)
-                .AddClaim("type", upgrade.Type.ToString().ToLower())
-                .AddClaim("expires", expires.TotalSeconds)
+                .AddClaim("type", upgrade.Type.ToString().ToLower(null))
+                .AddClaim("expires", config.UpgradeValidFor.TotalSeconds)
                 .AddClaim("a", entropy)
                 .CommitClaims();
-            
-            //Sign with jwk
-            upgradeJwt.SignFromJwk(secret);
-            
+
+            //Generate a new random secret
+            byte[] secret = RandomHash.GetRandomBytes(config.UpgradeKeyBytes);
+
+            //Init alg
+            using(HMAC alg = GetSigningAlg(secret))
+            {
+                //sign jwt
+                upgradeJwt.Sign(alg);
+            }
+
             //compile and return jwt upgrade
-            return new(upgradeJwt.Compile(), Convert.ToBase64String(upgradeJwt.SignatureData));
+            return new(upgradeJwt.Compile(), VnEncoding.ToBase32String(secret));
         }
 
-        public static void MfaUpgradeSignature(this in SessionInfo session, string? base64Signature) => session[SESSION_SIG_KEY] = base64Signature!;
+        public static void MfaUpgradeSecret(this in SessionInfo session, string? base32Signature) => session[SESSION_SIG_KEY] = base32Signature!;
 
-        public static string? MfaUpgradeSignature(this in SessionInfo session) => session[SESSION_SIG_KEY];
+        public static string? MfaUpgradeSecret(this in SessionInfo session) => session[SESSION_SIG_KEY];
     }
 }

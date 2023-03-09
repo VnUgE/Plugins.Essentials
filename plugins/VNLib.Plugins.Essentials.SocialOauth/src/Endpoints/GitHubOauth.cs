@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2022 Vaughn Nugent
+* Copyright (c) 2023 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.SocialOauth
@@ -23,9 +23,7 @@
 */
 
 using System;
-using System.Text;
 using System.Threading;
-using System.Text.Json;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
@@ -37,7 +35,6 @@ using VNLib.Utils.Logging;
 using VNLib.Net.Rest.Client;
 using VNLib.Plugins.Essentials.Accounts;
 using VNLib.Plugins.Extensions.Loading;
-using VNLib.Plugins.Extensions.Loading.Users;
 
 namespace VNLib.Plugins.Essentials.SocialOauth.Endpoints
 {
@@ -47,38 +44,11 @@ namespace VNLib.Plugins.Essentials.SocialOauth.Endpoints
         private const string GITHUB_V3_ACCEPT = "application/vnd.github.v3+json";
 
         private readonly string UserEmailUrl;
-       
-        protected override OauthClientConfig Config { get; }
+        
 
-        public GitHubOauth(PluginBase plugin, IReadOnlyDictionary<string, JsonElement> config) : base()
-        {
-            
+        public GitHubOauth(PluginBase plugin, IConfigScope config) : base(plugin, config)
+        {            
             UserEmailUrl = config["user_email_url"].GetString() ?? throw new KeyNotFoundException("Missing required key 'user_email_url' for github configuration");
-
-            Config = new("github", config)
-            {
-                Passwords = plugin.GetPasswords(),
-                Users = plugin.GetUserManager(),
-            };
-
-            InitPathAndLog(Config.EndpointPath, plugin.Log);
-
-            //Load secrets
-            _ = plugin.ObserveTask(async () =>
-            {
-                //Get id/secret
-                Task<SecretResult?> clientIdTask = plugin.TryGetSecretAsync("github_client_id");
-                Task<SecretResult?> secretTask = plugin.TryGetSecretAsync("github_client_secret");
-
-                await Task.WhenAll(secretTask, clientIdTask);
-
-                using SecretResult? secret = await secretTask;
-                using SecretResult? clientId = await clientIdTask;
-
-                Config.ClientID = clientId?.Result.ToString() ?? throw new KeyNotFoundException("Missing Github client id from config or vault");
-                Config.ClientSecret = secret?.Result.ToString() ?? throw new KeyNotFoundException("Missing the Github client secret from config or vault");
-
-            }, 100);
         }
 
         protected override void StaticClientPoolInitializer(RestClient client)

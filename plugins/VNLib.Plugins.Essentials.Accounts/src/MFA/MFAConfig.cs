@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2022 Vaughn Nugent
+* Copyright (c) 2023 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
@@ -23,81 +23,171 @@
 */
 
 using System;
-using System.Linq;
-using System.Text.Json;
-using System.Collections.Generic;
+using System.Text.Json.Serialization;
+
+using FluentValidation;
 
 using VNLib.Hashing;
-using VNLib.Utils.Extensions;
-using VNLib.Hashing.IdentityUtility;
+using VNLib.Plugins.Extensions.Loading;
 
 namespace VNLib.Plugins.Essentials.Accounts.MFA
-{
-    internal class MFAConfig
+{   
+
+    [ConfigurationName("mfa")]
+    internal class MFAConfig : IOnConfigValidation
     {
-        public ReadOnlyJsonWebKey? MFASecret { get; set; }
+        private static IValidator<MFAConfig> GetValidator()
+        {
+            InlineValidator<MFAConfig> val = new();
 
-        public bool TOTPEnabled { get; }
-        public string? IssuerName { get; }
-        public TimeSpan TOTPPeriod { get; }
-        public HashAlg TOTPAlg { get; }
-        public int TOTPDigits { get; }
-        public int TOTPSecretBytes { get; }
-        public int TOTPTimeWindowSteps { get; }
+            val.RuleFor(c => c.UpgradeExpSeconds)
+                .GreaterThan(1)
+                .WithMessage("You must configure a non-zero upgrade expiration timeout");
+
+            val.RuleFor(c => c.NonceLenBytes)
+                .GreaterThanOrEqualTo(8)
+                .WithMessage("You must configure a nonce size of 8 bytes or larger");
+
+            val.RuleFor(c => c.UpgradeKeyBytes)
+                .GreaterThanOrEqualTo(8)
+                .WithMessage("You must configure a signing key size of 8 bytes or larger");
+
+            return val;
+        }
+
+        private static IValidator<MFAConfig> _validator { get; } = GetValidator();
+
+        [JsonPropertyName("totp")]
+        public TOTPConfig? TOTPConfig { get; set; }
+
+        [JsonIgnore]
+        public bool TOTPEnabled => TOTPConfig?.IssuerName != null;
+
+        [JsonPropertyName("fido")]
+        public FidoConfig? FIDOConfig { get; set; }
+
+        [JsonIgnore]
+        public bool FIDOEnabled => FIDOConfig?.FIDOSiteName != null;
+
+        [JsonIgnore]
+        public TimeSpan UpgradeValidFor { get; private set; } = TimeSpan.FromSeconds(120);
+
+        [JsonPropertyName("upgrade_expires_secs")]
+        public int UpgradeExpSeconds
+        {
+            get => (int)UpgradeValidFor.TotalSeconds;
+            set => UpgradeValidFor = TimeSpan.FromSeconds(value);
+        }
+
+        [JsonPropertyName("nonce_size")]
+        public int NonceLenBytes { get; set; } = 16;
+        [JsonPropertyName("upgrade_size")]
+        public int UpgradeKeyBytes { get; set; } = 32;
+      
+
+        public void Validate()
+        {
+            //Validate the current confige before child configs
+            _validator.ValidateAndThrow(this);
+
+            TOTPConfig?.Validate();
+            FIDOConfig?.Validate();
+        }
+    }
+
+    internal class TOTPConfig : IOnConfigValidation
+    {
+        private static IValidator<TOTPConfig> GetValidator()
+        {
+            InlineValidator<TOTPConfig> val = new();
+
+            val.RuleFor(c => c.IssuerName)
+               .NotEmpty();
+
+            val.RuleFor(c => c.PeriodSec)
+                .InclusiveBetween(1, 600);
+
+            val.RuleFor(c => c.TOTPAlg)
+                .Must(a => a != HashAlg.None)
+                .WithMessage("TOTP Algorithim name must not be NONE");
+
+            val.RuleFor(c => c.TOTPDigits)
+                .GreaterThan(1)
+                .WithMessage("You should have more than 1 digit for a totp code");
+
+            //We dont neet to check window steps, the user may want to configure 0 or more
+            val.RuleFor(c => c.TOTPTimeWindowSteps);
+
+            val.RuleFor(c => c.TOTPSecretBytes)
+                .GreaterThan(8)
+                .WithMessage("You should configure a larger TOTP secret size for better security");
+
+            return val;
+        }
+
+        [JsonIgnore]
+        private static IValidator<TOTPConfig> _validator { get; } = GetValidator(); 
+
+        [JsonPropertyName("issuer")]
+        public string? IssuerName { get; set; }
+
+        [JsonPropertyName("period_sec")]
+        public int PeriodSec
+        {
+            get => (int)TOTPPeriod.TotalSeconds;
+            set => TOTPPeriod = TimeSpan.FromSeconds(value);
+        }
+        [JsonIgnore]
+        public TimeSpan TOTPPeriod { get; set; } = TimeSpan.FromSeconds(30);
+      
+
+        [JsonPropertyName("algorithm")]
+        public string AlgName
+        {
+            get => TOTPAlg.ToString();
+            set => TOTPAlg = Enum.Parse<HashAlg>(value.ToUpper(null));
+        }
+        [JsonIgnore]
+        public HashAlg TOTPAlg { get; set; } = HashAlg.SHA1;
+
+        [JsonPropertyName("digits")]
+        public int TOTPDigits { get; set; } = 6;
+
+        [JsonPropertyName("secret_size")]
+        public int TOTPSecretBytes { get; set; } = 32;
+
+        [JsonPropertyName("window_size")]
+        public int TOTPTimeWindowSteps { get; set; } = 1;
+
+        public void Validate()
+        {
+            //Validate the current instance on the 
+            _validator.ValidateAndThrow(this);
+        }
+    }
+
+    internal class FidoConfig : IOnConfigValidation
+    {
+        private static IValidator<FidoConfig> GetValidator()
+        {
+            InlineValidator<FidoConfig> val = new();
 
 
-        public bool FIDOEnabled { get; }
+            return val; 
+        }
+
+        private static IValidator<FidoConfig> _validator { get; } = GetValidator();
+
+     
         public int FIDOChallangeSize { get; }
         public int FIDOTimeout { get; }
         public string? FIDOSiteName { get; }
         public string? FIDOAttestationType { get; }
         public FidoAuthenticatorSelection? FIDOAuthSelection { get; }
 
-        public TimeSpan UpgradeValidFor { get; }
-        public int NonceLenBytes { get; }
-
-        public MFAConfig(IReadOnlyDictionary<string, JsonElement> conf)
+        public void Validate()
         {
-            UpgradeValidFor = conf["upgrade_expires_secs"].GetTimeSpan(TimeParseType.Seconds);
-            NonceLenBytes = conf["nonce_size"].GetInt32();
-            string siteName = conf["site_name"].GetString() ?? throw new KeyNotFoundException("Missing required key 'site_name' in 'mfa' config");
-
-            //Totp setup
-            if (conf.TryGetValue("totp", out JsonElement totpEl))
-            {
-                IReadOnlyDictionary<string, JsonElement> totp = totpEl.EnumerateObject().ToDictionary(k => k.Name, k => k.Value);
-
-                //Get totp config
-                IssuerName = siteName;
-                //Get alg name
-                string TOTPAlgName = totp["algorithm"].GetString()?.ToUpper() ?? throw new KeyNotFoundException("Missing required key 'algorithm' in plugin 'mfa' config");
-                //Parse from enum string
-                TOTPAlg = Enum.Parse<HashAlg>(TOTPAlgName);
-
-               
-                TOTPDigits = totp["digits"].GetInt32();
-                TOTPPeriod = TimeSpan.FromSeconds(totp["period_secs"].GetInt32());
-                TOTPSecretBytes = totp["secret_size"].GetInt32();
-                TOTPTimeWindowSteps = totp["window_size"].GetInt32();
-                //Set enabled flag
-                TOTPEnabled = true;
-            }
-            //Fido setup
-            if(conf.TryGetValue("fido", out JsonElement fidoEl))
-            {
-                IReadOnlyDictionary<string, JsonElement> fido = fidoEl.EnumerateObject().ToDictionary(k => k.Name, k => k.Value);
-                FIDOChallangeSize = fido["challenge_size"].GetInt32();
-                FIDOAttestationType = fido["attestation"].GetString();
-                FIDOTimeout = fido["timeout"].GetInt32();
-                FIDOSiteName = siteName;
-                //Deserailze a 
-                if(fido.TryGetValue("authenticatorSelection", out JsonElement authSel))
-                {
-                    FIDOAuthSelection = authSel.Deserialize<FidoAuthenticatorSelection>();
-                }
-                //Set enabled flag
-                FIDOEnabled = true;
-            }
+            _validator.ValidateAndThrow(this);
         }
     }
 }

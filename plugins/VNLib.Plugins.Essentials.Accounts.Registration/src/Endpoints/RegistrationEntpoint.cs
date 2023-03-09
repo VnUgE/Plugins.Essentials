@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2022 Vaughn Nugent
+* Copyright (c) 2023 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts.Registration
@@ -45,7 +45,7 @@ using VNLib.Plugins.Extensions.Loading.Sql;
 using VNLib.Plugins.Extensions.Loading.Events;
 using VNLib.Plugins.Extensions.Loading.Users;
 using VNLib.Plugins.Extensions.Validation;
-using VNLib.Plugins.Extentions.TransactionalEmail;
+using Emails.Transactional.Client.Extensions;
 using VNLib.Plugins.Essentials.Accounts.Registration.TokenRevocation;
 using static VNLib.Plugins.Essentials.Accounts.AccountUtil;
 
@@ -54,7 +54,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
 {
 
     [ConfigurationName("registration")]
-    internal sealed class RegistrationEntpoint : UnprotectedWebEndpoint, IIntervalScheduleable
+    internal sealed class RegistrationEntpoint : UnprotectedWebEndpoint
     {
         /// <summary>
         /// Generates a CNG random buffer to use as a nonce
@@ -66,7 +66,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
        
         private readonly IUserManager Users;
         private readonly IValidator<string> RegJwtValdidator;
-        private readonly PasswordHashing Passwords;
+        private readonly IPasswordHashingProvider Passwords;
         private readonly RevokedTokenStore RevokedTokens;
         private readonly TransactionalEmailConfig Emails;
         private readonly Task<ReadOnlyJsonWebKey> RegSignatureKey;
@@ -77,7 +77,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
         /// </summary>
         /// <param name="Path">The path identifier</param>
         /// <exception cref="ArgumentException"></exception>
-        public RegistrationEntpoint(PluginBase plugin, IReadOnlyDictionary<string, JsonElement> config)
+        public RegistrationEntpoint(PluginBase plugin, IConfigScope config)
         {
             string? path = config["path"].GetString();
 
@@ -89,15 +89,12 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
             RegJwtValdidator = GetJwtValidator();
 
             Passwords = plugin.GetPasswords();
-            Users = plugin.GetUserManager();
+            Users = plugin.GetOrCreateSingleton<UserManager>();
             RevokedTokens = new(plugin.GetContextOptions());
-            Emails = plugin.GetEmailConfig();
+            Emails = plugin.GetOrCreateSingleton<TEmailConfig>();
 
             //Begin the async op to get the signature key from the vault
             RegSignatureKey = plugin.TryGetSecretAsync("reg_sig_key").ToJsonWebKey(true);
-
-            //Register timeout for cleanup
-            plugin.ScheduleInterval(this, TimeSpan.FromSeconds(60));
         }
 
         private static IValidator<string> GetJwtValidator()
@@ -300,7 +297,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
             string regUrl = $"https://{entity.Server.RequestUri.Authority}{Path}?t={jwtData}";
 
             //Send email to user in background task and do not await it
-            _ = SendRegEmailAsync(request.UserName!, regUrl).ConfigureAwait(false);
+            _ = SendRegEmailAsync(request.UserName!, regUrl, timeStamp).ConfigureAwait(false);
 
         Exit:
             //await sort of constant time delay
@@ -315,7 +312,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
         }
       
 
-        private async Task SendRegEmailAsync(string emailAddress, string url)
+        private async Task SendRegEmailAsync(string emailAddress, string url, DateTimeOffset current)
         {
             try
             {
@@ -326,7 +323,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
                 emailTemplate.AddVariable("username", emailAddress);
                 //Set the security code variable string
                 emailTemplate.AddVariable("reg_url", url);
-                emailTemplate.AddVariable("date", DateTimeOffset.UtcNow.ToString("f"));
+                emailTemplate.AddVariable("date", current.ToString("f"));
               
                 //Send the email
                 TransactionResult result = await Emails.SendEmailAsync(emailTemplate);
@@ -359,7 +356,10 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
             }
         }
 
-        async Task IIntervalScheduleable.OnIntervalAsync(ILogProvider log, CancellationToken cancellationToken)
+
+        //Schedule cleanup interval 60 seconds
+        [AsyncInterval(Minutes = 1)]
+        public async Task OnIntervalAsync(ILogProvider log, CancellationToken cancellationToken)
         {
             //Cleanup tokens
             await RevokedTokens.CleanTableAsync(RegExpiresSec, cancellationToken);

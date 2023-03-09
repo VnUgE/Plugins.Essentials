@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2022 Vaughn Nugent
+* Copyright (c) 2023 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
@@ -29,7 +29,6 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
-using VNLib.Hashing;
 using VNLib.Utils;
 using VNLib.Utils.Memory;
 using VNLib.Utils.Logging;
@@ -51,14 +50,16 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 
         private readonly IUserManager Users;
         private readonly MFAConfig? MultiFactor;
+        private readonly IPasswordHashingProvider Passwords;
 
-        public MFAEndpoint(PluginBase pbase, IReadOnlyDictionary<string, JsonElement> config)
+        public MFAEndpoint(PluginBase pbase, IConfigScope config)
         {
             string? path = config["path"].GetString();
             InitPathAndLog(path, pbase.Log);
 
-            Users = pbase.GetUserManager();
-            MultiFactor = pbase.GetMfaConfig();
+            Users = pbase.GetOrCreateSingleton<UserManager>();
+            MultiFactor = pbase.GetConfigElement<MFAConfig>();
+            Passwords = pbase.GetPasswords();
         }
 
         private class TOTPUpdateMessage
@@ -78,18 +79,22 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
         protected override async ValueTask<VfReturnType> GetAsync(HttpEntity entity)
         {
             List<string> enabledModes = new(2);
+
             //Load the MFA entry for the user
             using IUser? user = await Users.GetUserFromIDAsync(entity.Session.UserID);
+
             //Set the TOTP flag if set
             if (!string.IsNullOrWhiteSpace(user?.MFAGetTOTPSecret()))
             {
                 enabledModes.Add("totp");
             }
+
             //TODO Set fido flag if enabled
             if (!string.IsNullOrWhiteSpace(""))
             {
                 enabledModes.Add("fido");
             }
+
             //Return mfa modes as an array
             entity.CloseResponseJson(HttpStatusCode.OK, enabledModes);
             return VfReturnType.VirtualSkip;
@@ -101,6 +106,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 
             //Get the request message
             using JsonDocument? mfaRequest = await entity.GetJsonFromFileAsync();
+
             if (webm.Assert(mfaRequest != null, "Invalid request"))
             {
                 entity.CloseResponseJson(HttpStatusCode.BadRequest, webm);
@@ -130,8 +136,17 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 return VfReturnType.VirtualSkip;
             }
 
+            //Get the user entry
+            using IUser? user = await Users.GetUserFromIDAsync(entity.Session.UserID);
+
+            if (webm.Assert(user != null, "Please log-out and try again."))
+            {
+                entity.CloseResponse(webm);
+                return VfReturnType.VirtualSkip;
+            }
+
             //get the user's password challenge
-            using (PrivateString? password = (PrivateString?)mfaRequest.RootElement.GetPropString("challenge"))
+            using (PrivateString? password = (PrivateString?)mfaRequest.RootElement.GetPropString("password"))
             {
                 if (PrivateString.IsNullOrEmpty(password))
                 {
@@ -139,26 +154,28 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                     entity.CloseResponseJson(HttpStatusCode.Unauthorized, webm);
                     return VfReturnType.VirtualSkip;
                 }
-                //Verify challenge
-                if (!entity.Session.VerifyChallenge(password))
+
+                //Verify password against the user
+                if (!user.VerifyPassword(password, Passwords))
                 {
                     webm.Result = "Please check your password";
                     entity.CloseResponseJson(HttpStatusCode.Unauthorized, webm);
                     return VfReturnType.VirtualSkip;
                 }
             }
-            //Get the user entry
-            using IUser? user = await Users.GetUserFromIDAsync(entity.Session.UserID);
-            if (webm.Assert(user != null, "Please log-out and try again."))
-            {
-                entity.CloseResponse(webm);
-                return VfReturnType.VirtualSkip;
-            }
+
             switch (mfaType.ToLower())
             {
                 //Process a Time based one time password(TOTP) creation/regeneration
                 case "totp":
                     {
+                        //Confirm totp is enabled
+                        if (webm.Assert(MultiFactor.TOTPEnabled, "TOTP is not enabled on the current server"))
+                        {
+                            entity.CloseResponse(webm);
+                            return VfReturnType.VirtualSkip;
+                        }
+
                         //generate a new secret (passing the buffer which will get copied to an array because the pw bytes can be modified during encryption)
                         byte[] secretBuffer = user.MFAGenreateTOTPSecret(MultiFactor);
                         //Alloc output buffer
@@ -167,7 +184,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                         try
                         {
                             //Encrypt the secret for the client
-                            ERRNO count = entity.Session.TryEncryptClientData(secretBuffer, outputBuffer.Span);
+                            ERRNO count = entity.TryEncryptClientData(secretBuffer, outputBuffer.Span);
                             
                             if (!count)
                             {
@@ -179,10 +196,10 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                             
                             webm.Result = new TOTPUpdateMessage()
                             {
-                                Issuer = MultiFactor.IssuerName,
-                                Digits = MultiFactor.TOTPDigits,
-                                Period = (int)MultiFactor.TOTPPeriod.TotalSeconds,
-                                Algorithm = MultiFactor.TOTPAlg.ToString(),
+                                Issuer = MultiFactor.TOTPConfig.IssuerName,
+                                Digits = MultiFactor.TOTPConfig.TOTPDigits,
+                                Period = (int)MultiFactor.TOTPConfig.TOTPPeriod.TotalSeconds,
+                                Algorithm = MultiFactor.TOTPConfig.TOTPAlg.ToString(),
                                 //Convert the secret to base64 string to send to client
                                 Base64EncSecret = Convert.ToBase64String(outputBuffer.Span[..(int)count])
                             };
@@ -194,7 +211,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                         {
                             //dispose the output buffer
                             outputBuffer.Dispose();
-                            RandomHash.GetRandomBytes(secretBuffer);
+                            MemoryUtil.InitializeBlock(secretBuffer.AsSpan());
                         }
                         //Only write changes to the db of operation was successful
                         await user.ReleaseAsync();
@@ -229,25 +246,38 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                     entity.CloseResponseJson(HttpStatusCode.BadRequest, webm);
                     return VfReturnType.VirtualSkip;
                 }
-                /*
-                 * An MFA upgrade requires a challenge to be verified because
-                 * it can break the user's ability to access their account
-                 */
-                string? challenge = request.RootElement.GetProperty("challenge").GetString();
+             
                 string? mfaType = request.RootElement.GetProperty("type").GetString();
-                if (!entity.Session.VerifyChallenge(challenge))
-                {
-                    webm.Result = "Please check your password";
-                    //return unauthorized
-                    entity.CloseResponseJson(HttpStatusCode.Unauthorized, webm);
-                    return VfReturnType.VirtualSkip;
-                }
+
                 //get the user
                 using IUser? user = await Users.GetUserFromIDAsync(entity.Session.UserID);
                 if (user == null)
                 {
                     return VfReturnType.NotFound;
                 }
+
+                /*
+                 * An MFA upgrade requires a challenge to be verified because
+                 * it can break the user's ability to access their account
+                 */
+                using (PrivateString? password = (PrivateString?)request.RootElement.GetPropString("password"))
+                {
+                    if (PrivateString.IsNullOrEmpty(password))
+                    {
+                        webm.Result = "Please check your password";
+                        entity.CloseResponseJson(HttpStatusCode.Unauthorized, webm);
+                        return VfReturnType.VirtualSkip;
+                    }
+
+                    //Verify password against the user
+                    if (!user.VerifyPassword(password, Passwords))
+                    {
+                        webm.Result = "Please check your password";
+                        entity.CloseResponseJson(HttpStatusCode.Unauthorized, webm);
+                        return VfReturnType.VirtualSkip;
+                    }
+                }
+
                 //Check for totp disable
                 if ("totp".Equals(mfaType, StringComparison.OrdinalIgnoreCase))
                 {
@@ -271,6 +301,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 {
                     webm.Result = "Invalid MFA type";
                 }
+
                 //Must write response while password is in scope
                 entity.CloseResponse(webm);
                 return VfReturnType.VirtualSkip;

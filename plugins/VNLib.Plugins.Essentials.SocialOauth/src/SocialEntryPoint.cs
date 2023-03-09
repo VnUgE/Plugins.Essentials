@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2022 Vaughn Nugent
+* Copyright (c) 2023 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.SocialOauth
@@ -23,7 +23,6 @@
 */
 
 using System;
-using System.Collections.Generic;
 
 using VNLib.Utils.Logging;
 using VNLib.Plugins.Essentials.SocialOauth.Endpoints;
@@ -39,32 +38,25 @@ namespace VNLib.Plugins.Essentials.SocialOauth
 
         protected override void OnLoad()
         {
-            try
+            //Get the discord oauth config from the config file
+            if (this.HasConfigForType<DiscordOauth>())
             {
-                //Get the discord oauth config from the config file
-                if (this.HasConfigForType<DiscordOauth>())
-                {
-                    //Add the discord login endpoint
-                    this.Route<DiscordOauth>();
-                    Log.Information("Discord social OAuth authentication loaded");
-                }
-                if (this.HasConfigForType<GitHubOauth>())
-                {
-                    //Add the github login endpoint
-                    this.Route<GitHubOauth>();
-                    Log.Information("Github social OAuth authentication loaded");
-                }
-
-                if (this.HasConfigForType<Auth0>())
-                {
-                    //Add the auth0 login endpoint
-                    this.Route<Auth0>();
-                    Log.Information("Auth0 social OAuth authentication loaded");
-                }
+                //Add the discord login endpoint
+                this.Route<DiscordOauth>();
+                Log.Information("Discord social OAuth authentication loaded");
             }
-            catch(KeyNotFoundException kne)
+            if (this.HasConfigForType<GitHubOauth>())
             {
-                Log.Error("Missing required configuration variables, {reason}", kne.Message);
+                //Add the github login endpoint
+                this.Route<GitHubOauth>();
+                Log.Information("Github social OAuth authentication loaded");
+            }
+
+            if (this.HasConfigForType<Auth0>())
+            {
+                //Add the auth0 login endpoint
+                this.Route<Auth0>();
+                Log.Information("Auth0 social OAuth authentication loaded");
             }
         }
        

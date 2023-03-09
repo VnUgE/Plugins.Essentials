@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2022 Vaughn Nugent
+* Copyright (c) 2023 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
@@ -25,14 +25,17 @@
 using System;
 using System.Linq;
 using System.Collections.Generic;
+using System.ComponentModel.Design;
 
 using VNLib.Utils.Memory;
 using VNLib.Utils.Logging;
+using VNLib.Plugins.Attributes;
 using VNLib.Plugins.Essentials.Users;
 using VNLib.Plugins.Essentials.Accounts.Endpoints;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Users;
 using VNLib.Plugins.Extensions.Loading.Routing;
+using VNLib.Plugins.Essentials.Accounts.SecurityProvider;
 
 namespace VNLib.Plugins.Essentials.Accounts
 {
@@ -41,34 +44,44 @@ namespace VNLib.Plugins.Essentials.Accounts
 
         public override string PluginName => "Essentials.Accounts";
 
+        private IAccountSecurityProvider? _securityProvider;
+
+        [ServiceConfigurator]
+        public void ConfigureServices(IServiceContainer services)
+        {
+            //Export the build in security provider 
+            if (_securityProvider != null)
+            {
+                services.AddService(typeof(IAccountSecurityProvider), _securityProvider);
+            }
+        }
+
         protected override void OnLoad()
         {
-            try
+            //Route endpoints
+            this.Route<LoginEndpoint>();
+
+            this.Route<LogoutEndpoint>();
+
+            this.Route<KeepAliveEndpoint>();
+
+            this.Route<ProfileEndpoint>();
+
+            this.Route<PasswordChangeEndpoint>();
+
+            this.Route<MFAEndpoint>();
+
+            //Only export the account security service if the configuration element is defined
+            if (this.HasConfigForType<AccountSecProvider>())
             {
-                //Route endpoints
-                this.Route<LoginEndpoint>();
+                //Inint the security provider
+                _securityProvider = this.GetOrCreateSingleton<AccountSecProvider>();
 
-                this.Route<LogoutEndpoint>();
-
-                this.Route<KeepAliveEndpoint>();
-
-                this.Route<ProfileEndpoint>();
-
-                this.Route<PasswordChangeEndpoint>();
-
-                this.Route<MFAEndpoint>();
-
-                //Write loaded to log
-                Log.Information("Plugin loaded");
+                Log.Information("Configuring the account security provider service");
             }
-            catch (KeyNotFoundException knf)
-            {
-                Log.Error("Missing required account configuration variables {mess}", knf.Message);
-            }
-            catch (UriFormatException uri)
-            {
-                Log.Error("Invalid endpoint URI {message}", uri.Message);
-            }
+
+            //Write loaded to log
+            Log.Information("Plugin loaded");
         }
 
      
@@ -88,8 +101,8 @@ namespace VNLib.Plugins.Essentials.Accounts
             }
             try
             {
-                IUserManager Users = this.GetUserManager();
-                PasswordHashing Passwords = this.GetPasswords();
+                IUserManager Users = this.GetOrCreateSingleton<UserManager>();
+                IPasswordHashingProvider Passwords = this.GetPasswords();
 
                 //get args as a list
                 List<string> args = cmd.Split(' ').ToList();

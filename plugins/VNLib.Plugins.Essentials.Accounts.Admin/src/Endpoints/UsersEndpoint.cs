@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2022 Vaughn Nugent
+* Copyright (c) 2023 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts.Admin
@@ -32,10 +32,10 @@ using VNLib.Plugins.Essentials.Users;
 using VNLib.Plugins.Essentials.Extensions;
 using VNLib.Plugins.Essentials.Accounts.Admin.Model;
 using VNLib.Plugins.Extensions.Data;
+using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Sql;
 using VNLib.Plugins.Extensions.Loading.Users;
 using VNLib.Plugins.Essentials.Accounts.Admin.Helpers;
-using VNLib.Plugins.Extensions.Loading;
 
 namespace VNLib.Plugins.Essentials.Accounts.Admin.Endpoints
 {
@@ -51,7 +51,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Admin.Endpoints
             this.LocalOnly = plugin.LocalOnlyEnabled();
             string? path = config["path"].GetString();
             //Store user-manager
-            Manager = plugin.GetUserManager();
+            Manager = plugin.GetOrCreateSingleton<UserManager>();
             //Create the indirect user context store
             UserStore = new(plugin.GetContextOptions());
             

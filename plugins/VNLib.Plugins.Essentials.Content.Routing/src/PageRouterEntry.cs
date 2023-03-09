@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2022 Vaughn Nugent
+* Copyright (c) 2023 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Content.Routing
@@ -23,32 +23,33 @@
 */
 
 using System;
-using System.Threading.Tasks;
-using System.Collections.Generic;
+using System.ComponentModel.Design;
 
 using VNLib.Utils.Logging;
+using VNLib.Plugins.Attributes;
+using VNLib.Plugins.Extensions.Loading;
+
 
 namespace VNLib.Plugins.Essentials.Content.Routing
 {
-    public sealed class PageRouterEntry : PluginBase, IPageRouter
+    public sealed class PageRouterEntry : PluginBase
     {
         public override string PluginName => "Essentials.Router";
 
         private Router PageRouter;
-        public ValueTask<FileProcessArgs> RouteAsync(HttpEntity entity) => PageRouter.RouteAsync(entity);
+
+        [ServiceConfigurator]
+        public void ConfigureServices(IServiceContainer services)
+        {
+            //Deploy the page router to the host
+            services.AddService(typeof(IPageRouter), PageRouter);
+        }
 
         protected override void OnLoad()
         {
-            try
-            {
-                //Init router
-                PageRouter = new(this);
-                Log.Information("Plugin loaded");
-            }
-            catch (KeyNotFoundException knf)
-            {
-                Log.Error("Plugin failed to load, missing required configuration variables {err}", knf.Message);
-            }
+            //Init router
+            PageRouter = this.GetOrCreateSingleton<Router>();
+            Log.Information("Plugin loaded");
         }
 
         protected override void OnUnLoad()

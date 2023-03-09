@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2022 Vaughn Nugent
+* Copyright (c) 2023 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Content.Routing
@@ -25,33 +25,32 @@
 using System;
 using System.Linq;
 using System.Buffers;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 
-using VNLib.Net.Http;
-using VNLib.Utils.Logging;
+using VNLib.Plugins.Essentials.Accounts;
+using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Sql;
-using VNLib.Plugins.Extensions.Loading.Events;
 using VNLib.Plugins.Essentials.Content.Routing.Model;
 using static VNLib.Plugins.Essentials.Accounts.AccountUtil;
 
+
 namespace VNLib.Plugins.Essentials.Content.Routing
 {
-    internal class Router : IPageRouter, IIntervalScheduleable
+    [ConfigurationName("page_router", Required = false)]
+    internal class Router : IPageRouter
     {
         private static readonly RouteComparer Comparer = new();
 
         private readonly RouteStore Store;
 
-        private readonly ConcurrentDictionary<IWebRoot, Task<ReadOnlyCollection<Route>>> RouteTable;
+        private readonly ConcurrentDictionary<IWebProcessor, Task<ReadOnlyCollection<Route>>> RouteTable;
 
         public Router(PluginBase plugin)
         {
             Store = new(plugin.GetContextOptions());
-            plugin.ScheduleInterval(this, TimeSpan.FromSeconds(30));
             RouteTable = new();
         }
 
@@ -59,11 +58,13 @@ namespace VNLib.Plugins.Essentials.Content.Routing
         public async ValueTask<FileProcessArgs> RouteAsync(HttpEntity entity)
         {
             ulong privilage = READ_MSK;
-            //Only select privilages for logged-in users
-            if (entity.Session.IsSet && entity.LoginCookieMatches() || entity.TokenMatches())
+
+            //Only select privilages for logged-in users, this is a medium security check since we may not have all data available
+            if (entity.Session.IsSet && entity.IsClientAuthorized(AuthorzationCheckLevel.Medium))
             {
                 privilage = entity.Session.Privilages;
             }
+
             //Get the routing table for the current host
             ReadOnlyCollection<Route> routes = await RouteTable.GetOrAdd(entity.RequestedRoot, LoadRoutesAsync);
             //Find the proper routine for the connection
@@ -75,7 +76,7 @@ namespace VNLib.Plugins.Essentials.Content.Routing
         /// </summary>
         public void ResetRoutes() => RouteTable.Clear();
 
-        private async Task<ReadOnlyCollection<Route>> LoadRoutesAsync(IWebRoot root)
+        private async Task<ReadOnlyCollection<Route>> LoadRoutesAsync(IWebProcessor root)
         {
             List<Route> collection = new();
             //Load all routes 
@@ -151,11 +152,6 @@ namespace VNLib.Plugins.Essentials.Content.Routing
             }
             //Test if the level and group privilages match for the current routine
             return (privilages & LEVEL_MSK) >= (route.Privilage & LEVEL_MSK) && (route.Privilage & GROUP_MSK) == (privilages & GROUP_MSK);
-        }
-
-        Task IIntervalScheduleable.OnIntervalAsync(ILogProvider log, CancellationToken cancellationToken)
-        {
-            return Task.CompletedTask;
         }
     }
 }
