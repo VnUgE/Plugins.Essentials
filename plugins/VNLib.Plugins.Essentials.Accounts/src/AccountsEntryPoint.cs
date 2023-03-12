@@ -58,18 +58,33 @@ namespace VNLib.Plugins.Essentials.Accounts
 
         protected override void OnLoad()
         {
-            //Route endpoints
-            this.Route<LoginEndpoint>();
+            //Add optional endpoint routing
 
-            this.Route<LogoutEndpoint>();
+            if (this.HasConfigForType<LoginEndpoint>())
+            {
+                this.Route<LoginEndpoint>();
+                this.Route<LogoutEndpoint>();
+            }
 
-            this.Route<KeepAliveEndpoint>();
+            if (this.HasConfigForType<KeepAliveEndpoint>())
+            {
+                this.Route<KeepAliveEndpoint>();
+            }
 
-            this.Route<ProfileEndpoint>();
+            if (this.HasConfigForType<ProfileEndpoint>())
+            {
+                this.Route<ProfileEndpoint>();
+            }
 
-            this.Route<PasswordChangeEndpoint>();
+            if (this.HasConfigForType<PasswordChangeEndpoint>())
+            {
+                this.Route<PasswordChangeEndpoint>();
+            }           
 
-            this.Route<MFAEndpoint>();
+            if (this.HasConfigForType<MFAEndpoint>())
+            {
+                this.Route<MFAEndpoint>();
+            }
 
             //Only export the account security service if the configuration element is defined
             if (this.HasConfigForType<AccountSecProvider>())
