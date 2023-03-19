@@ -31,18 +31,10 @@ using VNLib.Plugins.Extensions.Validation;
 namespace VNLib.Plugins.Essentials.Accounts.Validators
 {
 
-    internal class LoginMessageValidation : AbstractValidator<LoginMessage>
+    internal class LoginMessageValidation : ClientSecurityMessageValidator<LoginMessage>
     {
-        public LoginMessageValidation()
+        public LoginMessageValidation() :base()
         {
-            RuleFor(static t => t.ClientId)
-                .Length(min: 10, max: 100)
-                .WithMessage(errorMessage: "Your browser is not sending required security information");
-
-            RuleFor(static t => t.ClientPublicKey)
-             .NotEmpty()
-             .Length(min: 50, max: 1000)
-             .WithMessage(errorMessage: "Your browser is not sending required security information");
 
             /* Rules for user-input on passwords, set max length to avoid DOS */
             RuleFor(static t => t.Password)
@@ -65,6 +57,21 @@ namespace VNLib.Plugins.Essentials.Accounts.Validators
             RuleFor(static t => t.LocalTime.ToUniversalTime())
                 .Must(static time => time > DateTime.UtcNow.AddSeconds(-60) && time < DateTime.UtcNow.AddSeconds(60))
                 .WithMessage(errorMessage: "Please check your system clock");
+        }
+    }
+
+    internal class ClientSecurityMessageValidator<T> : AbstractValidator<T> where T: IClientSecInfo
+    {
+        public ClientSecurityMessageValidator()
+        {
+            RuleFor(static t => t.ClientId)
+                .Length(min: 10, max: 100)
+                .WithMessage(errorMessage: "Your browser is not sending required security information");
+
+            RuleFor(static t => t.PublicKey)
+             .NotEmpty()
+             .Length(min: 50, max: 1000)
+             .WithMessage(errorMessage: "Your browser is not sending required security information");
         }
     }
 }

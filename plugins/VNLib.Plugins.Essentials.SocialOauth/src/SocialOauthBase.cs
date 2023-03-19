@@ -29,7 +29,6 @@ using System.Buffers;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text.Json.Serialization;
 using System.Runtime.InteropServices;
@@ -38,6 +37,7 @@ using System.Diagnostics.CodeAnalysis;
 using FluentValidation;
 
 using RestSharp;
+
 using VNLib.Net.Http;
 using VNLib.Net.Rest.Client;
 using VNLib.Hashing;
@@ -53,6 +53,8 @@ using VNLib.Plugins.Essentials.Extensions;
 using VNLib.Plugins.Essentials.SocialOauth.Validators;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Validation;
+
+using ContentType = VNLib.Net.Http.ContentType;
 
 namespace VNLib.Plugins.Essentials.SocialOauth
 {
@@ -172,7 +174,6 @@ namespace VNLib.Plugins.Essentials.SocialOauth
         protected virtual void StaticClientPoolInitializer(RestClient client)
         {
             client.AddDefaultHeader("accept", HttpHelpers.GetContentTypeString(ContentType.Json));
-            client.UseSerializer<RestSharp.Serializers.Json.SystemTextJsonSerializer>();
         }
 
         protected virtual void OnBeforeGetToken(HttpEntity entity, string code, RestRequest state) { }

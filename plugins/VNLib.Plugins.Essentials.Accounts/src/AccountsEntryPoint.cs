@@ -86,6 +86,11 @@ namespace VNLib.Plugins.Essentials.Accounts
                 this.Route<MFAEndpoint>();
             }
 
+            if (this.HasConfigForType<PkiLoginEndpoint>())
+            {
+                this.Route<PkiLoginEndpoint>();
+            }
+
             //Only export the account security service if the configuration element is defined
             if (this.HasConfigForType<AccountSecProvider>())
             {

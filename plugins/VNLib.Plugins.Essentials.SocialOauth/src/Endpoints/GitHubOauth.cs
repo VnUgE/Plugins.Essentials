@@ -53,7 +53,6 @@ namespace VNLib.Plugins.Essentials.SocialOauth.Endpoints
 
         protected override void StaticClientPoolInitializer(RestClient client)
         {
-            client.UseSerializer<RestSharp.Serializers.Json.SystemTextJsonSerializer>();
             //add accept types of normal json and github json
             client.AcceptedContentTypes = new string[2] { "application/json", GITHUB_V3_ACCEPT };
         }

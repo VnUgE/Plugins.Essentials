@@ -29,6 +29,8 @@ using System.Threading.Tasks;
 using System.Security.Cryptography;
 using System.Text.Json.Serialization;
 
+using FluentValidation;
+
 using VNLib.Utils.Memory;
 using VNLib.Utils.Logging;
 using VNLib.Utils.Extensions;
@@ -41,7 +43,6 @@ using VNLib.Plugins.Essentials.Accounts.Validators;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Users;
 using static VNLib.Plugins.Essentials.Statics;
-
 
 namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 {
@@ -142,7 +143,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 }
                 
                 //Make sure the account has not been locked out
-                if (webm.Assert(!UserLoginLocked(user), LOCKED_ACCOUNT_MESSAGE))
+                if (webm.Assert(!UserLoginLocked(user, entity.RequestedTimeUtc), LOCKED_ACCOUNT_MESSAGE))
                 {
                     goto Cleanup;
                 }
@@ -302,7 +303,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 return VfReturnType.VirtualSkip;
             }
 
-            bool locked = UserLoginLocked(user);
+            bool locked = UserLoginLocked(user, entity.RequestedTimeUtc);
 
             //Make sure the account has not been locked out
             if (!webm.Assert(locked == false, LOCKED_ACCOUNT_MESSAGE))
@@ -383,27 +384,27 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             webm.Success = true;
             //Write to log
             Log.Verbose("Successful login for user {uid}...", user.UserID[..8]);
-        }        
+        }
 
-        public bool UserLoginLocked(IUser user)
+        public bool UserLoginLocked(IUser user, DateTimeOffset now)
         {
             //Recover last counter value
             TimestampedCounter flc = user.FailedLoginCount();
-            
-            if(flc.Count < MaxFailedLogins)
+
+            if (flc.Count < MaxFailedLogins)
             {
                 //Period exceeded
                 return false;
             }
-            
+
             //See if the flc timeout period has expired
-            if (flc.LastModified.Add(FailedCountTimeout) < DateTimeOffset.UtcNow)
+            if (flc.LastModified.Add(FailedCountTimeout) < now)
             {
                 //clear flc flag
                 user.FailedLoginCount(0);
                 return false;
             }
-            
+
             //Count has been exceeded, and has not timed out yet
             return true;
         }

@@ -78,21 +78,27 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 
         protected override async ValueTask<VfReturnType> GetAsync(HttpEntity entity)
         {
-            List<string> enabledModes = new(2);
+            string[] enabledModes = new string[3];
 
             //Load the MFA entry for the user
             using IUser? user = await Users.GetUserFromIDAsync(entity.Session.UserID);
 
             //Set the TOTP flag if set
-            if (!string.IsNullOrWhiteSpace(user?.MFAGetTOTPSecret()))
+            if (user?.MFATotpEnabled() == true)
             {
-                enabledModes.Add("totp");
+                enabledModes[0] = "totp";
             }
 
             //TODO Set fido flag if enabled
             if (!string.IsNullOrWhiteSpace(""))
             {
-                enabledModes.Add("fido");
+                enabledModes[1] = "fido";
+            }
+
+            //PKI enabled
+            if (user?.PKIEnabled() == true)
+            {
+                enabledModes[2] = "pki";
             }
 
             //Return mfa modes as an array
@@ -176,45 +182,8 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                             return VfReturnType.VirtualSkip;
                         }
 
-                        //generate a new secret (passing the buffer which will get copied to an array because the pw bytes can be modified during encryption)
-                        byte[] secretBuffer = user.MFAGenreateTOTPSecret(MultiFactor);
-                        //Alloc output buffer
-                        UnsafeMemoryHandle<byte> outputBuffer = MemoryUtil.UnsafeAlloc<byte>(4096, true);
-                        
-                        try
-                        {
-                            //Encrypt the secret for the client
-                            ERRNO count = entity.TryEncryptClientData(secretBuffer, outputBuffer.Span);
-                            
-                            if (!count)
-                            {
-                                webm.Result = "There was an error updating your credentials";
-                                //If this code is running, the client should have a valid public key stored, but log it anyway
-                                Log.Warn("TOTP secret encryption failed, for requested user {uid}", entity.Session.UserID);
-                                break;
-                            }
-                            
-                            webm.Result = new TOTPUpdateMessage()
-                            {
-                                Issuer = MultiFactor.TOTPConfig.IssuerName,
-                                Digits = MultiFactor.TOTPConfig.TOTPDigits,
-                                Period = (int)MultiFactor.TOTPConfig.TOTPPeriod.TotalSeconds,
-                                Algorithm = MultiFactor.TOTPConfig.TOTPAlg.ToString(),
-                                //Convert the secret to base64 string to send to client
-                                Base64EncSecret = Convert.ToBase64String(outputBuffer.Span[..(int)count])
-                            };
-                            
-                            //set success flag
-                            webm.Success = true;
-                        }
-                        finally
-                        {
-                            //dispose the output buffer
-                            outputBuffer.Dispose();
-                            MemoryUtil.InitializeBlock(secretBuffer.AsSpan());
-                        }
-                        //Only write changes to the db of operation was successful
-                        await user.ReleaseAsync();
+                        //Update TOTP secret for user
+                        await UpdateUserTotp(entity, user, webm);
                     }
                     break;
                 default:
@@ -311,6 +280,52 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 webm.Result = "The request was is missing required fields";
                 entity.CloseResponseJson(HttpStatusCode.UnprocessableEntity, webm);
                 return VfReturnType.BadRequest;
+            }
+        }
+
+        private async Task UpdateUserTotp(HttpEntity entity, IUser user, WebMessage webm)
+        {
+            //generate a new secret (passing the buffer which will get copied to an array because the pw bytes can be modified during encryption)
+            byte[] secretBuffer = user.MFAGenreateTOTPSecret(MultiFactor);
+            //Alloc output buffer
+            UnsafeMemoryHandle<byte> outputBuffer = MemoryUtil.UnsafeAlloc<byte>(4096, true);
+
+            try
+            {
+                //Encrypt the secret for the client
+                ERRNO count = entity.TryEncryptClientData(secretBuffer, outputBuffer.Span);
+
+                if (!count)
+                {
+                    webm.Result = "There was an error updating your credentials";
+
+                    //If this code is running, the client should have a valid public key stored, but log it anyway
+                    Log.Warn("TOTP secret encryption failed, for requested user {uid}", entity.Session.UserID);
+                }
+                else
+                {
+                    webm.Result = new TOTPUpdateMessage()
+                    {
+                        Issuer = MultiFactor.TOTPConfig.IssuerName,
+                        Digits = MultiFactor.TOTPConfig.TOTPDigits,
+                        Period = (int)MultiFactor.TOTPConfig.TOTPPeriod.TotalSeconds,
+                        Algorithm = MultiFactor.TOTPConfig.TOTPAlg.ToString(),
+                        //Convert the secret to base64 string to send to client
+                        Base64EncSecret = Convert.ToBase64String(outputBuffer.Span[..(int)count])
+                    };
+
+                    //set success flag
+                    webm.Success = true;
+
+                    //Only write changes to the db of operation was successful
+                    await user.ReleaseAsync();
+                }
+            }
+            finally
+            {
+                //dispose the output buffer
+                outputBuffer.Dispose();
+                MemoryUtil.InitializeBlock(secretBuffer.AsSpan());
             }
         }
     }

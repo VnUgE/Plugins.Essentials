@@ -23,7 +23,9 @@
 */
 
 using System;
+using System.Text;
 using System.Linq;
+using System.Buffers;
 using System.Text.Json;
 using System.Collections.Generic;
 using System.Security.Cryptography;
@@ -46,6 +48,8 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
         public const string TOTP_KEY_ENTRY = "mfa.totp";
         public const string PGP_PUB_KEY = "mfa.pgpp";
         public const string SESSION_SIG_KEY = "mfa.sig";
+
+        public const string USER_PKI_ENTRY = "mfa.pki";
 
         /// <summary>
         /// Determines if the user account has an 
@@ -184,6 +188,75 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
             //calculate the modulus value
             TOTPCode %= (uint)Math.Pow(10, config.TOTPDigits);
             return TOTPCode;
+        }
+
+        #endregion
+
+        #region PKI
+        const int JWK_KEY_BUFFER_SIZE = 2048;
+
+        /// <summary>
+        /// Gets a value that determines if the user has PKI enabled
+        /// </summary>
+        /// <param name="user"></param>
+        /// <returns>True if the user has a PKI key stored in their user account</returns>
+        public static bool PKIEnabled(this IUser user) => !string.IsNullOrWhiteSpace(user[USER_PKI_ENTRY]);
+
+        /// <summary>
+        /// Verifies a PKI login JWT against the user's stored login key data
+        /// </summary>
+        /// <param name="user">The user requesting a login</param>
+        /// <param name="jwt">The login jwt to verify</param>
+        /// <param name="keyId">The id of the key that generated the request, it must match the id of the stored key</param>
+        /// <returns>True if the user has PKI enabled, the key was recovered, the key id matches, and the JWT signature is verified</returns>
+        public static bool PKIVerifyUserJWT(this IUser user, JsonWebToken jwt, string keyId)
+        {
+            //Recover key data from user, it may not be enabled
+            using ReadOnlyJsonWebKey? jwk = RecoverKey(user);
+
+            if(jwk == null)
+            {
+                return false;
+            }
+
+            //Confim the key id matches
+            if(!keyId.Equals(jwk.KeyId, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            //verify the jwt
+            return jwt.VerifyFromJwk(jwk);
+        }
+
+        public static void PKISetUserKey(this IUser user, IReadOnlyDictionary<string, string>? keyData) 
+        {
+            //Store key data
+            user.SetObject(USER_PKI_ENTRY, keyData);
+        }
+
+        private static ReadOnlyJsonWebKey? RecoverKey(IUser user)
+        {
+            string? keyData = user[USER_PKI_ENTRY];
+
+            if(string.IsNullOrEmpty(keyData))
+            {
+                return null;
+            }
+
+            //Get buffer to recover the key data from
+            byte[] buffer = ArrayPool<byte>.Shared.Rent(JWK_KEY_BUFFER_SIZE);
+            try
+            {
+                //Recover bytes and get the jwk from the data
+                int encoded = Encoding.UTF8.GetBytes(keyData, buffer);
+                return new ReadOnlyJsonWebKey(buffer.AsSpan(0, encoded));
+            }
+            finally
+            {
+                MemoryUtil.InitializeBlock(buffer.AsSpan());
+                ArrayPool<byte>.Shared.Return(buffer);
+            }
         }
 
         #endregion

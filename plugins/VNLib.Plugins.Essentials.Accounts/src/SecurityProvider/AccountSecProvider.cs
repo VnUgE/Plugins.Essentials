@@ -32,7 +32,6 @@
  */
 
 using System;
-using System.Text;
 using System.Text.Json;
 using System.Security.Cryptography;
 using System.Diagnostics.CodeAnalysis;
@@ -52,18 +51,18 @@ using VNLib.Plugins.Essentials.Extensions;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Validation;
 
-
 namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
 {
     [ConfigurationName("account_security", Required = false)]
     internal class AccountSecProvider : IAccountSecurityProvider
     {
         private const int PUB_KEY_JWT_NONCE_SIZE = 16;
-        private const int PUB_KEY_ENCODE_BUFFER_SIZE = 128;
 
         //Session entry keys
         private const string CLIENT_PUB_KEY_ENTRY = "acnt.pbk";
         private const string PUBLIC_KEY_SIG_KEY_ENTRY = "acnt.pbsk";
+
+        private const HashAlg ClientTokenHmacType = HashAlg.SHA256;
 
 
         /// <summary>
@@ -71,13 +70,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
         /// </summary>
         public static readonly RSAEncryptionPadding ClientEncryptonPadding = RSAEncryptionPadding.OaepSHA256;
 
-        /*
-         * Using the P-256 curve for message signing
-         */
-        private static readonly ECCurve DefaultCurv = ECCurve.NamedCurves.nistP256;
-        private static readonly HashAlgorithmName DefaultHashAlg = HashAlgorithmName.SHA256;
-
-        private static HMAC GetPubKeySigningAlg(byte[] key) => new HMACSHA256(key);
+        //private static HMAC GetPubKeySigningAlg(byte[] key) => new HMACSHA256(key);
 
         private readonly AccountSecConfig _config;
 
@@ -255,54 +248,25 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             {
                 ERRNO result = VnEncoding.TryFromBase64Chars(publicKey, buffer);
                 return buffer.Slice(0, result);
-            }
-
-            static string EpxortPubKey(ECDsa alg)
-            {
-                //Stack buffer
-                Span<byte> buffer = stackalloc byte[PUB_KEY_ENCODE_BUFFER_SIZE];
-
-                if(!alg.TryExportSubjectPublicKeyInfo(buffer, out int written))
-                {
-                    throw new InternalBufferTooSmallException("Failed to export the public key because the internal buffer is too small");
-                }
-
-                //Convert to base64
-                string base64 = Convert.ToBase64String(buffer[..written]);
-                MemoryUtil.InitializeBlock(buffer);
-                return base64;
-            }
+            }        
 
             //Alloc buffer for encode/decode
-            using IMemoryHandle<byte> buffer = MemoryUtil.SafeAllocNearestPage<byte>(8000, true);
+            using IMemoryHandle<byte> buffer = MemoryUtil.SafeAllocNearestPage<byte>(4000, true);
             try
             {
                 using RSA rsa = RSA.Create();
 
                 //Import the client's public key
-                rsa.ImportSubjectPublicKeyInfo(PublicKey(publicKey, buffer.Span), out _);
+                rsa.ImportSubjectPublicKeyInfo(PublicKey(publicKey, buffer.Span), out _);              
 
-                string pubKey;
+                Span<byte> secretBuffer = buffer.Span[.._config.TokenKeySize];
+                Span<byte> outputBuffer = buffer.Span[_config.TokenKeySize..];
 
-                Span<byte> privKeyBuffer = buffer.Span[..512];
-                Span<byte> outputBuffer = buffer.Span[512..];
-
-                //Init the ecdsa keypair for message signing
-                using (ECDsa keypair = ECDsa.Create(DefaultCurv))
-                {
-                    //Export private key
-                    pubKey = EpxortPubKey(keypair);
-                    //Export private key to buffer
-                    if(!keypair.TryExportPkcs8PrivateKey(privKeyBuffer, out int written))
-                    {
-                        throw new InternalBufferTooSmallException("Failed to export the client's new private key");
-                    }
-                    //resize the buffe
-                    privKeyBuffer = privKeyBuffer[0..written];
-                }
+                //Computes a random shared key
+                RandomHash.GetRandomBytes(secretBuffer);
 
                 //Encyrpt the private key to send to client
-                if (!rsa.TryEncrypt(privKeyBuffer, outputBuffer, ClientEncryptonPadding, out int bytesEncrypted))
+                if (!rsa.TryEncrypt(secretBuffer, outputBuffer, ClientEncryptonPadding, out int bytesEncrypted))
                 {
                     throw new InternalBufferTooSmallException("The internal buffer used to store the encrypted token is too small");
                 }
@@ -313,7 +277,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                     //Client token is the encrypted private key
                     ClientToken = Convert.ToBase64String(outputBuffer[..bytesEncrypted]),
                     //Store public key as the server token
-                    ServerToken = pubKey
+                    ServerToken = VnEncoding.ToBase32String(secretBuffer)
                 };
             }
             finally
@@ -325,18 +289,6 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
 
         private bool VerifyClientToken(HttpEntity entity)
         {
-            static void InitPubKey(string privKey, ECDsa alg)
-            {
-                Span<byte> buffer = stackalloc byte[PUB_KEY_ENCODE_BUFFER_SIZE];
-                if(!Convert.TryFromBase64Chars(privKey, buffer, out int bytes))
-                {
-                    throw new InternalBufferTooSmallException("The decoding buffer is too small to store the public key");
-                }
-
-                //Import private key
-                alg.ImportSubjectPublicKeyInfo(buffer[..bytes], out _);
-            }
-
             //Get the token from the client header, the client should always sent this
             string? signedMessage = entity.Server.Headers[_config.TokenHeaderName];
          
@@ -346,9 +298,9 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                 return false;
             }
 
-            //Get the stored public key
-            string publicKey = entity.Session.Token;
-            if (string.IsNullOrWhiteSpace(publicKey))
+            //Get the stored shared symetric key
+            string sharedKey = entity.Session.Token;
+            if (string.IsNullOrWhiteSpace(sharedKey))
             {
                 return false;
             }
@@ -364,15 +316,19 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             {
                 //Parse the client jwt signed message
                 using JsonWebToken jwt = JsonWebToken.Parse(signedMessage);
-
-                //It should be verifiable from the stored public key
-                using(ECDsa alg = ECDsa.Create(DefaultCurv))
+               
+                using (UnsafeMemoryHandle<byte> decodeBuffer = MemoryUtil.UnsafeAllocNearestPage<byte>(_config.TokenKeySize, true))
                 {
-                    //Import public key
-                    InitPubKey(publicKey, alg);
+                    //Recover the key from base32
+                    ERRNO count = VnEncoding.TryFromBase32Chars(sharedKey, decodeBuffer.Span);
 
-                    //Verify jwt
-                    isValid &= jwt.Verify(alg, in DefaultHashAlg);
+                    if (!count)
+                    {
+                        return false;
+                    }
+
+                    //Verity the jwt against the store symmetric key
+                    isValid &= jwt.Verify(decodeBuffer.AsSpan(0, count), ClientTokenHmacType);
                 }
 
                 //Get the message payload
@@ -613,12 +569,8 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             //genreate random signing key to store in the user's session
             byte[] signingKey = RandomHash.GetRandomBytes(_config.PubKeySigningKeySize);
 
-            //Sign using hmac 256
-            using (HMAC hmac = GetPubKeySigningAlg(signingKey))
-            {
-                //Sign jwt
-                jwt.Sign(hmac);
-            }
+            //Sign jwt
+            jwt.Sign(signingKey, ClientTokenHmacType);
 
             //base32 encode the signing key 
             string base32SigningKey = VnEncoding.ToBase32String(signingKey, false);
@@ -652,6 +604,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
         {
             pubKey = null;
 
+            //Check session is valid for use
             if (!entity.Session.IsSet || entity.Session.IsNew || entity.Session.SessionType != SessionType.Web)
             {
                 return false;
@@ -678,12 +631,9 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             byte[] signingKey = VnEncoding.FromBase32String(base32Sig)!;
 
             //verify the client signature
-            using (HMAC hmac = GetPubKeySigningAlg(signingKey))
+            if (!jwt.Verify(signingKey, ClientTokenHmacType))
             {
-                if (!jwt.Verify(hmac))
-                {
-                    return false;
-                }
+                return false;
             }
 
             //Verify expiration
@@ -756,6 +706,10 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                 //Time difference doesnt need to be validated, it may be 0 to effectively disable it
                 val.RuleFor(c => c.SignedTokenTimeDiff);
 
+                val.RuleFor(c => c.TokenKeySize)
+                    .InclusiveBetween(8, 512)
+                    .WithMessage("You should choose an OTP symmetric key size between 8 and 512 bytes");
+
                 return val;
             }
 
@@ -803,7 +757,12 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             [JsonPropertyName("otp_header_name")]
             public string TokenHeaderName { get; set; } = "X-Web-Token";
 
-            public int PasswordChallengeKeySize { get; set; } = 128;
+            /// <summary>
+            /// The size (in bytes) of the symmetric key used
+            /// by the client to sign token messages
+            /// </summary>
+            [JsonPropertyName("otp_key_size")]
+            public int TokenKeySize { get; set; } = 64;
 
             /// <summary>
             /// The name of the cookie that stores the user's signed public encryption key
