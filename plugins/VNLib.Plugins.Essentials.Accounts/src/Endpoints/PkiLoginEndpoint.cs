@@ -120,7 +120,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             JsonWebToken jwt;
             try
             {
-                //We can try to recover the jwt data
+                //We can try to recover the jwt data, if the data is invalid, 
                 jwt = JsonWebToken.Parse(login.LoginJwt);
             }
             catch (KeyNotFoundException)
@@ -197,7 +197,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 if (webm.Assert(user.PKIVerifyUserJWT(jwt, authInfo.KeyId) == true, INVALID_MESSAGE))
                 {
                     //increment flc on invalid signature
-                    user.FailedLoginIncrement();
+                    user.FailedLoginIncrement(entity.RequestedTimeUtc);
                     await user.ReleaseAsync();
 
                     entity.CloseResponse(webm);
@@ -399,7 +399,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             if (flc.LastModified.AddSeconds(_config.FailedCountTimeoutSec) < now)
             {
                 //clear flc flag
-                user.FailedLoginCount(0);
+                user.ClearFailedLoginCount();
                 return false;
             }
 
@@ -430,7 +430,11 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 RuleFor(l => l.LoginJwt)
                     .NotEmpty()
                     .MinimumLength(50)
-                    .IllegalCharacters();
+                    //Token should not contain illegal chars, only base64url + '.'
+                    .IllegalCharacters()
+                    //Make sure the jwt contains exacly 2 '.' chracters
+                    .Must(static l => l.Where(static c => c == '.').Count() == 2)
+                    .WithMessage("Your credential is not a valid Json Web Token");
             }
         }
 

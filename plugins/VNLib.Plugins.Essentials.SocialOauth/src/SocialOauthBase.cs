@@ -80,14 +80,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth
         protected virtual OauthClientConfig Config { get; }
         
         ///<inheritdoc/>
-        protected override ProtectionSettings EndpointProtectionSettings { get; } = new()
-        {
-            /*
-             * Disable cross site checking because the OAuth2 flow requires
-             * cross site when redirecting the client back
-             */
-            DisableCrossSiteDenied = true
-        };
+        protected override ProtectionSettings EndpointProtectionSettings { get; } = new();
 
         /// <summary>
         /// The resst client connection pool

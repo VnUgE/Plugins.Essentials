@@ -54,6 +54,12 @@ namespace VNLib.Plugins.Essentials.Content.Routing
             RouteTable = new();
         }
 
+        public Router(PluginBase plugin, IConfigScope config)
+        {
+            Store = new(plugin.GetContextOptions());
+            RouteTable = new();
+        }
+
         ///<inheritdoc/>
         public async ValueTask<FileProcessArgs> RouteAsync(HttpEntity entity)
         {

@@ -153,21 +153,18 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                 return false;
             }
 
-            switch (level)
+            //Reconcile cookies on request
+            ReconcileCookies(entity);
+
+            return level switch
             {
                 //Accept the client token or the cookie as any/medium 
-                case AuthorzationCheckLevel.Any:
-                case AuthorzationCheckLevel.Medium:
-                    return VerifyLoginCookie(entity) || VerifyClientToken(entity);
-
+                AuthorzationCheckLevel.Any or AuthorzationCheckLevel.Medium => VerifyLoginCookie(entity) || VerifyClientToken(entity),
                 //Critical requires that the client cookie is set and the token is set
-                case AuthorzationCheckLevel.Critical:
-                    return VerifyLoginCookie(entity) && VerifyClientToken(entity);
-
+                AuthorzationCheckLevel.Critical => VerifyLoginCookie(entity) && VerifyClientToken(entity),
                 //Default to false condition
-                default:
-                    return false;
-            }
+                _ => false,
+            };
         }
 
         IClientAuthorization IAccountSecurityProvider.ReAuthorizeClient(HttpEntity entity)
@@ -366,6 +363,21 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
         #endregion
 
         #region Cookies
+
+        private void ReconcileCookies(HttpEntity entity)
+        {
+            //Only handle cookies if session is loaded and is a web based session
+            if (!entity.Session.IsSet || entity.Session.SessionType != SessionType.Web)
+            {
+                return;
+            }
+            
+            //If the session is new, or not supposed to be logged in, clear the login cookies if they were set
+            if (entity.Session.IsNew || string.IsNullOrEmpty(entity.Session.LoginHash) || string.IsNullOrEmpty(entity.Session.Token))
+            {
+                ExpireCookies(entity);
+            }
+        }
         
         private bool VerifyLoginCookie(HttpEntity entity)
         {
@@ -389,11 +401,11 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
 
 
             //Alloc buffer for decoding the base64 signatures
-            using UnsafeMemoryHandle<byte> buffer = MemoryUtil.UnsafeAllocNearestPage<byte>(2 * entity.Session.LoginHash.Length, true);
+            using UnsafeMemoryHandle<byte> buffer = MemoryUtil.UnsafeAllocNearestPage<byte>(2 * _config.LoginCookieSize, true);
 
             //Slice up buffers 
             Span<byte> cookieBuffer = buffer.Span[.._config.LoginCookieSize];
-            Span<byte> sessionBuffer = buffer.Span.Slice(_config.LoginCookieSize, _config.LoginCookieSize);
+            Span<byte> sessionBuffer = buffer.AsSpan(_config.LoginCookieSize, _config.LoginCookieSize);
             
             //Convert cookie and session hash value
             if (Convert.TryFromBase64Chars(cookie, cookieBuffer, out int cookieBytesWriten)
@@ -405,6 +417,8 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                     return true;
                 }
             }
+            //Clear login cookie if failed
+            ExpireCookies(entity);
             return false;
         }
 
@@ -413,17 +427,48 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             //Expire login cookie if set
             if (entity.Server.RequestCookies.ContainsKey(_config.LoginCookieName))
             {
-                entity.Server.ExpireCookie(_config.LoginCookieName, sameSite: CookieSameSite.SameSite);
+                HttpCookie pkCookie = new(_config.LoginCookieName, string.Empty)
+                {
+                    Domain = _config.CookieDomain,
+                    Path = _config.CookiePath,
+                    ValidFor = TimeSpan.Zero,
+                    SameSite = CookieSameSite.SameSite,
+                    HttpOnly = true,
+                    Secure = true
+                };
+
+                entity.Server.SetCookie(in pkCookie);
             }
             //Expire the LI cookie if set
             if (entity.Server.RequestCookies.ContainsKey(_config.ClientStatusCookieName))
             {
-                entity.Server.ExpireCookie(_config.ClientStatusCookieName, sameSite: CookieSameSite.SameSite);
+                HttpCookie pkCookie = new(_config.ClientStatusCookieName, string.Empty)
+                {
+                    Domain = _config.CookieDomain,
+                    Path = _config.CookiePath,
+                    ValidFor = TimeSpan.Zero,
+                    SameSite = CookieSameSite.SameSite,
+                    HttpOnly = true,
+                    Secure = true
+                };
+
+                entity.Server.SetCookie(in pkCookie);
             }
             //Expire pupkey cookie
             if (entity.Server.RequestCookies.ContainsKey(_config.PubKeyCookieName))
             {
-                entity.Server.ExpireCookie(_config.PubKeyCookieName, sameSite: CookieSameSite.SameSite);
+                //Init exipiration cookie
+                HttpCookie pkCookie = new(_config.PubKeyCookieName, string.Empty)
+                {
+                    Domain = _config.CookieDomain,
+                    Path = _config.CookiePath,
+                    ValidFor = TimeSpan.Zero,
+                    SameSite = CookieSameSite.SameSite,
+                    HttpOnly = true,
+                    Secure = true
+                };
+
+                entity.Server.SetCookie(in pkCookie);
             }
         }
 

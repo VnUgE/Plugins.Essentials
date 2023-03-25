@@ -53,7 +53,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
     [ConfigurationName("login_endpoint")]
     internal sealed class LoginEndpoint : UnprotectedWebEndpoint
     {
-        public const string INVALID_MESSAGE = "Please check your email or password.";
+        public const string INVALID_MESSAGE = "Please check your email or password. You may get locked out.";
         public const string LOCKED_ACCOUNT_MESSAGE = "You have been timed out, please try again later";
         public const string MFA_ERROR_MESSAGE = "Invalid or expired request.";
 
@@ -159,7 +159,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 }
 
                 //Inc failed login count
-                user.FailedLoginIncrement();
+                user.FailedLoginIncrement(entity.RequestedTimeUtc);
                 webm.Result = INVALID_MESSAGE;
 
             Cleanup:
@@ -181,8 +181,10 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             {
                 return false;
             }
-            //Reset flc for account
-            user.FailedLoginCount(0);
+
+            //Reset flc for account, either the user will be authorized, or the mfa will be triggered, but the flc should be reset
+            user.ClearFailedLoginCount();
+
             try
             {
                 if (user.Status == UserStatus.Active)
@@ -342,7 +344,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                         {
                             webm.Result = "Please check your code.";
                             //Increment flc and update the user in the store
-                            user.FailedLoginIncrement();                           
+                            user.FailedLoginIncrement(entity.RequestedTimeUtc);                           
                             return;
                         }
                         //Valid, complete                         
@@ -401,7 +403,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             if (flc.LastModified.Add(FailedCountTimeout) < now)
             {
                 //clear flc flag
-                user.FailedLoginCount(0);
+                user.ClearFailedLoginCount();
                 return false;
             }
 
