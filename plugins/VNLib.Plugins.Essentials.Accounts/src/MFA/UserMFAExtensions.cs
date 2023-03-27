@@ -121,7 +121,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
                 return false;
             }
             //Alloc buffer with zero o
-            using UnsafeMemoryHandle<byte> buffer = MemoryUtil.UnsafeAlloc<byte>(base32Secret.Length, true);
+            using UnsafeMemoryHandle<byte> buffer = MemoryUtil.UnsafeAlloc(base32Secret.Length, true);
             ERRNO count = VnEncoding.TryFromBase32Chars(base32Secret, buffer);
             //Verify the TOTP using the decrypted secret
             return count && VerifyTOTP(code, buffer.AsSpan(0, count), config.TOTPConfig);

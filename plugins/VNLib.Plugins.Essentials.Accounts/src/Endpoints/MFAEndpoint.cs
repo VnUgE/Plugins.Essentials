@@ -288,7 +288,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             //generate a new secret (passing the buffer which will get copied to an array because the pw bytes can be modified during encryption)
             byte[] secretBuffer = user.MFAGenreateTOTPSecret(MultiFactor);
             //Alloc output buffer
-            UnsafeMemoryHandle<byte> outputBuffer = MemoryUtil.UnsafeAlloc<byte>(4096, true);
+            UnsafeMemoryHandle<byte> outputBuffer = MemoryUtil.UnsafeAlloc(4096, true);
 
             try
             {
