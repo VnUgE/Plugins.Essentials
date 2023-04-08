@@ -59,7 +59,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 
             Users = pbase.GetOrCreateSingleton<UserManager>();
             MultiFactor = pbase.GetConfigElement<MFAConfig>();
-            Passwords = pbase.GetPasswords();
+            Passwords = pbase.GetOrCreateSingleton<ManagedPasswordHashing>();
         }
 
         private class TOTPUpdateMessage

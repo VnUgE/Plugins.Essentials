@@ -71,7 +71,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             InitPathAndLog(path, pbase.Log);
 
             Users = pbase.GetOrCreateSingleton<UserManager>();
-            Passwords = pbase.GetPasswords();
+            Passwords = pbase.GetOrCreateSingleton<ManagedPasswordHashing>();
             ResetMessValidator = GetMessageValidator();
             mFAConfig = pbase.GetConfigElement<MFAConfig>();
         }

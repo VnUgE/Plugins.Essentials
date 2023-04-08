@@ -88,7 +88,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
             //Init reg jwt validator
             RegJwtValdidator = GetJwtValidator();
 
-            Passwords = plugin.GetPasswords();
+            Passwords = plugin.GetOrCreateSingleton<ManagedPasswordHashing>();
             Users = plugin.GetOrCreateSingleton<UserManager>();
             RevokedTokens = new(plugin.GetContextOptions());
             Emails = plugin.GetOrCreateSingleton<TEmailConfig>();

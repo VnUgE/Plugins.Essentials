@@ -122,7 +122,7 @@ namespace VNLib.Plugins.Essentials.Accounts
             try
             {
                 IUserManager Users = this.GetOrCreateSingleton<UserManager>();
-                IPasswordHashingProvider Passwords = this.GetPasswords();
+                IPasswordHashingProvider Passwords = this.GetOrCreateSingleton<ManagedPasswordHashing>();
 
                 //get args as a list
                 List<string> args = cmd.Split(' ').ToList();

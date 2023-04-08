@@ -66,7 +66,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth
             InitClaimValidFor = config["claim_valid_for_sec"].GetTimeSpan(TimeParseType.Seconds);
 
             Users = plugin.GetOrCreateSingleton<UserManager>();
-            Passwords = plugin.GetPasswords();
+            Passwords = plugin.GetOrCreateSingleton<ManagedPasswordHashing>();
         }
 
         public async Task ConfigureServiceAsync(PluginBase plugin)

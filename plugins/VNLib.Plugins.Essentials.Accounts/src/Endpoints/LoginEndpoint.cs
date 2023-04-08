@@ -44,6 +44,7 @@ using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Users;
 using static VNLib.Plugins.Essentials.Statics;
 
+
 namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 {
 
@@ -73,7 +74,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 
             InitPathAndLog(path, pbase.Log);
 
-            Passwords = pbase.GetPasswords();
+            Passwords = pbase.GetOrCreateSingleton<ManagedPasswordHashing>();
             Users = pbase.GetOrCreateSingleton<UserManager>();
             MultiFactor = pbase.GetConfigElement<MFAConfig>();
         }
