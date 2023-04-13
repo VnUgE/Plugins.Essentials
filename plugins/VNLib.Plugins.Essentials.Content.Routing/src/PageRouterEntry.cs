@@ -23,12 +23,14 @@
 */
 
 using System;
+using System.Threading.Tasks;
 using System.ComponentModel.Design;
 
 using VNLib.Utils.Logging;
 using VNLib.Plugins.Attributes;
 using VNLib.Plugins.Extensions.Loading;
-
+using VNLib.Plugins.Extensions.Loading.Sql;
+using VNLib.Plugins.Essentials.Content.Routing.Model;
 
 namespace VNLib.Plugins.Essentials.Content.Routing
 {
@@ -49,6 +51,10 @@ namespace VNLib.Plugins.Essentials.Content.Routing
         {
             //Init router
             PageRouter = this.GetOrCreateSingleton<Router>();
+
+            //Schedule the db creation
+            _ = this.ObserveWork(OnDbCreationAsync, 500);
+
             Log.Information("Plugin loaded");
         }
 
@@ -64,6 +70,12 @@ namespace VNLib.Plugins.Essentials.Content.Routing
                 PageRouter?.ResetRoutes();
                 Log.Information("Routing table reset");
             }
+        }
+
+        private async Task OnDbCreationAsync()
+        {
+            //Create the router
+            await this.EnsureDbCreatedAsync<RoutingContext>(null);
         }
     }
 }

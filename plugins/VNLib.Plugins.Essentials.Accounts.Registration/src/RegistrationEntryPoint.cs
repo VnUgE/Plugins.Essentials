@@ -25,6 +25,7 @@
 using VNLib.Utils.Logging;
 
 using VNLib.Plugins.Extensions.Loading;
+using VNLib.Plugins.Extensions.Loading.Sql;
 using VNLib.Plugins.Extensions.Loading.Routing;
 using VNLib.Plugins.Essentials.Accounts.Registration.Endpoints;
 
@@ -39,7 +40,16 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration
             //Route reg endpoint
             this.Route<RegistrationEntpoint>();
 
+            //Schedule creating database tables
+            _ = this.ObserveWork(CreateDatabaseTables, 1000);
+
             Log.Information("Plugin loaded");
+        }
+
+        private async Task CreateDatabaseTables()
+        {
+            //Ensure the database is created
+            await this.EnsureDbCreatedAsync<RegistrationContext>(this);
         }
         
         protected override void OnUnLoad()

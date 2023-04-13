@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2022 Vaughn Nugent
+* Copyright (c) 2023 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Content.Routing
@@ -27,15 +27,64 @@ using System;
 using Microsoft.EntityFrameworkCore;
 
 using VNLib.Plugins.Extensions.Data;
+using VNLib.Plugins.Extensions.Loading.Sql;
 
 namespace VNLib.Plugins.Essentials.Content.Routing.Model
 {
-    internal class RoutingContext : TransactionalDbContext
+    internal class RoutingContext : TransactionalDbContext, IDbTableDefinition
     {
         public DbSet<Route> Routes { get; set; }
 
+#nullable disable
+
         public RoutingContext(DbContextOptions options) :base(options)
         {
+        }
+
+        public RoutingContext()
+        {}
+
+#nullable enable
+
+        public void OnDatabaseCreating(IDbContextBuilder builder, object? userState)
+        {
+            //Build the route table
+
+            builder.DefineTable<Route>(nameof(Routes))
+                .WithColumn(r => r.Id)
+                    .MaxLength(50)
+                    .Next()
+
+                .WithColumn(r => r.Hostname)
+                    .MaxLength(100)
+                    .AllowNull(false)
+                    .Next()
+
+                .WithColumn(r => r.MatchPath)
+                    .MaxLength(1000)
+                    .AllowNull(false)
+                    .Next()
+
+                //Default to read-on
+                .WithColumn(r => r.Privilage)
+                    .WithDefault(Accounts.AccountUtil.READ_MSK)
+                    .AllowNull(false)
+                    .Next()
+
+                .WithColumn(r => r.Alternate)
+                    .MaxLength(1000)
+                    .Next()
+
+                .WithColumn(r => (int)r.Routine)
+                    .WithDefault(FpRoutine.Continue)
+                    .Next()
+
+                .WithColumn(r => r.Created)
+                    .AllowNull(false)
+                    .Next()
+
+                .WithColumn(r => r.LastModified)
+                    .AllowNull(false);
         }
     }
 }

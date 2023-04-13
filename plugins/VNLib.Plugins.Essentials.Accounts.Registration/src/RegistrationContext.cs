@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2022 Vaughn Nugent
+* Copyright (c) 2023 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts.Registration
@@ -25,15 +25,33 @@
 using Microsoft.EntityFrameworkCore;
 
 using VNLib.Plugins.Extensions.Data;
+using VNLib.Plugins.Extensions.Loading.Sql;
 using VNLib.Plugins.Essentials.Accounts.Registration.TokenRevocation;
 
 namespace VNLib.Plugins.Essentials.Accounts.Registration
 {
-    internal class RegistrationContext : TransactionalDbContext
+    internal class RegistrationContext : TransactionalDbContext, IDbTableDefinition
     {
         public DbSet<RevokedToken> RevokedRegistrationTokens { get; set; }
         
         public RegistrationContext(DbContextOptions options) : base(options)
         {}
+
+        public RegistrationContext()
+        {}
+
+        public void OnDatabaseCreating(IDbContextBuilder builder, object? state)
+        {
+            //Define a table for the revoked tokens
+            builder.DefineTable<RevokedToken>(nameof(RevokedRegistrationTokens))
+                //Define the token column and the created column, let the framework determine the data-types
+                .WithColumn(p => p.Token)
+                    .MaxLength(200)
+                    .Next()
+
+                //Define the next column
+                .WithColumn(p => p.Created)
+                    .AllowNull(false);
+        }
     }
 }

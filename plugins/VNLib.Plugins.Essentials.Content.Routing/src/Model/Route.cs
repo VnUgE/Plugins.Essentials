@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2022 Vaughn Nugent
+* Copyright (c) 2023 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Content.Routing
@@ -23,6 +23,7 @@
 */
 
 using System;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 using Microsoft.EntityFrameworkCore;
@@ -34,6 +35,7 @@ namespace VNLib.Plugins.Essentials.Content.Routing.Model
     [Index(nameof(Id), IsUnique = true)]
     internal class Route : DbModelBase
     {
+        [Key]
         public override string Id { get; set; }
         public override DateTime Created { get; set; }
         public override DateTime LastModified { get; set; }

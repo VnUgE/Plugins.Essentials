@@ -64,13 +64,10 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
 
         private const HashAlg ClientTokenHmacType = HashAlg.SHA256;
 
-
         /// <summary>
         /// The client data encryption padding.
         /// </summary>
         public static readonly RSAEncryptionPadding ClientEncryptonPadding = RSAEncryptionPadding.OaepSHA256;
-
-        //private static HMAC GetPubKeySigningAlg(byte[] key) => new HMACSHA256(key);
 
         private readonly AccountSecConfig _config;
 
@@ -248,7 +245,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             }        
 
             //Alloc buffer for encode/decode
-            using IMemoryHandle<byte> buffer = MemoryUtil.SafeAllocNearestPage<byte>(4000, true);
+            using IMemoryHandle<byte> buffer = MemoryUtil.SafeAllocNearestPage(4000, true);
             try
             {
                 using RSA rsa = RSA.Create();
@@ -314,7 +311,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                 //Parse the client jwt signed message
                 using JsonWebToken jwt = JsonWebToken.Parse(signedMessage);
                
-                using (UnsafeMemoryHandle<byte> decodeBuffer = MemoryUtil.UnsafeAllocNearestPage<byte>(_config.TokenKeySize, true))
+                using (UnsafeMemoryHandle<byte> decodeBuffer = MemoryUtil.UnsafeAllocNearestPage(_config.TokenKeySize, true))
                 {
                     //Recover the key from base32
                     ERRNO count = VnEncoding.TryFromBase32Chars(sharedKey, decodeBuffer.Span);
@@ -401,7 +398,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
 
 
             //Alloc buffer for decoding the base64 signatures
-            using UnsafeMemoryHandle<byte> buffer = MemoryUtil.UnsafeAllocNearestPage<byte>(2 * _config.LoginCookieSize, true);
+            using UnsafeMemoryHandle<byte> buffer = MemoryUtil.UnsafeAllocNearestPage(2 * _config.LoginCookieSize, true);
 
             //Slice up buffers 
             Span<byte> cookieBuffer = buffer.Span[.._config.LoginCookieSize];
@@ -496,7 +493,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             }
 
             //Alloc a buffer for decoding the public key
-            using UnsafeMemoryHandle<byte> pubKeyBuffer = MemoryUtil.UnsafeAllocNearestPage<byte>(base64PubKey.Length, true);
+            using UnsafeMemoryHandle<byte> pubKeyBuffer = MemoryUtil.UnsafeAllocNearestPage(base64PubKey.Length, true);
 
             //Decode the public key
             ERRNO pbkBytesWritten = VnEncoding.TryFromBase64Chars(base64PubKey, pubKeyBuffer.Span);

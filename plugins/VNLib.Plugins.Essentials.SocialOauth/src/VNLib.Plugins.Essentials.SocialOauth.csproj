@@ -39,7 +39,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\..\core\lib\Net.Rest.Client\src\VNLib.Net.Rest.Client.csproj" />
     <ProjectReference Include="..\..\..\..\..\core\lib\Plugins.Essentials\src\VNLib.Plugins.Essentials.csproj" />
-    <ProjectReference Include="..\..\..\..\..\core\lib\Plugins.PluginBase\src\VNLib.Plugins.PluginBase.csproj" />
     <ProjectReference Include="..\..\..\..\Extensions\lib\VNLib.Plugins.Extensions.Loading\src\VNLib.Plugins.Extensions.Loading.csproj" />
     <ProjectReference Include="..\..\..\..\Extensions\lib\VNLib.Plugins.Extensions.Validation\src\VNLib.Plugins.Extensions.Validation.csproj" />
   </ItemGroup>
