@@ -23,12 +23,10 @@
 */
 
 using System;
-using System.Text;
 using System.Linq;
 using System.Buffers;
 using System.Text.Json;
 using System.Collections.Generic;
-using System.Security.Cryptography;
 using System.Text.Json.Serialization;
 
 using VNLib.Hashing;
@@ -229,10 +227,16 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
             return jwt.VerifyFromJwk(jwk);
         }
 
-        public static void PKISetUserKey(this IUser user, IReadOnlyDictionary<string, string>? keyData) 
+        public static void PKISetUserKey(this IUser user, IReadOnlyDictionary<string, string>? keyFields) 
         {
+            //Serialize the key data
+            byte[] keyData = JsonSerializer.SerializeToUtf8Bytes(keyFields, Statics.SR_OPTIONS);
+
+            //convert to base32 string before writing user data
+            string base64 = Convert.ToBase64String(keyData);
+
             //Store key data
-            user.SetObject(USER_PKI_ENTRY, keyData);
+            user[USER_PKI_ENTRY] = base64;
         }
 
         private static ReadOnlyJsonWebKey? RecoverKey(IUser user)
@@ -248,9 +252,14 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
             byte[] buffer = ArrayPool<byte>.Shared.Rent(JWK_KEY_BUFFER_SIZE);
             try
             {
-                //Recover bytes and get the jwk from the data
-                int encoded = Encoding.UTF8.GetBytes(keyData, buffer);
-                return new ReadOnlyJsonWebKey(buffer.AsSpan(0, encoded));
+                //Recover base64 bytes from key data
+                ERRNO bytes = VnEncoding.TryFromBase64Chars(keyData, buffer);
+                if (!bytes)
+                {
+                    return null;
+                }
+                //Recover json from the decoded binary data
+                return new ReadOnlyJsonWebKey(buffer.AsSpan(0, bytes));
             }
             finally
             {
@@ -293,7 +302,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
 
         #endregion
 
-        private static HMAC GetSigningAlg(byte[] key) => new HMACSHA256(key);
+        private static HashAlg SigingAlg { get; } = HashAlg.SHA256;
 
         private static ReadOnlyMemory<byte> UpgradeHeader { get; } = CompileJwtHeader();
 
@@ -313,7 +322,6 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
         /// </summary>
         /// <param name="config"></param>
         /// <param name="upgradeJwtString">The signed JWT upgrade message</param>
-        /// <param name="upgrade">The recovered upgrade</param>
         /// <param name="base32Secret">The stored base64 encoded signature from the session that requested an upgrade</param>
         /// <returns>True if the upgrade was verified, not expired, and was recovered from the signed message, false otherwise</returns>
         public static MFAUpgrade? RecoverUpgrade(this MFAConfig config, string upgradeJwtString, string base32Secret)
@@ -325,10 +333,8 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
             byte[] secret = VnEncoding.FromBase32String(base32Secret)!;
             try
             {
-                //Verify the 
-                using HMAC hmac = GetSigningAlg(secret);
-
-                if (!jwt.Verify(hmac))
+                //Verify the signature
+                if (!jwt.Verify(secret, SigingAlg))
                 {
                     return null;
                 }
@@ -364,7 +370,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
         /// <param name="login">The message from the user requesting the login</param>
         /// <returns>A signed upgrade message the client will pass back to the server after the MFA verification</returns>
         /// <exception cref="InvalidOperationException"></exception>
-        public static Tuple<string, string>? MFAGetUpgradeIfEnabled(this IUser user, MFAConfig? conf, LoginMessage login)
+        public static MfaUpgradeMessage? MFAGetUpgradeIfEnabled(this IUser user, MFAConfig? conf, LoginMessage login)
         {
             //Webauthn config
 
@@ -383,8 +389,8 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
                     Type = MFAType.TOTP,
                     //Store login message details
                     UserName = login.UserName,
-                    ClientID = login.ClientId,
-                    Base64PubKey = login.ClientPublicKey,
+                    ClientId = login.ClientId,
+                    PublicKey = login.ClientPublicKey,
                     ClientLocalLanguage = login.LocalLanguage,
                 };
 
@@ -394,7 +400,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
             return null;
         }
 
-        private static Tuple<string, string> GetUpgradeMessage(MFAUpgrade upgrade, MFAConfig config)
+        private static MfaUpgradeMessage GetUpgradeMessage(MFAUpgrade upgrade, MFAConfig config)
         {
             //Add some random entropy to the upgrade message, to help prevent forgery
             string entropy = RandomHash.GetRandomBase32(config.NonceLenBytes);
@@ -414,12 +420,8 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
             //Generate a new random secret
             byte[] secret = RandomHash.GetRandomBytes(config.UpgradeKeyBytes);
 
-            //Init alg
-            using(HMAC alg = GetSigningAlg(secret))
-            {
-                //sign jwt
-                upgradeJwt.Sign(alg);
-            }
+            //sign jwt
+            upgradeJwt.Sign(secret, SigingAlg);
 
             //compile and return jwt upgrade
             return new(upgradeJwt.Compile(), VnEncoding.ToBase32String(secret));
@@ -429,4 +431,6 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
 
         public static string? MfaUpgradeSecret(this in SessionInfo session) => session[SESSION_SIG_KEY];
     }
+
+    readonly record struct MfaUpgradeMessage(string ClientJwt, string SessionKey);
 }

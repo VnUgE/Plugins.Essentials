@@ -54,6 +54,10 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
     {
         public const string INVALID_MESSAGE = "Your assertion is invalid, please regenerate and try again";
 
+        /*
+         * I am only supporting EC keys for size reasons, user objects are limited in back-end size and keys can 
+         * take up large ammounts of data.
+         */
         private static readonly ImmutableArray<string> AllowedCurves = new string[3] { "P-256", "P-384", "P-521"}.ToImmutableArray();
         private static readonly ImmutableArray<string> AllowedAlgs = new string[3] { "ES256", "ES384", "ES512" }.ToImmutableArray();
 

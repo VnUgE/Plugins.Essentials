@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2022 Vaughn Nugent
+* Copyright (c) 2023 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
@@ -24,17 +24,15 @@
 
 using System.Text.Json.Serialization;
 
-#nullable enable
-
 namespace VNLib.Plugins.Essentials.Accounts.MFA
 {
-    internal class MFAUpgrade
+    internal class MFAUpgrade : IClientSecInfo
     {
         /// <summary>
         /// The login's client id specifier
         /// </summary>
         [JsonPropertyName("cid")]
-        public string? ClientID { get; set; }
+        public string? ClientId { get; set; }
         /// <summary>
         /// The id of the user that is requesting a login
         /// </summary>
@@ -50,16 +48,11 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
         /// public key
         /// </summary>
         [JsonPropertyName("pubkey")]
-        public string? Base64PubKey { get; set; }
+        public string? PublicKey { get; set; }
         /// <summary>
         /// The user's specified language
         /// </summary>
         [JsonPropertyName("lang")]
         public string? ClientLocalLanguage { get; set; }
-        /// <summary>
-        /// The encrypted password token for the client
-        /// </summary>
-        [JsonPropertyName("cd")]
-        public string? PwClientData { get; set; }
     }
 }

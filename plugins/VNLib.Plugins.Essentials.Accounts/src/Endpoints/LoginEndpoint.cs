@@ -31,6 +31,7 @@ using System.Text.Json.Serialization;
 
 using FluentValidation;
 
+using VNLib.Utils;
 using VNLib.Utils.Memory;
 using VNLib.Utils.Logging;
 using VNLib.Utils.Extensions;
@@ -44,6 +45,17 @@ using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Users;
 using static VNLib.Plugins.Essentials.Statics;
 
+/*
+  * Password only log-ins should be immune to repeat attacks on the same backend, because sessions are 
+  * guarunteed to be mutally exclusive on the same system, therefor a successful login cannot be repeated
+  * without a logout with the proper authorization.
+  * 
+  * Since MFA upgrades are indempodent upgrades can be regenerated continually as long as the session 
+  * is not authorized, however login authorizations should be immune to repeats because session locking
+  * 
+  * Session id's are also regenerated per request, the only possible vector could be stale session cache
+  * that has a valid MFA key and an old, but valid session id.
+  */
 
 namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 {
@@ -61,7 +73,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
         private static readonly LoginMessageValidation LmValidator = new();
        
         private readonly IPasswordHashingProvider Passwords;
-        private readonly MFAConfig? MultiFactor;
+        private readonly MFAConfig MultiFactor;
         private readonly IUserManager Users;
         private readonly uint MaxFailedLogins;
         private readonly TimeSpan FailedCountTimeout;
@@ -79,15 +91,11 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             MultiFactor = pbase.GetConfigElement<MFAConfig>();
         }
 
-        private class MfaUpgradeWebm : ValErrWebMessage
+        protected override ERRNO PreProccess(HttpEntity entity)
         {
-            [JsonPropertyName("pwtoken")]
-            public string? PasswordToken { get; set; }
-
-            [JsonPropertyName("mfa")]
-            public bool? MultiFactorUpgrade { get; set; } = null;
+            //Cannot have new sessions
+            return base.PreProccess(entity) && !entity.Session.IsNew;
         }
-
 
         protected async override ValueTask<VfReturnType> PostAsync(HttpEntity entity)
         {
@@ -99,7 +107,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             }
             
             //If mfa is enabled, allow processing via mfa
-            if (MultiFactor != null)
+            if (MultiFactor.FIDOEnabled || MultiFactor.TOTPEnabled)
             {
                 if (entity.QueryArgs.ContainsKey("mfa"))
                 {
@@ -108,7 +116,6 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             }
             return await ProccesLoginAsync(entity);
         }
-
 
         private async ValueTask<VfReturnType> ProccesLoginAsync(HttpEntity entity)
         {
@@ -173,13 +180,28 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 Log.Warn(uue);
                 return VfReturnType.Error;
             }
-        }
-        
+        }        
+
         private bool LoginUser(HttpEntity entity, LoginMessage loginMessage, IUser user, MfaUpgradeWebm webm)
         {
             //Verify password before we tell the user the status of their account for security reasons
-            if (!Passwords.Verify(user.PassHash, new PrivateString(loginMessage.Password, false)))
+            if (!Passwords.Verify(user.PassHash, loginMessage.Password))
             {
+                return false;
+            }
+
+            //Only allow active users
+            if (user.Status != UserStatus.Active)
+            {
+                //This is an unhandled case, and should never happen, but just incase write a warning to the log
+                Log.Warn("Account {uid} has invalid status key and a login was attempted from {ip}", user.UserID, entity.TrustedRemoteIp);
+                return false;
+            }
+
+            //Is the account restricted to a local network connection?
+            if (user.LocalOnly && !entity.IsLocalConnection)
+            {
+                Log.Information("User {uid} attempted a login from a non-local network with the correct password. Access was denied", user.UserID);
                 return false;
             }
 
@@ -188,34 +210,27 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 
             try
             {
-                if (user.Status == UserStatus.Active)
+                //get the new upgrade jwt string
+                MfaUpgradeMessage? message = user.MFAGetUpgradeIfEnabled(MultiFactor, loginMessage);
+
+                /*
+                 * Mfa is essentially indempodent, the session stores the last upgrade key, so 
+                 * if this method is continually called, new mfa tokens will be generated.
+                 */
+
+                //if message is null, mfa was not enabled or could not be prepared
+                if (message.HasValue)
                 {
-                    //Is the account restricted to a local network connection?
-                    if (user.LocalOnly && !entity.IsLocalConnection)
-                    {
-                        Log.Information("User {uid} attempted a login from a non-local network with the correct password. Access was denied", user.UserID);
-                        return false;
-                    }
+                    //Store the base64 signature
+                    entity.Session.MfaUpgradeSecret(message.Value.SessionKey);
 
-                    //get the new upgrade jwt string
-                    Tuple<string, string>? message = user.MFAGetUpgradeIfEnabled(MultiFactor, loginMessage);
-
-                    //if message is null, mfa was not enabled or could not be prepared
-                    if (message != null)
-                    {
-                        //Store the base64 signature
-                        entity.Session.MfaUpgradeSecret(message.Item2);
-
-                        //send challenge message to client
-                        webm.Result = message.Item1;
-                        webm.Success = true;
-                        webm.MultiFactorUpgrade = true;
-                       
-                        return true;
-                    }
-
-                    //Set password token
-                    webm.PasswordToken = null;
+                    //send challenge message to client
+                    webm.Result = message.Value.ClientJwt;
+                    webm.MultiFactorUpgrade = true;
+                }
+                else
+                {
+                    /* SUCCESSFULL LOGIN! */
 
                     //Elevate the login status of the session to reflect the user's status
                     entity.GenerateAuthorization(loginMessage, user, webm);
@@ -226,18 +241,12 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                         EmailAddress = user.EmailAddress,
                     };
 
-                    webm.Success = true;
                     //Write to log
                     Log.Verbose("Successful login for user {uid}...", user.UserID[..8]);
+                }
 
-                    return true;
-                }
-                else
-                {
-                    //This is an unhandled case, and should never happen, but just incase write a warning to the log
-                    Log.Warn("Account {uid} has invalid status key and a login was attempted from {ip}", user.UserID, entity.TrustedRemoteIp);
-                    return false;
-                }
+                webm.Success = true;
+                return true;
             }
             /*
              * Account auhorization may throw excetpions if the configuration does not 
@@ -254,8 +263,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 Log.Debug(ce);
             }
             return false;
-        }
-       
+        }       
 
         private async ValueTask<VfReturnType> ProcessMfaAsync(HttpEntity entity)
         {
@@ -340,10 +348,12 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                     {
                         //get totp code from request
                         uint code = request.RootElement.GetProperty("code").GetUInt32();
+
                         //Verify totp code
                         if (!MultiFactor!.VerifyTOTP(user, code))
                         {
                             webm.Result = "Please check your code.";
+
                             //Increment flc and update the user in the store
                             user.FailedLoginIncrement(entity.RequestedTimeUtc);                           
                             return;
@@ -361,30 +371,22 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                     return;
             }
 
+            //SUCCESSFUL LOGIN
+
             //Wipe session signature
             entity.Session.MfaUpgradeSecret(null);
 
-            //build login message from upgrade
-            LoginMessage loginMessage = new()
-            {
-                ClientId = upgrade.ClientID,
-                ClientPublicKey = upgrade.Base64PubKey,
-                LocalLanguage = upgrade.ClientLocalLanguage,
-                LocalTime = localTime,
-                UserName = upgrade.UserName
-            };
-
             //Elevate the login status of the session to reflect the user's status
-            entity.GenerateAuthorization(loginMessage, user, webm);
-
-            //Set the password token as the password field of the login message
-            webm.PasswordToken = upgrade.PwClientData;
+            entity.GenerateAuthorization(upgrade, user, webm);
+            
             //Send the Username (since they already have it)
             webm.Result = new AccountData()
             {
                 EmailAddress = user.EmailAddress,
             };
+
             webm.Success = true;
+
             //Write to log
             Log.Verbose("Successful login for user {uid}...", user.UserID[..8]);
         }
@@ -410,6 +412,13 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 
             //Count has been exceeded, and has not timed out yet
             return true;
+        }
+
+        private sealed class MfaUpgradeWebm : ValErrWebMessage
+        {
+
+            [JsonPropertyName("mfa")]
+            public bool? MultiFactorUpgrade { get; set; } = null;
         }
     }
 }
