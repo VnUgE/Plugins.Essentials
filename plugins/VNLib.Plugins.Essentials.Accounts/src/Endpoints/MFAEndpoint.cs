@@ -143,7 +143,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             }
 
             //Get the user entry
-            using IUser? user = await Users.GetUserFromIDAsync(entity.Session.UserID);
+            using IUser? user = await Users.GetUserAndPassFromIDAsync(entity.Session.UserID);
 
             if (webm.Assert(user != null, "Please log-out and try again."))
             {

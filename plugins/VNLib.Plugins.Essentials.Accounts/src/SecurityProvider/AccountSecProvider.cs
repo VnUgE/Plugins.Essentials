@@ -59,7 +59,6 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
         private const int PUB_KEY_JWT_NONCE_SIZE = 16;
 
         //Session entry keys
-        private const string CLIENT_PUB_KEY_ENTRY = "acnt.pbk";
         private const string PUBLIC_KEY_SIG_KEY_ENTRY = "acnt.pbsk";
 
         private const HashAlg ClientTokenHmacType = HashAlg.SHA256;
@@ -203,16 +202,8 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
 
         ERRNO IAccountSecurityProvider.TryEncryptClientData(HttpEntity entity, ReadOnlySpan<byte> data, Span<byte> outputBuffer)
         {
-            //Session must be enabled and not new
-            if (!entity.Session.IsSet || entity.Session.IsNew)
-            {
-                return false;
-            }
-            
-            //try to get the public key from the client
-            string base64PubKey = entity.Session[CLIENT_PUB_KEY_ENTRY];
-
-            return TryEncryptClientData(base64PubKey, data, outputBuffer);
+            //Recover the signed public key, already does session checks
+            return TryGetPublicKey(entity, out string? pubKey) ? TryEncryptClientData(pubKey, data, outputBuffer) : ERRNO.E_FAIL;
         }
 
         ERRNO IAccountSecurityProvider.TryEncryptClientData(IClientSecInfo entity, ReadOnlySpan<byte> data, Span<byte> outputBuffer)

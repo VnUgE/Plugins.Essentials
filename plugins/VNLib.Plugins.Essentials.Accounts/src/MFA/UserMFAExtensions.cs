@@ -27,7 +27,6 @@ using System.Linq;
 using System.Buffers;
 using System.Text.Json;
 using System.Collections.Generic;
-using System.Text.Json.Serialization;
 
 using VNLib.Hashing;
 using VNLib.Utils;
@@ -44,7 +43,6 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
     {
         public const string WEBAUTHN_KEY_ENTRY = "mfa.fido";
         public const string TOTP_KEY_ENTRY = "mfa.totp";
-        public const string PGP_PUB_KEY = "mfa.pgpp";
         public const string SESSION_SIG_KEY = "mfa.sig";
 
         public const string USER_PKI_ENTRY = "mfa.pki";
@@ -266,34 +264,6 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
                 MemoryUtil.InitializeBlock(buffer.AsSpan());
                 ArrayPool<byte>.Shared.Return(buffer);
             }
-        }
-
-        #endregion
-
-        #region pgp
-
-        private class PgpMfaCred
-        {
-            [JsonPropertyName("p")]
-            public string? SpkiPublicKey { get; set; }
-
-            [JsonPropertyName("c")]
-            public string? CurveFriendlyName { get; set; }
-        }
-        
-
-        /// <summary>
-        /// Gets the stored PGP public key for the user
-        /// </summary>
-        /// <param name="user"></param>
-        /// <returns>The stored PGP signature key </returns>
-        public static string MFAGetPGPPubKey(this IUser user) => user[PGP_PUB_KEY];
-
-        public static void MFASetPGPPubKey(this IUser user, string? pubKey) => user[PGP_PUB_KEY] = pubKey!;
-
-        public static void VerifySignedData(string data)
-        {
-            
         }
 
         #endregion
