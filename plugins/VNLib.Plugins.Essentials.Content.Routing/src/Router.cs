@@ -30,40 +30,40 @@ using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 
+using VNLib.Utils.Logging;
+using VNLib.Utils.Extensions;
 using VNLib.Plugins.Essentials.Accounts;
 using VNLib.Plugins.Extensions.Loading;
-using VNLib.Plugins.Extensions.Loading.Sql;
 using VNLib.Plugins.Essentials.Content.Routing.Model;
-using static VNLib.Plugins.Essentials.Accounts.AccountUtil;
 
 
 namespace VNLib.Plugins.Essentials.Content.Routing
 {
-    [ConfigurationName("page_router", Required = false)]
+
     internal class Router : IPageRouter
     {
         private static readonly RouteComparer Comparer = new();
 
-        private readonly RouteStore Store;
+        private readonly IRouteStore Store;
+        private readonly ILogProvider Logger;
 
         private readonly ConcurrentDictionary<IWebProcessor, Task<ReadOnlyCollection<Route>>> RouteTable;
 
         public Router(PluginBase plugin)
         {
-            Store = new(plugin.GetContextOptions());
+            Store = plugin.GetOrCreateSingleton<ManagedRouteStore>();
+            Logger = plugin.Log;
             RouteTable = new();
         }
 
-        public Router(PluginBase plugin, IConfigScope config)
-        {
-            Store = new(plugin.GetContextOptions());
-            RouteTable = new();
-        }
+        public Router(PluginBase plugin, IConfigScope config):this(plugin)
+        { }
 
         ///<inheritdoc/>
         public async ValueTask<FileProcessArgs> RouteAsync(HttpEntity entity)
         {
-            ulong privilage = READ_MSK;
+            //Default to read-only privilages
+            ulong privilage = AccountUtil.READ_MSK;
 
             //Only select privilages for logged-in users, this is a medium security check since we may not have all data available
             if (entity.Session.IsSet && entity.IsClientAuthorized(AuthorzationCheckLevel.Medium))
@@ -73,8 +73,12 @@ namespace VNLib.Plugins.Essentials.Content.Routing
 
             //Get the routing table for the current host
             ReadOnlyCollection<Route> routes = await RouteTable.GetOrAdd(entity.RequestedRoot, LoadRoutesAsync);
+
             //Find the proper routine for the connection
-            return FindArgs(routes, entity.RequestedRoot.Hostname, entity.Server.Path, privilage);
+            Route? selected = SelectBestRoute(routes, entity.RequestedRoot.Hostname, entity.Server.Path, privilage);
+
+            //Get the arguments for the selected route, if not found allow the connection to continue
+            return selected?.GetArgs(entity) ?? FileProcessArgs.Continue;
         }
 
         /// <summary>
@@ -82,11 +86,16 @@ namespace VNLib.Plugins.Essentials.Content.Routing
         /// </summary>
         public void ResetRoutes() => RouteTable.Clear();
 
+
         private async Task<ReadOnlyCollection<Route>> LoadRoutesAsync(IWebProcessor root)
         {
             List<Route> collection = new();
-            //Load all routes 
-            _ = await Store.GetPageAsync(collection, 0, int.MaxValue);
+
+            //Load all routes from the backing store and filter them
+            await Store.GetAllRoutesAsync(collection);
+
+            Logger.Debug("Found {r} routes in store", collection.Count);
+
             //Select only exact match routes, or wildcard routes
             return (from r in collection
                     where r.Hostname.EndsWith(root.Hostname, StringComparison.OrdinalIgnoreCase) || r.Hostname == "*"
@@ -97,37 +106,67 @@ namespace VNLib.Plugins.Essentials.Content.Routing
                     .AsReadOnly();
         }
 
-
-        private static FileProcessArgs FindArgs(ReadOnlyCollection<Route> routes, string hostname, string path, ulong privilages)
+        /// <summary>
+        /// Selects the best route for a given hostname, path, and privilage level and returns it
+        /// if one could be found
+        /// </summary>
+        /// <param name="routes">The routes collection to read</param>
+        /// <param name="hostname">The connection hostname to filter routes for</param>
+        /// <param name="path">The connection url path to filter routes for</param>
+        /// <param name="privilages">The calculated privialges of the connection</param>
+        /// <returns>The best route match for the connection if one is found, null otherwise</returns>
+        private static Route? SelectBestRoute(ReadOnlyCollection<Route> routes, string hostname, string path, ulong privilages)
         {
             //Rent an array to sort routes for the current user
             Route[] matchArray = ArrayPool<Route>.Shared.Rent(routes.Count);
             int count = 0;
+
             //Search for routes that match
-            for(int i = 0; i < routes.Count; i++)
+            for (int i = 0; i < routes.Count; i++)
             {
-                if(Matches(routes[i], hostname, path, privilages))
+                if (FastMatch(routes[i], hostname, path, privilages))
                 {
                     //Add to sort array
                     matchArray[count++] = routes[i];
                 }
             }
+
             //If no matches are found, return continue routine
             if (count == 0)
             {
                 //Return the array to the pool
                 ArrayPool<Route>.Shared.Return(matchArray);
-                return FileProcessArgs.Continue;
+                return null;
             }
-            //Get sorting span for matches
-            Span<Route> found = matchArray.AsSpan(0, count);
-            //Sort the found rules
-            found.Sort(Comparer);
-            //Select the last element
-            Route selected = found[^1];
-            //Return array to pool
-            ArrayPool<Route>.Shared.Return(matchArray);
-            return selected.MatchArgs;
+
+            //If only one match is found, return it
+            if (count == 1)
+            {
+                //Return the array to the pool
+                ArrayPool<Route>.Shared.Return(matchArray);
+                return matchArray[0];
+            }
+            else
+            {
+                //Get sorting span for matches
+                Span<Route> found = matchArray.AsSpan(0, count);
+
+                /*
+                 * Sortining elements using the static comparer, to find the best match 
+                 * out of all matching routes.
+                 * 
+                 * The comparer will put the most specific routes at the end of the array
+                 */
+                found.Sort(Comparer);
+
+                //Select the last element
+                Route selected = found[^1];
+
+                //Return array to pool
+                ArrayPool<Route>.Shared.Return(matchArray);
+
+                return selected;
+            }
         }
 
         /// <summary>
@@ -139,25 +178,38 @@ namespace VNLib.Plugins.Essentials.Content.Routing
         /// <param name="path">The resource path to test</param>
         /// <param name="privilages">The privialge level to search for</param>
         /// <returns>True if the route can be matched to the resource and the privialge level</returns>
-        private static bool Matches(Route route, ReadOnlySpan<char> hostname, ReadOnlySpan<char> path, ulong privilages)
+        private static bool FastMatch(Route route, ReadOnlySpan<char> hostname, ReadOnlySpan<char> path, ulong privilages)
         {
             //Get span of hostname to stop string heap allocations during comparisons
             ReadOnlySpan<char> routineHost = route.Hostname;
             ReadOnlySpan<char> routinePath = route.MatchPath;
-            //Test if hostname hostname matches exactly (may be wildcard) or hostname begins with a wildcard and ends with the request hostname
-            bool hostMatch = routineHost.SequenceEqual(hostname) || (routineHost.Length > 1 && routineHost[0] == '*' && hostname.EndsWith(routineHost[1..]));
+
+            //Test if hostname matches
+            bool hostMatch = 
+                //Wildcard routine only, matches all hostnames
+                (routineHost.Length == 1 && routineHost[0] == '*') 
+                //Exact hostname match
+                || routineHost.SequenceEqual(hostname) 
+                //wildcard hostname match with trailing 
+                || (routineHost.Length > 1 && routineHost[0] == '*' && hostname.EndsWith(routineHost[1..], StringComparison.OrdinalIgnoreCase));
+
             if (!hostMatch)
             {
                 return false;
             }
-            //Test if path is a wildcard, matches exactly, or if the path is a wildcard path, that the begining of the reqest path matches the routine path
-            bool pathMatch = routinePath == "*" || routinePath.SequenceEqual(path) || (routinePath.Length > 1 && routinePath[^1] == '*' && path.StartsWith(routinePath[..^1]));
+
+            //Test if path is a wildcard, matches exactly, or if the path is a wildcard path, that the begining of the request path matches the routine path
+            bool pathMatch = routinePath == "*" 
+                || routinePath.Equals(path, StringComparison.OrdinalIgnoreCase)
+                || (routinePath.Length > 1 && routinePath[^1] == '*' && path.StartsWith(routinePath[..^1], StringComparison.OrdinalIgnoreCase));
+
             if (!pathMatch)
             {
                 return false;
             }
+
             //Test if the level and group privilages match for the current routine
-            return (privilages & LEVEL_MSK) >= (route.Privilage & LEVEL_MSK) && (route.Privilage & GROUP_MSK) == (privilages & GROUP_MSK);
+            return (privilages & AccountUtil.LEVEL_MSK) >= (route.Privilage & AccountUtil.LEVEL_MSK) && (route.Privilage & AccountUtil.GROUP_MSK) == (privilages & AccountUtil.GROUP_MSK);
         }
     }
 }

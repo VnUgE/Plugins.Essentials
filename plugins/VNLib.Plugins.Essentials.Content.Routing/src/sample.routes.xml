@@ -1,0 +1,44 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+
+<!--Routes container element holds a collection of route elements-->
+<routes>
+  <!-- 
+    Example route configuration for a single page app
+    where the tree looks like this:
+    / (index.html)
+    /assets (assets directory) (css and js files)
+    
+    Wildcard hosts match all hosts that do not have rules with more specific hosts
+  -->
+  
+  <!--
+    Allow assets directory to pass through for all requests, using the Continue routine (1)
+    
+    Because this route has a more specific path than the catch all route
+    it will be processed first
+  -->
+  <route routine="1" privilage="0">
+    
+    <!--Wildcard host-->
+    <hostname>*</hostname>
+    
+    <!--All paths that start with /assets/ will be matched-->
+    <path>/assets/*</path>
+  </route>
+  
+  <!--Overwrite all other requests to the index file (catch all) using the ServeOther routine (4)-->
+  <route routine="4" privilage="0">
+    
+    <!--Wildcard hostname-->
+    <hostname>*</hostname>    
+    
+    <!--Declares that all files after / will be matched by this rule-->
+    <path>/*</path>
+    
+    <!--Return to the root path, lets the file processor handle extension searching-->
+    <alternate>/</alternate>
+  </route>
+  
+  <!--All routes that do not match will be allowed, this is only / since it does not have a matching rule-->
+  
+</routes>
