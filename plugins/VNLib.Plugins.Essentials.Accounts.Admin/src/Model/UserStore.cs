@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2022 Vaughn Nugent
+* Copyright (c) 2023 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts.Admin
@@ -23,10 +23,6 @@
 */
 
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 using Microsoft.EntityFrameworkCore;
 
@@ -41,7 +37,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Admin.Model
 
         public UserStore(DbContextOptions options)
         {
-            this.Options = options;
+            Options = options;
         }
 
         //Item id's are not used

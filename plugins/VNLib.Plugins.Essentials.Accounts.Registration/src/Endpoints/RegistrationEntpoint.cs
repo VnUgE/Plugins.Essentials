@@ -69,7 +69,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
         private readonly IPasswordHashingProvider Passwords;
         private readonly RevokedTokenStore RevokedTokens;
         private readonly TransactionalEmailConfig Emails;
-        private readonly Task<ReadOnlyJsonWebKey> RegSignatureKey;
+        private readonly IAsyncLazy<ReadOnlyJsonWebKey> RegSignatureKey;
         private readonly TimeSpan RegExpiresSec;
 
         /// <summary>
@@ -94,7 +94,8 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
             Emails = plugin.GetOrCreateSingleton<TEmailConfig>();
 
             //Begin the async op to get the signature key from the vault
-            RegSignatureKey = plugin.TryGetSecretAsync("reg_sig_key").ToJsonWebKey(true);
+            RegSignatureKey = plugin.GetSecretAsync("reg_sig_key")
+                                .ToLazy(static sr => sr.GetJsonWebKey());
         }
 
         private static IValidator<string> GetJwtValidator()
@@ -169,7 +170,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
                 //get jwt
                 using JsonWebToken jwt = JsonWebToken.Parse(regJwt);
                 //verify signature
-                bool verified = jwt.VerifyFromJwk(RegSignatureKey.Result);
+                bool verified = jwt.VerifyFromJwk(RegSignatureKey.Value);
 
                 if (webm.Assert(verified, FAILED_AUTH_ERR))
                 {
@@ -279,7 +280,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
             string jwtData;
             using (JsonWebToken emailJwt = new())
             {
-                emailJwt.WriteHeader(RegSignatureKey.Result.JwtHeader);
+                emailJwt.WriteHeader(RegSignatureKey.Value.JwtHeader);
 
                 //Init new claim stack, include the same iat time, nonce for entropy, and descriptor storage id
                 emailJwt.InitPayloadClaim(3)
@@ -289,7 +290,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
                     .CommitClaims();
 
                 //sign the jwt
-                emailJwt.SignFromJwk(RegSignatureKey.Result);
+                emailJwt.SignFromJwk(RegSignatureKey.Value);
                 //Compile to encoded string
                 jwtData = emailJwt.Compile();
             }

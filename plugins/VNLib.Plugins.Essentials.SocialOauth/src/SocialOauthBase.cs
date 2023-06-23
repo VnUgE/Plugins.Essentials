@@ -188,8 +188,8 @@ namespace VNLib.Plugins.Essentials.SocialOauth
             RestRequest request = new(Config.AccessTokenUrl, Method.Post);
 
             //Add required params url-encoded
-            request.AddParameter("client_id", Config.ClientID, ParameterType.GetOrPost);
-            request.AddParameter("client_secret", Config.ClientSecret, ParameterType.GetOrPost);
+            request.AddParameter("client_id", Config.ClientID.Value, ParameterType.GetOrPost);
+            request.AddParameter("client_secret", Config.ClientSecret.Value, ParameterType.GetOrPost);
             request.AddParameter("grant_type", "authorization_code", ParameterType.GetOrPost);
             request.AddParameter("code", code, ParameterType.GetOrPost);
             request.AddParameter("redirect_uri", $"{ev.Server.RequestUri.Scheme}://{ev.Server.RequestUri.Authority}{Path}", ParameterType.GetOrPost);
@@ -653,7 +653,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth
                 writer.Append(config.AccessCodeUrl.OriginalString);
                 //begin query arguments
                 writer.Append("&client_id=");
-                writer.Append(config.ClientID);
+                writer.Append(config.ClientID.Value);
                 //add the redirect url
                 writer.Append("&redirect_uri=");
                 writer.Append(redirectUrl);

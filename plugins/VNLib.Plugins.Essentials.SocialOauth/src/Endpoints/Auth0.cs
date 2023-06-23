@@ -45,7 +45,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth.Endpoints
     [ConfigurationName("auth0")]
     internal sealed class Auth0 : SocialOauthBase
     {
-        private readonly Task<ReadOnlyJsonWebKey[]> Auth0VerificationJwk;
+        private readonly IAsyncLazy<ReadOnlyJsonWebKey[]> Auth0VerificationJwk;
 
         public Auth0(PluginBase plugin, IConfigScope config) : base(plugin, config)
         {
@@ -54,7 +54,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth.Endpoints
             Uri keyUri = new(keyUrl);
 
             //Get certificate on background thread
-            Auth0VerificationJwk = Task.Run(() => GetRsaCertificate(keyUri));
+            Auth0VerificationJwk = Task.Run(() => GetRsaCertificate(keyUri)).AsLazy();
         }
 
 
@@ -143,7 +143,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth.Endpoints
             using JsonWebToken jwt = JsonWebToken.Parse(clientAccess.IdToken);
 
             //Verify the token against the first signing key
-            if (!jwt.VerifyFromJwk(Auth0VerificationJwk.Result[0]))
+            if (!jwt.VerifyFromJwk(Auth0VerificationJwk.Value[0]))
             {
                 return EmptyLoginData;
             }
@@ -164,7 +164,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth.Endpoints
             }
 
             //Verify audience matches client id
-            if (!Config.ClientID.Equals(audience, StringComparison.Ordinal))
+            if (!Config.ClientID.Value.Equals(audience, StringComparison.Ordinal))
             {
                 //Invalid audience
                 return EmptyLoginData;

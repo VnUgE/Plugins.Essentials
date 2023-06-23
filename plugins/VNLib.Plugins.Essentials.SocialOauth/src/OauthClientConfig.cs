@@ -23,7 +23,6 @@
 */
 
 using System;
-using System.Threading.Tasks;
 using System.Collections.Generic;
 
 using VNLib.Utils.Extensions;
@@ -35,7 +34,7 @@ using VNLib.Plugins.Extensions.Loading.Users;
 namespace VNLib.Plugins.Essentials.SocialOauth
 {
 
-    public sealed class OauthClientConfig : IAsyncConfigurable
+    public sealed class OauthClientConfig
     {
         private readonly string ConfigName;
 
@@ -67,27 +66,24 @@ namespace VNLib.Plugins.Essentials.SocialOauth
 
             Users = plugin.GetOrCreateSingleton<UserManager>();
             Passwords = plugin.GetOrCreateSingleton<ManagedPasswordHashing>();
+
+            //Setup async lazy loaders for secrets
+            ClientID = plugin.GetSecretAsync($"{ConfigName}_client_id")
+                            .ToLazy(static r => r.Result.ToString());
+
+            ClientSecret = plugin.GetSecretAsync($"{ConfigName}_client_secret")
+                                .ToLazy(static r => r.Result.ToString());
         }
 
-        public async Task ConfigureServiceAsync(PluginBase plugin)
-        {
-            //Get id/secret
-            Task<SecretResult?> clientIdTask = plugin.TryGetSecretAsync($"{ConfigName}_client_id");
-            Task<SecretResult?> secretTask = plugin.TryGetSecretAsync($"{ConfigName}_client_secret");
-
-            await Task.WhenAll(secretTask, clientIdTask);
-
-            using SecretResult? secret = await secretTask;
-            using SecretResult? clientId = await clientIdTask;
-
-            ClientID = clientId?.Result.ToString() ?? throw new KeyNotFoundException($"Missing {ConfigName} client id from config or vault");
-            ClientSecret = secret?.Result.ToString() ?? throw new KeyNotFoundException($"Missing the {ConfigName} client secret from config or vault");
-        }
-
-
-        public string ClientID { get; private set; } = string.Empty;
+        /// <summary>
+        /// The client ID for the OAuth2 service
+        /// </summary>
+        public IAsyncLazy<string> ClientID { get; } 
        
-        public string ClientSecret { get; private set; } = string.Empty;
+        /// <summary>
+        /// The client secret for the OAuth2 service
+        /// </summary>
+        public IAsyncLazy<string> ClientSecret { get; }
 
 
         /// <summary>
@@ -113,6 +109,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth
         public Uri UserDataUrl { get; }
 
         public TimeSpan LoginNonceLifetime { get; }
+
         /// <summary>
         /// The user store to create/get users from
         /// </summary>     
