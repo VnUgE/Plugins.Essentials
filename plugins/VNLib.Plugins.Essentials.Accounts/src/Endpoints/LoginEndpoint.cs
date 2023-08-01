@@ -361,13 +361,8 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                         //Valid, complete                         
                     }
                     break;
-                case MFAType.PGP:
-                    { }
-                    break;
                 default:
-                    {
-                        webm.Result = MFA_ERROR_MESSAGE;
-                    }
+                    webm.Result = MFA_ERROR_MESSAGE;
                     return;
             }
 

@@ -120,7 +120,10 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
             using UnsafeMemoryHandle<byte> buffer = MemoryUtil.UnsafeAlloc(base32Secret.Length, true);
             ERRNO count = VnEncoding.TryFromBase32Chars(base32Secret, buffer);
             //Verify the TOTP using the decrypted secret
-            return count && VerifyTOTP(code, buffer.AsSpan(0, count), config.TOTPConfig);
+            bool isValid = count && VerifyTOTP(code, buffer.AsSpan(0, count), config.TOTPConfig);
+            //Zero out the buffer
+            MemoryUtil.InitializeBlock(buffer.Span);
+            return isValid;
         }
 
         private static bool VerifyTOTP(uint totpCode, ReadOnlySpan<byte> userSecret, TOTPConfig config)
@@ -227,6 +230,12 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
 
         public static void PKISetUserKey(this IUser user, IReadOnlyDictionary<string, string>? keyFields) 
         {
+            if(keyFields == null)
+            {
+                user[USER_PKI_ENTRY] = null!;
+                return;
+            }
+
             //Serialize the key data
             byte[] keyData = JsonSerializer.SerializeToUtf8Bytes(keyFields, Statics.SR_OPTIONS);
 
@@ -294,7 +303,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
         /// <param name="upgradeJwtString">The signed JWT upgrade message</param>
         /// <param name="base32Secret">The stored base64 encoded signature from the session that requested an upgrade</param>
         /// <returns>True if the upgrade was verified, not expired, and was recovered from the signed message, false otherwise</returns>
-        public static MFAUpgrade? RecoverUpgrade(this MFAConfig config, string upgradeJwtString, string base32Secret)
+        internal static MFAUpgrade? RecoverUpgrade(this MFAConfig config, string upgradeJwtString, string base32Secret)
         {
             //Parse jwt
             using JsonWebToken jwt = JsonWebToken.Parse(upgradeJwtString);
@@ -340,7 +349,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
         /// <param name="login">The message from the user requesting the login</param>
         /// <returns>A signed upgrade message the client will pass back to the server after the MFA verification</returns>
         /// <exception cref="InvalidOperationException"></exception>
-        public static MfaUpgradeMessage? MFAGetUpgradeIfEnabled(this IUser user, MFAConfig? conf, LoginMessage login)
+        internal static MfaUpgradeMessage? MFAGetUpgradeIfEnabled(this IUser user, MFAConfig? conf, LoginMessage login)
         {
             //Webauthn config
 
