@@ -23,7 +23,7 @@
 */
 
 using System;
-using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Text.Json.Serialization;
@@ -32,9 +32,10 @@ using RestSharp;
 
 using VNLib.Hashing;
 using VNLib.Utils.Logging;
-using VNLib.Net.Rest.Client;
 using VNLib.Plugins.Essentials.Accounts;
 using VNLib.Plugins.Extensions.Loading;
+using VNLib.Net.Rest.Client.Construction;
+
 
 namespace VNLib.Plugins.Essentials.SocialOauth.Endpoints
 {
@@ -43,14 +44,92 @@ namespace VNLib.Plugins.Essentials.SocialOauth.Endpoints
     {
         public DiscordOauth(PluginBase plugin, IConfigScope config) : base(plugin, config)
         {
+            //Define profile endpoint
+            SiteAdapter.DefineSingleEndpoint()
+                .WithEndpoint<DiscordProfileRequest>()
+                .WithMethod(Method.Get)
+                .WithUrl(Config.UserDataUrl)
+                .WithHeader("Authorization", r => $"{r.AccessToken.Type} {r.AccessToken.Token}");
         }
 
-        
+        /*
+         * Creates a user-id from the users discord username, that is repeatable 
+         * and matches the Auth0 social user-id format
+         */
         private static string GetUserIdFromPlatform(string userName)
         {
             return ManagedHash.ComputeHash($"discord|{userName}", HashAlg.SHA1, HashEncodingMode.Hexadecimal);
         }
 
+
+        ///<inheritdoc/>
+        protected override async Task<AccountData?> GetAccountDataAsync(IOAuthAccessState accessToken, CancellationToken cancellationToken)
+        {
+            //Get the user's profile
+            UserProfile? profile = await GetUserProfileAssync(accessToken, cancellationToken);
+
+            if (profile == null)
+            {
+                return null;
+            }
+
+            //Make sure the user's account is verified
+            if (!profile.Verified)
+            {
+                return null;
+            }
+
+            return new()
+            {
+                EmailAddress = profile.EmailAddress,
+                First = profile.Username,
+            };
+        }
+
+        ///<inheritdoc/>
+        protected override async Task<UserLoginData?> GetLoginDataAsync(IOAuthAccessState accessToken, CancellationToken cancellationToken)
+        {
+            //Get the user's profile
+            UserProfile? profile = await GetUserProfileAssync(accessToken, cancellationToken);
+
+            if(profile == null)
+            {
+                return null;
+            }
+
+            return new()
+            {
+                //Get unique user-id from the discord profile and sha1 hex hash to store in db
+                UserId = GetUserIdFromPlatform(profile.UserID)
+            };
+        }
+
+        private async Task<UserProfile?> GetUserProfileAssync(IOAuthAccessState accessToken, CancellationToken cancellationToken)
+        {
+            //Get the user's email address's
+            DiscordProfileRequest req = new(accessToken);
+            RestResponse response = await SiteAdapter.ExecuteAsync(req, cancellationToken);
+
+            //Check response
+            if (!response.IsSuccessful || response.Content == null)
+            {
+                Log.Debug("Discord user request responded with code {code}:{data}", response.StatusCode, response.Content);
+                return null;
+            }
+
+            UserProfile? discordProfile = JsonSerializer.Deserialize<UserProfile>(response.RawBytes);
+
+            if (string.IsNullOrWhiteSpace(discordProfile?.UserID))
+            {
+                Log.Debug("Discord user request responded with invalid response data {code}:{data}", response.StatusCode, response.Content);
+                return null;
+            }
+
+            return discordProfile;
+        }
+
+        private sealed record class DiscordProfileRequest(IOAuthAccessState AccessToken)
+        { }
 
         /*
          * Matches the profile endpoint (@me) json object 
@@ -67,62 +146,6 @@ namespace VNLib.Plugins.Essentials.SocialOauth.Endpoints
             public bool Verified { get; set; }
             [JsonPropertyName("email")]
             public string? EmailAddress { get; set; }
-        }
-
-
-        protected override async Task<AccountData?> GetAccountDataAsync(IOAuthAccessState accessToken, CancellationToken cancellationToken)
-        {
-            //Get the user's email address's
-            RestRequest request = new(Config.UserDataUrl);
-            //Add authorization token
-            request.AddHeader("Authorization", $"{accessToken.Type} {accessToken.Token}");
-            //Get client from pool
-            using ClientContract client = ClientPool.Lease();
-            //get user's profile data
-            RestResponse<UserProfile> getProfileResponse = await client.Resource.ExecuteAsync<UserProfile>(request, cancellationToken: cancellationToken);
-            //Check response
-            if (!getProfileResponse.IsSuccessful || getProfileResponse.Data == null)
-            {
-                Log.Debug("Discord user request responded with code {code}:{data}", getProfileResponse.StatusCode, getProfileResponse.Content);
-                return null;
-            }
-            UserProfile discordProfile = getProfileResponse.Data;
-            //Make sure the user's account is verified
-            if (!discordProfile.Verified)
-            {
-                return null;
-            }
-            return new()
-            {
-                EmailAddress = discordProfile.EmailAddress,
-                First = discordProfile.Username,
-            };
-        }
-
-        protected override async Task<UserLoginData?> GetLoginDataAsync(IOAuthAccessState accessToken, CancellationToken cancellationToken)
-        {
-            //Get the user's email address's
-            RestRequest request = new(Config.UserDataUrl);
-            //Add authorization token
-            request.AddHeader("Authorization", $"{accessToken.Type} {accessToken.Token}");
-            //Get client from pool
-            using ClientContract client = ClientPool.Lease();
-            //get user's profile data
-            RestResponse<UserProfile> getProfileResponse = await client.Resource.ExecuteAsync<UserProfile>(request, cancellationToken: cancellationToken);
-            //Check response
-            if (!getProfileResponse.IsSuccessful || getProfileResponse.Data?.UserID == null)
-            {
-                Log.Debug("Discord user request responded with code {code}:{data}", getProfileResponse.StatusCode, getProfileResponse.Content);
-                return null;
-            }
-
-            UserProfile discordProfile = getProfileResponse.Data;
-
-            return new()
-            {
-                //Get unique user-id from the discord profile and sha1 hex hash to store in db
-                UserId = GetUserIdFromPlatform(discordProfile.UserID)
-            };
         }
     }
 }

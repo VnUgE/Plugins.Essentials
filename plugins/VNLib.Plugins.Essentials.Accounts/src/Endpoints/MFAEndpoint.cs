@@ -170,7 +170,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 }
             }
 
-            switch (mfaType.ToLower())
+            switch (mfaType.ToLower(null))
             {
                 //Process a Time based one time password(TOTP) creation/regeneration
                 case "totp":

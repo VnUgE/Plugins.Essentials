@@ -23,35 +23,34 @@
 */
 
 using System;
+using System.Net;
 using System.Collections.Generic;
 
+using VNLib.Utils.Logging;
 using VNLib.Utils.Extensions;
-using VNLib.Plugins.Essentials.Users;
-using VNLib.Plugins.Essentials.Accounts;
 using VNLib.Plugins.Extensions.Loading;
-using VNLib.Plugins.Extensions.Loading.Users;
 
 namespace VNLib.Plugins.Essentials.SocialOauth
 {
 
+    /// <summary>
+    /// Contains the standard configuration data for an OAuth2 endpoint
+    /// defined by plugin configuration
+    /// </summary>
     public sealed class OauthClientConfig
     {
-        private readonly string ConfigName;
-
 
         public OauthClientConfig(PluginBase plugin, IConfigScope config)
         {
-            ConfigName = config.ScopeName;
-
-            EndpointPath = config["path"].GetString() ?? throw new KeyNotFoundException($"Missing required key 'path' in config {ConfigName}");
+            EndpointPath = config["path"].GetString() ?? throw new KeyNotFoundException($"Missing required key 'path' in config {config.ScopeName}");
 
             //Set discord account origin
-            AccountOrigin = config["account_origin"].GetString() ?? throw new KeyNotFoundException($"Missing required key 'account_origin' in config {ConfigName}");
+            AccountOrigin = config["account_origin"].GetString() ?? throw new KeyNotFoundException($"Missing required key 'account_origin' in config {config.ScopeName}");
            
             //Get the auth and token urls
-            string authUrl = config["authorization_url"].GetString() ?? throw new KeyNotFoundException($"Missing required key 'authorization_url' in config {ConfigName}");
-            string tokenUrl = config["token_url"].GetString() ?? throw new KeyNotFoundException($"Missing required key 'token_url' in config {ConfigName}");
-            string userUrl = config["user_data_url"].GetString() ?? throw new KeyNotFoundException($"Missing required key 'user_data_url' in config {ConfigName}");
+            string authUrl = config["authorization_url"].GetString() ?? throw new KeyNotFoundException($"Missing required key 'authorization_url' in config {config.ScopeName}");
+            string tokenUrl = config["token_url"].GetString() ?? throw new KeyNotFoundException($"Missing required key 'token_url' in config {config.ScopeName}");
+            string userUrl = config["user_data_url"].GetString() ?? throw new KeyNotFoundException($"Missing required key 'user_data_url' in config {config.ScopeName}");
             //Create the uris 
             AccessCodeUrl = new(authUrl);
             AccessTokenUrl = new(tokenUrl);
@@ -59,20 +58,26 @@ namespace VNLib.Plugins.Essentials.SocialOauth
 
             AllowForLocalAccounts = config["allow_for_local"].GetBoolean();
             AllowRegistration = config["allow_registration"].GetBoolean();
-            LoginNonceLifetime = config["valid_for_sec"].GetTimeSpan(TimeParseType.Seconds);
             NonceByteSize = config["nonce_size"].GetUInt32();
             RandomPasswordSize = config["password_size"].GetInt32();
             InitClaimValidFor = config["claim_valid_for_sec"].GetTimeSpan(TimeParseType.Seconds);
 
-            Users = plugin.GetOrCreateSingleton<UserManager>();
-            Passwords = plugin.GetOrCreateSingleton<ManagedPasswordHashing>();
-
             //Setup async lazy loaders for secrets
-            ClientID = plugin.GetSecretAsync($"{ConfigName}_client_id")
+            ClientID = plugin.GetSecretAsync($"{config.ScopeName}_client_id")
                             .ToLazy(static r => r.Result.ToString());
 
-            ClientSecret = plugin.GetSecretAsync($"{ConfigName}_client_secret")
+            ClientSecret = plugin.GetSecretAsync($"{config.ScopeName}_client_secret")
                                 .ToLazy(static r => r.Result.ToString());
+
+            //Log the token server ip address for the user to verify
+            if (plugin.Log.IsEnabled(LogLevel.Verbose))
+            {
+                _ = plugin.ObserveWork(async () =>
+                {
+                    IPAddress[] addresses = await Dns.GetHostAddressesAsync(AccessTokenUrl.DnsSafeHost);
+                    plugin.Log.Verbose("Token server {host} resolves to {ip}", AccessTokenUrl.DnsSafeHost, addresses);
+                });
+            }
         }
 
         /// <summary>
@@ -107,15 +112,6 @@ namespace VNLib.Plugins.Essentials.SocialOauth
         /// The endpoint to get user-data object from
         /// </summary>
         public Uri UserDataUrl { get; }
-
-        public TimeSpan LoginNonceLifetime { get; }
-
-        /// <summary>
-        /// The user store to create/get users from
-        /// </summary>     
-        public IUserManager Users { get; } 
-      
-        public IPasswordHashingProvider Passwords { get; }
 
         /// <summary>
         /// The endpoint route/path

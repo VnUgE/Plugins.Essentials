@@ -25,7 +25,6 @@
 using System;
 using System.Net;
 using System.Text;
-using System.Buffers;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -39,13 +38,13 @@ using FluentValidation;
 using RestSharp;
 
 using VNLib.Net.Http;
-using VNLib.Net.Rest.Client;
 using VNLib.Hashing;
 using VNLib.Hashing.IdentityUtility;
 using VNLib.Utils;
 using VNLib.Utils.Memory;
 using VNLib.Utils.Logging;
 using VNLib.Utils.Extensions;
+using VNLib.Net.Rest.Client.Construction;
 using VNLib.Plugins.Essentials.Users;
 using VNLib.Plugins.Essentials.Accounts;
 using VNLib.Plugins.Essentials.Endpoints;
@@ -53,6 +52,7 @@ using VNLib.Plugins.Essentials.Extensions;
 using VNLib.Plugins.Essentials.SocialOauth.Validators;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Validation;
+using VNLib.Plugins.Extensions.Loading.Users;
 
 using ContentType = VNLib.Net.Http.ContentType;
 
@@ -72,8 +72,6 @@ namespace VNLib.Plugins.Essentials.SocialOauth
         const string CLAIM_COOKIE_NAME = "extern-claim";
         const int SIGNING_KEY_SIZE = 32;
 
-        private static HMAC GetSigningAlg(byte[] key) => new HMACSHA256(key);
-
         /// <summary>
         /// The client configuration struct passed during base class construction
         /// </summary>
@@ -83,10 +81,20 @@ namespace VNLib.Plugins.Essentials.SocialOauth
         protected override ProtectionSettings EndpointProtectionSettings { get; } = new();
 
         /// <summary>
-        /// The resst client connection pool
+        /// The site adapter used to make requests to the OAuth2 provider
         /// </summary>
-        protected RestClientPool ClientPool { get; }
-   
+        protected OAuthSiteAdapter SiteAdapter { get; }
+
+        /// <summary>
+        /// The user manager used to create and manage user accounts
+        /// </summary>
+        protected IUserManager Users { get; }
+
+        /// <summary>
+        /// The password hashing provider used to hash user passwords
+        /// </summary>
+        protected IPasswordHashingProvider Passwords { get; }
+
         private readonly IValidator<LoginClaim> ClaimValidator;
         private readonly IValidator<string> NonceValidator;
         private readonly IValidator<AccountData> AccountDataValidator;
@@ -96,24 +104,31 @@ namespace VNLib.Plugins.Essentials.SocialOauth
             ClaimValidator = GetClaimValidator();
             NonceValidator = GetNonceValidator();
             AccountDataValidator = new AccountDataValidator();
-
-            RestClientOptions poolOptions = new()
-            {
-                MaxTimeout = 5000,
-                AutomaticDecompression = DecompressionMethods.All,
-                Encoding = Encoding.UTF8,
-                //disable redirects, api should not redirect
-                FollowRedirects = false,
-            };
-            
-            //Configure rest client to comunications to main discord api
-            ClientPool = new(10, poolOptions, StaticClientPoolInitializer);
-
+         
             //Get the configuration element for the derrived type
             Config = plugin.CreateService<OauthClientConfig>(config);
 
             //Init endpoint 
             InitPathAndLog(Config.EndpointPath, plugin.Log);
+
+            Users = plugin.GetOrCreateSingleton<UserManager>();
+            Passwords = plugin.GetOrCreateSingleton<ManagedPasswordHashing>();
+
+            //Define the site adapter
+            SiteAdapter = new();
+
+            //Define the the get-token request endpoint
+            SiteAdapter.DefineSingleEndpoint()
+                .WithEndpoint<GetTokenRequest>()
+                .WithMethod(Method.Post)
+                .WithUrl(Config.AccessTokenUrl)
+                .WithHeader("Accept", HttpHelpers.GetContentTypeString(ContentType.Json))
+                .WithParameter("client_id", c => Config.ClientID.Value)
+                .WithParameter("client_secret", c => Config.ClientSecret.Value)
+                .WithParameter("grant_type", "authorization_code")
+                .WithParameter("code", r => r.Code)
+                .WithParameter("redirect_uri", r => r.RedirectUrl);
+
         }
 
         private static IValidator<LoginClaim> GetClaimValidator()
@@ -121,11 +136,13 @@ namespace VNLib.Plugins.Essentials.SocialOauth
             InlineValidator<LoginClaim> val = new();
             val.RuleFor(static s => s.ClientId)
                 .Length(10, 100)
+                .WithMessage("Request is not valid")
+                .AlphaNumericOnly()
                 .WithMessage("Request is not valid");
 
             val.RuleFor(static s => s.PublicKey)
                 .Length(50, 1024)
-                 .WithMessage("Request is not valid");
+                .WithMessage("Request is not valid");
 
             return val;
         }
@@ -161,17 +178,6 @@ namespace VNLib.Plugins.Essentials.SocialOauth
         }
 
         /// <summary>
-        /// Invoked by the constructor during rest client initlialization
-        /// </summary>
-        /// <param name="client">The new client to be configured</param>
-        protected virtual void StaticClientPoolInitializer(RestClient client)
-        {
-            client.AddDefaultHeader("accept", HttpHelpers.GetContentTypeString(ContentType.Json));
-        }
-
-        protected virtual void OnBeforeGetToken(HttpEntity entity, string code, RestRequest state) { }
-
-        /// <summary>
         /// When derrived in a child class, exchanges an OAuth2 code grant type
         /// for an OAuth2 access token to make api requests
         /// </summary>
@@ -184,25 +190,13 @@ namespace VNLib.Plugins.Essentials.SocialOauth
         /// </returns>
         protected virtual async Task<OAuthAccessState?> ExchangeCodeForTokenAsync(HttpEntity ev, string code, CancellationToken cancellationToken)
         {
-            //valid response, time to get the actual authorization from gh for client
-            RestRequest request = new(Config.AccessTokenUrl, Method.Post);
-
-            //Add required params url-encoded
-            request.AddParameter("client_id", Config.ClientID.Value, ParameterType.GetOrPost);
-            request.AddParameter("client_secret", Config.ClientSecret.Value, ParameterType.GetOrPost);
-            request.AddParameter("grant_type", "authorization_code", ParameterType.GetOrPost);
-            request.AddParameter("code", code, ParameterType.GetOrPost);
-            request.AddParameter("redirect_uri", $"{ev.Server.RequestUri.Scheme}://{ev.Server.RequestUri.Authority}{Path}", ParameterType.GetOrPost);
-
-            //Allow reconfiguration
-            OnBeforeGetToken(ev, code, request);
-
-            //Get client from pool
-            using ClientContract client = ClientPool.Lease();
+            //Create new request object
+            GetTokenRequest req = new(code, $"{ev.Server.RequestUri.Scheme}://{ev.Server.RequestUri.Authority}{Path}");
+          
             //Execute request and attempt to recover the authorization response
-            RestResponse<OAuthAccessState> response = await client.Resource.ExecuteAsync<OAuthAccessState>(request, cancellationToken: cancellationToken);
-            //Make sure successfull, if so return the access token to store
-            return response.IsSuccessful && response.Data != null ? response.Data : null;
+            OAuthAccessState? response = await SiteAdapter.ExecuteAsync(req, cancellationToken).AsJson<OAuthAccessState>();
+         
+            return response;
         }
 
         /// <summary>
@@ -213,6 +207,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth
         /// <param name="cancellationToken">A token to cancel the operation</param>
         /// <returns>The user's account data, null if not account exsits on the remote site, and process cannot continue</returns>
         protected abstract Task<AccountData?> GetAccountDataAsync(IOAuthAccessState clientAccess, CancellationToken cancellationToken);
+
         /// <summary>
         /// Gets an object that represents the required information for logging-in a user (namley unique user-id)
         /// </summary>
@@ -221,43 +216,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth
         /// <returns></returns>
         protected abstract Task<UserLoginData?> GetLoginDataAsync(IOAuthAccessState clientAccess, CancellationToken cancellation);
 
-        sealed class LoginClaim : IClientSecInfo
-        {
-            [JsonPropertyName("public_key")]
-            public string? PublicKey { get; set; }
-            
-            [JsonPropertyName("browser_id")]
-            public string? ClientId { get; set; }
-
-            [JsonPropertyName("exp")]
-            public long ExpirationSeconds { get; set; }
-
-            [JsonPropertyName("iat")]
-            public long IssuedAtTime { get; set; }           
-
-            [JsonPropertyName("nonce")]
-            public string? Nonce { get; set; }
-         
-            public void ComputeNonce(int nonceSize)
-            {
-                byte[] buffer = ArrayPool<byte>.Shared.Rent(nonceSize);
-                try
-                {
-                    Span<byte> nonce = buffer.AsSpan(0, nonceSize);
-
-                    //get random data
-                    RandomHash.GetRandomBytes(nonce);
-
-                    //Encode nonce
-                    Nonce = VnEncoding.ToBase32String(nonce);
-                }
-                finally
-                {
-                    MemoryUtil.InitializeBlock(buffer.AsSpan());
-                    ArrayPool<byte>.Shared.Return(buffer);
-                }
-            }
-        }
+       
 
         /*
          * Claims are considered indempodent because they require no previous state
@@ -265,6 +224,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth
          * uniquely identifies the claim and authorization upgrade later
          */
 
+        ///<inheritdoc/>
         protected override async ValueTask<VfReturnType> PutAsync(HttpEntity entity)
         {
             ValErrWebMessage webm = new();
@@ -295,11 +255,10 @@ namespace VNLib.Plugins.Essentials.SocialOauth
             claim.ComputeNonce((int)Config.NonceByteSize);
 
             //Build the redirect uri
-            webm.Result = new LoginUriBuilder()
+            webm.Result = new LoginUriBuilder(Config)
                 .WithEncoding(entity.Server.Encoding)
                 .WithUrl(entity.IsSecure ? "https" : "http", entity.Server.RequestUri.Authority, Path)
                 .WithNonce(claim.Nonce!)
-                .Build(Config)
                 .Encrypt(entity, claim);
 
             //Sign and set the claim cookie
@@ -313,11 +272,12 @@ namespace VNLib.Plugins.Essentials.SocialOauth
 
         /*
          * Get method is invoked when the remote OAuth2 control has been passed back
-         * to this server. If successfull should include a code that grants authorization
+         * to this server. If successful should include a code that grants authorization
          * and include a state variable that the client decrypted from an initial claim
          * to prove its identity
          */
 
+        ///<inheritdoc/>
         protected override async ValueTask<VfReturnType> GetAsync(HttpEntity entity)
         {
             //Make sure state and code parameters are available
@@ -392,6 +352,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth
          * Post messages finalize a login from a nonce
          */
 
+        ///<inheritdoc/>
         protected override async ValueTask<VfReturnType> PostAsync(HttpEntity entity)
         {
             ValErrWebMessage webm = new();
@@ -440,7 +401,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth
             {
                 entity.CloseResponse(webm);
                 return VfReturnType.VirtualSkip;
-            }           
+            }
 
             //Safe to recover the access token
             IOAuthAccessState token = entity.Session.GetObject<OAuthAccessState>(SESSION_TOKEN_KEY_NAME);
@@ -455,7 +416,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth
             }
             
             //Fetch the user from the database
-            IUser? user = await Config.Users.GetUserFromIDAsync(userLogin.UserId, entity.EventCancellation);
+            IUser? user = await Users.GetUserFromIDAsync(userLogin.UserId, entity.EventCancellation);
             
             if(user == null)
             {
@@ -483,11 +444,11 @@ namespace VNLib.Plugins.Essentials.SocialOauth
                 }
               
                 //Generate a new random passowrd incase the user wants to use a local account to log in sometime in the future
-                using PrivateString passhash = Config.Passwords.GetRandomPassword(Config.RandomPasswordSize);
+                using PrivateString passhash = Passwords.GetRandomPassword(Config.RandomPasswordSize);
                 try
                 {
                     //Create the user with the specified email address, minimum privilage level, and an empty password
-                    user = await Config.Users.CreateUserAsync(userLogin.UserId!, userAccount.EmailAddress, AccountUtil.MINIMUM_LEVEL, passhash, entity.EventCancellation);
+                    user = await Users.CreateUserAsync(userLogin.UserId!, userAccount.EmailAddress, AccountUtil.MINIMUM_LEVEL, passhash, entity.EventCancellation);
                     //Set active status
                     user.Status = UserStatus.Active;
                     //Store the new profile
@@ -532,6 +493,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth
                     return VfReturnType.VirtualSkip;
                 }
             }
+
             //Finalze login
             try
             {
@@ -582,8 +544,106 @@ namespace VNLib.Plugins.Essentials.SocialOauth
             entity.CloseResponse(webm);
             return VfReturnType.VirtualSkip;
         }
-     
-       
+
+        private static bool VerifyAndGetClaim(HttpEntity entity, [NotNullWhen(true)] out LoginClaim? claim)
+        {
+            claim = null;
+
+            //Try to get the cookie
+            if (!entity.Server.GetCookie(CLAIM_COOKIE_NAME, out string? cookieValue))
+            {
+                return false;
+            }
+
+            //Recover the signing key from the user's session
+            string sigKey = entity.Session[SESSION_SIG_KEY_NAME];
+            byte[]? key = VnEncoding.FromBase32String(sigKey);
+
+            if (key == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                //Try to parse the jwt
+                using JsonWebToken jwt = JsonWebToken.Parse(cookieValue);
+
+                //Verify the jwt
+                if (!jwt.Verify(key, HashAlg.SHA256))
+                {
+                    return false;
+                }
+
+                //Recover the clam from the jwt
+                claim = jwt.GetPayload<LoginClaim>();
+
+                //Verify the expiration time
+                return claim.ExpirationSeconds > entity.RequestedTimeUtc.ToUnixTimeSeconds();
+            }
+            catch (FormatException)
+            {
+                //JWT was corrupted and could not be parsed
+                return false;
+            }
+            finally
+            {
+                MemoryUtil.InitializeBlock(key.AsSpan());
+            }
+        }
+
+        private static void ClearClaimData(HttpEntity entity)
+        {
+            //Remove the upgrade cookie
+            if (entity.Server.RequestCookies.ContainsKey(CLAIM_COOKIE_NAME))
+            {
+                //Expire cookie
+                HttpCookie cookie = new(CLAIM_COOKIE_NAME, string.Empty)
+                {
+                    Secure = true,
+                    HttpOnly = true,
+                    ValidFor = TimeSpan.Zero,
+                    SameSite = CookieSameSite.SameSite
+                };
+
+                entity.Server.SetCookie(in cookie);
+            }
+
+            //Clear the signing key from the session
+            entity.Session[SESSION_SIG_KEY_NAME] = null!;
+        }
+
+        private void SignAndSetCookie(HttpEntity entity, LoginClaim claim)
+        {
+            //Setup Jwt
+            using JsonWebToken jwt = new();
+
+            //Write claim body, we dont need a header
+            jwt.WritePayload(claim);
+
+            //Generate signing key
+            byte[] sigKey = RandomHash.GetRandomBytes(SIGNING_KEY_SIZE);
+
+            //Sign the jwt
+            jwt.Sign(sigKey, HashAlg.SHA256);
+
+            //Build and set cookie
+            HttpCookie cookie = new(CLAIM_COOKIE_NAME, jwt.Compile())
+            {
+                Secure = true,
+                HttpOnly = true,
+                ValidFor = Config.InitClaimValidFor,
+                SameSite = CookieSameSite.SameSite
+            };
+
+            entity.Server.SetCookie(in cookie);
+
+            //Encode and store the signing key in the clien't session
+            entity.Session[SESSION_SIG_KEY_NAME] = VnEncoding.ToBase32String(sigKey);
+
+            //Clear the signing key
+            MemoryUtil.InitializeBlock(sigKey.AsSpan());
+        }
 
         /*
          * Construct the client's redirect url based on their login claim, which contains
@@ -594,32 +654,19 @@ namespace VNLib.Plugins.Essentials.SocialOauth
          * The result is an encrypted nonce that should guard against replay attacks and MITM
          */
 
-        sealed class LoginUriBuilder 
+        sealed record class LoginUriBuilder(OauthClientConfig Config)
         {
-            private readonly IMemoryHandle<byte> _buffer;
-
-            private Span<byte> _binBuffer => _buffer.Span[1024..];
-            private Span<char> _charBuffer => MemoryMarshal.Cast<byte, char>(_buffer.Span[..1024]);
-
             private string? redirectUrl;
             private string? nonce;
-            private Encoding _encoding;
-
-            private int _urlCharPointer;
-
-            public LoginUriBuilder()
-            {
-                //Alloc buffer
-                _buffer = MemoryUtil.SafeAllocNearestPage<byte>(8000, true);
-
-                //Set default encoding
-                _encoding = Encoding.UTF8;
-            }
-
+            private Encoding _encoding = Encoding.UTF8;
+          
             public LoginUriBuilder WithUrl(ReadOnlySpan<char> scheme, ReadOnlySpan<char> authority, ReadOnlySpan<char> path)
             {
+                //Alloc stack buffer for url
+                Span<char> buffer = stackalloc char[1024];
+
                 //buffer writer for easier syntax
-                ForwardOnlyWriter<char> writer = new(_charBuffer);
+                ForwardOnlyWriter<char> writer = new(buffer);
                 //first build the redirect url to re-encode it
                 writer.Append(scheme);
                 writer.Append("://");
@@ -642,18 +689,29 @@ namespace VNLib.Plugins.Essentials.SocialOauth
             {
                 nonce = base32Nonce;
                 return this;
-            }
+            }            
 
-            public LoginUriBuilder Build(OauthClientConfig config)
+            public string Encrypt(HttpEntity client, IClientSecInfo secInfo)
             {
-                //buffer writer for easier syntax
-                ForwardOnlyWriter<char> writer = new(_charBuffer);
+                //Alloc buffer and split it into binary and char buffers
+                using UnsafeMemoryHandle<byte> buffer = MemoryUtil.UnsafeAllocNearestPage(8000);
+
+                Span<byte> binBuffer = buffer.Span[2048..];
+                Span<char> charBuffer = MemoryMarshal.Cast<byte, char>(buffer.Span[..2048]);            
+
+
+                /*
+                 * Build the character uri so we can encode it to binary, 
+                 * encrypt it and return it to the client
+                 */
+
+                ForwardOnlyWriter<char> writer = new(charBuffer);
 
                 //Append the config redirect path
-                writer.Append(config.AccessCodeUrl.OriginalString);
+                writer.Append(Config.AccessCodeUrl.OriginalString);
                 //begin query arguments
                 writer.Append("&client_id=");
-                writer.Append(config.ClientID.Value);
+                writer.Append(Config.ClientID.Value);
                 //add the redirect url
                 writer.Append("&redirect_uri=");
                 writer.Append(redirectUrl);
@@ -661,132 +719,59 @@ namespace VNLib.Plugins.Essentials.SocialOauth
                 writer.Append("&state=");
                 writer.Append(nonce);
 
-                //Update url pointer
-                _urlCharPointer = writer.Written;
+                //Collect the written character data
+                ReadOnlySpan<char> url = writer.AsSpan();
 
-                return this;
+                //Separate bin buffers for encryption and encoding
+                Span<byte> encryptionBuffer = binBuffer[1024..];
+                Span<byte> encodingBuffer = binBuffer[..1024];
+
+                //Encode the url to binary
+                int byteCount = _encoding.GetBytes(url, encodingBuffer);
+
+                //Encrypt the binary data
+                ERRNO count = client.TryEncryptClientData(secInfo, encodingBuffer[..byteCount], encryptionBuffer);
+
+                //base64 encode the encrypted
+                return Convert.ToBase64String(encryptionBuffer[0..(int)count]);
             }
+        }
+      
 
-            public string Encrypt(HttpEntity client, IClientSecInfo secInfo)
+        sealed class LoginClaim : IClientSecInfo
+        {
+            [JsonPropertyName("public_key")]
+            public string? PublicKey { get; set; }
+
+            [JsonPropertyName("browser_id")]
+            public string? ClientId { get; set; }
+
+            [JsonPropertyName("exp")]
+            public long ExpirationSeconds { get; set; }
+
+            [JsonPropertyName("iat")]
+            public long IssuedAtTime { get; set; }
+
+            [JsonPropertyName("nonce")]
+            public string? Nonce { get; set; }
+
+            public void ComputeNonce(int nonceSize)
             {
+                //Alloc nonce buffer
+                using UnsafeMemoryHandle<byte> buffer = MemoryUtil.UnsafeAlloc(nonceSize);
                 try
                 {
-                    ReadOnlySpan<char> url = _charBuffer[.._urlCharPointer];
+                    //fill the buffer with random data
+                    RandomHash.GetRandomBytes(buffer.Span);
 
-                    //Separate buffers
-                    Span<byte> encryptionBuffer = _binBuffer[1024..];
-                    Span<byte> encodingBuffer = _binBuffer[..1024];
-
-                    //Encode the url to binary
-                    int byteCount = _encoding.GetBytes(url, encodingBuffer);
-
-                    //Encrypt the binary data
-                    ERRNO count = client.TryEncryptClientData(secInfo, encodingBuffer[..byteCount], encryptionBuffer);
-
-                    //base64 encode the encrypted
-                    return Convert.ToBase64String(encryptionBuffer[0..(int)count]);
+                    //Base32-Encode nonce and save it
+                    Nonce = VnEncoding.ToBase32String(buffer.Span);
                 }
                 finally
                 {
-                    _urlCharPointer = 0;
-                    //Dispose buffer
-                    _buffer.Dispose();
+                    MemoryUtil.InitializeBlock(buffer.Span);
                 }
             }
-
-        }
-
-        private static bool VerifyAndGetClaim(HttpEntity entity, [NotNullWhen(true)] out LoginClaim? claim)
-        {
-            claim = null;
-
-            //Try to get the cookie
-            if(!entity.Server.GetCookie(CLAIM_COOKIE_NAME, out string? cookieValue))
-            {
-                return false;
-            }
-
-            //Recover the signing key from the user's session
-            string sigKey = entity.Session[SESSION_SIG_KEY_NAME];
-            byte[]? key = VnEncoding.FromBase32String(sigKey);
-
-            if (key == null)
-            {
-                return false;
-            }          
-
-            try
-            {
-                //Try to parse the jwt
-                using JsonWebToken jwt = JsonWebToken.Parse(cookieValue);
-
-                //Verify the jwt
-                using(HMAC alg = GetSigningAlg(key))
-                {
-                    if (!jwt.Verify(alg))
-                    {
-                        return false;
-                    }
-                }
-
-                //Recover the clam from the jwt
-                claim = jwt.GetPayload<LoginClaim>();
-
-                //Verify the expiration time
-                return claim.ExpirationSeconds > entity.RequestedTimeUtc.ToUnixTimeSeconds();
-            }
-            catch (FormatException)
-            {
-                return false;
-            }
-            finally
-            {
-                MemoryUtil.InitializeBlock(key.AsSpan());
-            }
-        }
-
-        private static void ClearClaimData(HttpEntity entity) 
-        {
-            if (entity.Server.RequestCookies.ContainsKey(CLAIM_COOKIE_NAME))
-            {
-                entity.Server.ExpireCookie(CLAIM_COOKIE_NAME);
-            }
-
-            entity.Session[SESSION_SIG_KEY_NAME] = null!;
-        }
-
-        private void SignAndSetCookie(HttpEntity entity, LoginClaim claim) 
-        {
-            //Setup Jwt
-            using JsonWebToken jwt = new();
-
-            //Write claim body
-            jwt.WritePayload(claim);
-
-            //Generate signing key
-            byte[] sigKey = RandomHash.GetRandomBytes(SIGNING_KEY_SIZE);
-
-            //Sign the jwt
-            using(HMAC alg = GetSigningAlg(sigKey))
-            {
-                jwt.Sign(alg);
-            }
-
-            //Build and set cookie
-            HttpCookie cookie = new(CLAIM_COOKIE_NAME, jwt.Compile())
-            {
-                Secure = true,
-                HttpOnly = true,
-                ValidFor = Config.InitClaimValidFor,
-                SameSite = CookieSameSite.SameSite
-            };
-
-            entity.Server.SetCookie(in cookie);
-
-            //Encode and store the signing key in the clien't session
-            entity.Session[SESSION_SIG_KEY_NAME] = VnEncoding.ToBase32String(sigKey);
-
-            MemoryUtil.InitializeBlock(sigKey.AsSpan());
         }
     }
 }

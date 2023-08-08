@@ -3,9 +3,9 @@
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.SocialOauth
-* File: UserLoginData.cs 
+* File: GetTokenRequest.cs 
 *
-* UserLoginData.cs is part of VNLib.Plugins.Essentials.SocialOauth which is part of the larger 
+* GetTokenRequest.cs is part of VNLib.Plugins.Essentials.SocialOauth which is part of the larger 
 * VNLib collection of libraries and utilities.
 *
 * VNLib.Plugins.Essentials.SocialOauth is free software: you can redistribute it and/or modify 
@@ -22,13 +22,13 @@
 * along with this program.  If not, see https://www.gnu.org/licenses/.
 */
 
-using System.Text.Json.Serialization;
-
 namespace VNLib.Plugins.Essentials.SocialOauth
 {
-    public class UserLoginData
-    {
-        [JsonPropertyName("user_id")]
-        public string? UserId { get; set; }
-    }
+    /// <summary>
+    /// A request message to get an OAuth2 token from a code
+    /// </summary>
+    /// <param name="Code">The clients authentication code</param>
+    /// <param name="RedirectUrl">The redirect url for current site</param>
+    public sealed record class GetTokenRequest(string Code, string RedirectUrl)
+    { }
 }

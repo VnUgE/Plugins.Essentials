@@ -34,10 +34,9 @@ using RestSharp;
 using VNLib.Hashing;
 using VNLib.Hashing.IdentityUtility;
 using VNLib.Utils.Logging;
-using VNLib.Net.Rest.Client;
 using VNLib.Plugins.Essentials.Accounts;
 using VNLib.Plugins.Extensions.Loading;
-
+using VNLib.Net.Rest.Client.Construction;
 
 namespace VNLib.Plugins.Essentials.SocialOauth.Endpoints
 {
@@ -51,31 +50,26 @@ namespace VNLib.Plugins.Essentials.SocialOauth.Endpoints
         {
             string keyUrl = config["key_url"].GetString() ?? throw new KeyNotFoundException("Missing Auth0 'key_url' from config");
 
-            Uri keyUri = new(keyUrl);
+            //Define the key endpoint
+            SiteAdapter.DefineSingleEndpoint()
+                .WithEndpoint<GetKeyRequest>()
+                .WithUrl(keyUrl)
+                .WithMethod(Method.Get)
+                .WithHeader("Accept", "application/json")
+                .OnResponse((r, res) => res.ThrowIfError());
 
             //Get certificate on background thread
-            Auth0VerificationJwk = Task.Run(() => GetRsaCertificate(keyUri)).AsLazy();
+            Auth0VerificationJwk = Task.Run(GetRsaCertificate).AsLazy();
         }
 
-
-        private async Task<ReadOnlyJsonWebKey[]> GetRsaCertificate(Uri certUri)
+        private async Task<ReadOnlyJsonWebKey[]> GetRsaCertificate()
         {
             try
             {
                 Log.Debug("Getting Auth0 signing keys");
-                //Get key request
-                RestRequest keyRequest = new(certUri, Method.Get);
-                keyRequest.AddHeader("Accept", "application/json");
 
                 //rent client from pool
-                RestResponse response;
-                
-                using (ClientContract client = ClientPool.Lease())
-                {
-                    response = await client.Resource.ExecuteAsync(keyRequest);
-                }
-
-                response.ThrowIfError();
+                RestResponse response = await SiteAdapter.ExecuteAsync(new GetKeyRequest());
 
                 //Get response as doc
                 using JsonDocument doc = JsonDocument.Parse(response.RawBytes);
@@ -98,40 +92,12 @@ namespace VNLib.Plugins.Essentials.SocialOauth.Endpoints
         }
 
         /*
-         * Account data may be recovered from the identity token
-         * and it happens after a call to GetLoginData so 
-         * we do not need to re-verify the token
+         * Auth0 uses the format "platoform|{user_id}" for the user id so it should match the 
+         * external platofrm as github and discord endoints also
          */
-        protected override Task<AccountData?> GetAccountDataAsync(IOAuthAccessState clientAccess, CancellationToken cancellationToken)
-        {
-            using JsonWebToken jwt = JsonWebToken.Parse(clientAccess.IdToken);
-
-            //verify signature
-
-            using JsonDocument userData = jwt.GetPayload();
-
-            if (!userData.RootElement.GetProperty("email_verified").GetBoolean())
-            {
-                return Task.FromResult<AccountData?>(null);
-            }
-
-            string fullName = userData.RootElement.GetProperty("name").GetString() ?? " ";
-
-            return Task.FromResult<AccountData?>(new AccountData()
-            {
-                EmailAddress = userData.RootElement.GetProperty("email").GetString(),
-                First = fullName.Split(' ')[0],
-                Last = fullName.Split(' ')[1],
-            });
-        }
 
         private static string GetUserIdFromPlatform(string userName)
         {
-            /*
-             * Auth0 uses the format "platoform|{user_id}" for the user id so it should match the 
-             * external platofrm as github and discord endoints also
-             */
-
             return ManagedHash.ComputeHash(userName, HashAlg.SHA1, HashEncodingMode.Hexadecimal);
         }
 
@@ -140,6 +106,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth.Endpoints
 
         protected override Task<UserLoginData?> GetLoginDataAsync(IOAuthAccessState clientAccess, CancellationToken cancellation)
         {
+            //recover the identity token
             using JsonWebToken jwt = JsonWebToken.Parse(clientAccess.IdToken);
 
             //Verify the token against the first signing key
@@ -175,5 +142,36 @@ namespace VNLib.Plugins.Essentials.SocialOauth.Endpoints
                 UserId = GetUserIdFromPlatform(userId)
             });
         }
+
+        /*
+         * Account data may be recovered from the identity token
+         * and it happens after a call to GetLoginData so 
+         * we do not need to re-verify the token
+         */
+        protected override Task<AccountData?> GetAccountDataAsync(IOAuthAccessState clientAccess, CancellationToken cancellationToken)
+        {
+            using JsonWebToken jwt = JsonWebToken.Parse(clientAccess.IdToken);
+
+            //verify signature
+
+            using JsonDocument userData = jwt.GetPayload();
+
+            if (!userData.RootElement.GetProperty("email_verified").GetBoolean())
+            {
+                return Task.FromResult<AccountData?>(null);
+            }
+
+            string fullName = userData.RootElement.GetProperty("name").GetString() ?? " ";
+
+            return Task.FromResult<AccountData?>(new AccountData()
+            {
+                EmailAddress = userData.RootElement.GetProperty("email").GetString(),
+                First = fullName.Split(' ').FirstOrDefault(),
+                Last = fullName.Split(' ').LastOrDefault(),
+            });
+        }
+
+        private sealed record class GetKeyRequest()
+        { }
     }
 }
