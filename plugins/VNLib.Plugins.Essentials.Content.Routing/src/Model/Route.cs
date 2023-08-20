@@ -46,15 +46,15 @@ namespace VNLib.Plugins.Essentials.Content.Routing.Model
 
         public string MatchPath { get; set; }
 
-        [Column("Privilage")]
-        public long _privilage
+        [Column("Privilege")]
+        public long _privilege
         {
-            get => (long)Privilage;
-            set => Privilage = (ulong)value;
+            get => (long)Privilege;
+            set => Privilege = (ulong)value;
         }
 
         [NotMapped]
-        public ulong Privilage { get; set; }
+        public ulong Privilege { get; set; }
 
         public string? Alternate { get; set; } = string.Empty;
 

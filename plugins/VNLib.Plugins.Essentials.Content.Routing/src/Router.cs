@@ -63,19 +63,19 @@ namespace VNLib.Plugins.Essentials.Content.Routing
         public async ValueTask<FileProcessArgs> RouteAsync(HttpEntity entity)
         {
             //Default to read-only privilages
-            ulong privilage = AccountUtil.READ_MSK;
+            ulong privileges = AccountUtil.READ_MSK;
 
             //Only select privilages for logged-in users, this is a medium security check since we may not have all data available
             if (entity.Session.IsSet && entity.IsClientAuthorized(AuthorzationCheckLevel.Medium))
             {
-                privilage = entity.Session.Privilages;
+                privileges = entity.Session.Privilages;
             }
 
             //Get the routing table for the current host
             ReadOnlyCollection<Route> routes = await RouteTable.GetOrAdd(entity.RequestedRoot, LoadRoutesAsync);
 
             //Find the proper routine for the connection
-            Route? selected = SelectBestRoute(routes, entity.RequestedRoot.Hostname, entity.Server.Path, privilage);
+            Route? selected = SelectBestRoute(routes, entity.RequestedRoot.Hostname, entity.Server.Path, privileges);
 
             //Get the arguments for the selected route, if not found allow the connection to continue
             return selected?.GetArgs(entity) ?? FileProcessArgs.Continue;
@@ -113,9 +113,9 @@ namespace VNLib.Plugins.Essentials.Content.Routing
         /// <param name="routes">The routes collection to read</param>
         /// <param name="hostname">The connection hostname to filter routes for</param>
         /// <param name="path">The connection url path to filter routes for</param>
-        /// <param name="privilages">The calculated privialges of the connection</param>
+        /// <param name="privileges">The calculated privialges of the connection</param>
         /// <returns>The best route match for the connection if one is found, null otherwise</returns>
-        private static Route? SelectBestRoute(ReadOnlyCollection<Route> routes, string hostname, string path, ulong privilages)
+        private static Route? SelectBestRoute(ReadOnlyCollection<Route> routes, string hostname, string path, ulong privileges)
         {
             //Rent an array to sort routes for the current user
             Route[] matchArray = ArrayPool<Route>.Shared.Rent(routes.Count);
@@ -124,7 +124,7 @@ namespace VNLib.Plugins.Essentials.Content.Routing
             //Search for routes that match
             for (int i = 0; i < routes.Count; i++)
             {
-                if (FastMatch(routes[i], hostname, path, privilages))
+                if (FastMatch(routes[i], hostname, path, privileges))
                 {
                     //Add to sort array
                     matchArray[count++] = routes[i];
@@ -176,9 +176,9 @@ namespace VNLib.Plugins.Essentials.Content.Routing
         /// <param name="route">The route to test against</param>
         /// <param name="hostname">The hostname to test</param>
         /// <param name="path">The resource path to test</param>
-        /// <param name="privilages">The privialge level to search for</param>
+        /// <param name="privileges">The privialge level to search for</param>
         /// <returns>True if the route can be matched to the resource and the privialge level</returns>
-        private static bool FastMatch(Route route, ReadOnlySpan<char> hostname, ReadOnlySpan<char> path, ulong privilages)
+        private static bool FastMatch(Route route, ReadOnlySpan<char> hostname, ReadOnlySpan<char> path, ulong privileges)
         {
             //Get span of hostname to stop string heap allocations during comparisons
             ReadOnlySpan<char> routineHost = route.Hostname;
@@ -209,7 +209,7 @@ namespace VNLib.Plugins.Essentials.Content.Routing
             }
 
             //Test if the level and group privilages match for the current routine
-            return (privilages & AccountUtil.LEVEL_MSK) >= (route.Privilage & AccountUtil.LEVEL_MSK) && (route.Privilage & AccountUtil.GROUP_MSK) == (privilages & AccountUtil.GROUP_MSK);
+            return (privileges & AccountUtil.LEVEL_MSK) >= (route.Privilege & AccountUtil.LEVEL_MSK) && (route.Privilege & AccountUtil.GROUP_MSK) == (privileges & AccountUtil.GROUP_MSK);
         }
     }
 }

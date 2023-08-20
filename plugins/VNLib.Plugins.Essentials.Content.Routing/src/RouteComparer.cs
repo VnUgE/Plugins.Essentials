@@ -68,7 +68,7 @@ namespace VNLib.Plugins.Essentials.Content.Routing
             if (val == 0)
             {
                 //Higher privilage routine is greater than lower privilage
-                val = (x.Privilage & LEVEL_MSK) > (y.Privilage & LEVEL_MSK) ? 1 : -1;
+                val = (x.Privilege & LEVEL_MSK) > (y.Privilege & LEVEL_MSK) ? 1 : -1;
             }
             //If both contain (or are) wildcards, then they are equal
             return val;

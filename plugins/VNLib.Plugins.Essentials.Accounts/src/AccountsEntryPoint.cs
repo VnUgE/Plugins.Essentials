@@ -31,6 +31,7 @@ using VNLib.Utils.Memory;
 using VNLib.Utils.Logging;
 using VNLib.Plugins.Attributes;
 using VNLib.Plugins.Essentials.Users;
+using VNLib.Plugins.Essentials.Middleware;
 using VNLib.Plugins.Essentials.Accounts.Endpoints;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Users;
@@ -44,7 +45,7 @@ namespace VNLib.Plugins.Essentials.Accounts
 
         public override string PluginName => "Essentials.Accounts";
 
-        private IAccountSecurityProvider? _securityProvider;
+        private AccountSecProvider? _securityProvider;
 
         [ServiceConfigurator]
         public void ConfigureServices(IServiceContainer services)
@@ -53,6 +54,9 @@ namespace VNLib.Plugins.Essentials.Accounts
             if (_securityProvider != null)
             {
                 services.AddService(typeof(IAccountSecurityProvider), _securityProvider);
+                
+                //Export as middleware
+                services.AddService(typeof(IHttpMiddleware[]), new IHttpMiddleware[] { _securityProvider });
             }
         }
 

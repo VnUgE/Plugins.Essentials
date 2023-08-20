@@ -146,6 +146,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth
 
             return val;
         }
+
         private static IValidator<string> GetNonceValidator()
         {
             InlineValidator<string> val = new();
@@ -281,7 +282,8 @@ namespace VNLib.Plugins.Essentials.SocialOauth
         protected override async ValueTask<VfReturnType> GetAsync(HttpEntity entity)
         {
             //Make sure state and code parameters are available
-            if (entity.QueryArgs.TryGetNonEmptyValue("state", out string? state) && entity.QueryArgs.TryGetNonEmptyValue("code", out string? code))
+            if (entity.QueryArgs.TryGetNonEmptyValue("state", out string? state) 
+                && entity.QueryArgs.TryGetNonEmptyValue("code", out string? code))
             {
                 //Disable refer headers when nonce is set
                 entity.Server.Headers["Referrer-Policy"] = "no-referrer";
@@ -633,7 +635,8 @@ namespace VNLib.Plugins.Essentials.SocialOauth
                 Secure = true,
                 HttpOnly = true,
                 ValidFor = Config.InitClaimValidFor,
-                SameSite = CookieSameSite.SameSite
+                SameSite = CookieSameSite.SameSite,
+                Path = this.Path
             };
 
             entity.Server.SetCookie(in cookie);

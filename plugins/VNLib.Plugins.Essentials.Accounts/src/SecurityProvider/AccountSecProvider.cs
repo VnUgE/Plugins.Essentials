@@ -33,6 +33,7 @@
 
 using System;
 using System.Text.Json;
+using System.Threading.Tasks;
 using System.Security.Cryptography;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
@@ -47,14 +48,16 @@ using VNLib.Utils.Memory;
 using VNLib.Utils.Extensions;
 using VNLib.Plugins.Essentials.Users;
 using VNLib.Plugins.Essentials.Sessions;
+using VNLib.Plugins.Essentials.Middleware;
 using VNLib.Plugins.Essentials.Extensions;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Validation;
 
 namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
 {
+
     [ConfigurationName("account_security", Required = false)]
-    internal class AccountSecProvider : IAccountSecurityProvider
+    internal class AccountSecProvider : IAccountSecurityProvider, IHttpMiddleware
     {
         private const int PUB_KEY_JWT_NONCE_SIZE = 16;
 
@@ -81,6 +84,20 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             //Parse config if defined
             _config = config.DeserialzeAndValidate<AccountSecConfig>();
         }
+
+        /*
+         * Middleware handler for reconciling client cookies for all connections
+         */
+
+        ///<inheritdoc/>
+        public ValueTask<HttpMiddlewareResult> ProcessAsync(HttpEntity entity)
+        {
+            //Reconcile cookies on every request we enabled
+            ReconcileCookies(entity);
+            //Always continue
+            return ValueTask.FromResult(HttpMiddlewareResult.Continue);
+        }
+
 
         #region Interface Impl
 
@@ -148,9 +165,6 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             {
                 return false;
             }
-
-            //Reconcile cookies on request
-            ReconcileCookies(entity);
 
             return level switch
             {
@@ -229,29 +243,20 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
 
         private ClientSecurityToken GenerateToken(ReadOnlySpan<char> publicKey)
         {
-            static ReadOnlySpan<byte> PublicKey(ReadOnlySpan<char> publicKey, Span<byte> buffer)
-            {
-                ERRNO result = VnEncoding.TryFromBase64Chars(publicKey, buffer);
-                return buffer.Slice(0, result);
-            }        
-
             //Alloc buffer for encode/decode
             using IMemoryHandle<byte> buffer = MemoryUtil.SafeAllocNearestPage(4000, true);
             try
             {
-                using RSA rsa = RSA.Create();
-
-                //Import the client's public key
-                rsa.ImportSubjectPublicKeyInfo(PublicKey(publicKey, buffer.Span), out _);              
-
                 Span<byte> secretBuffer = buffer.Span[.._config.TokenKeySize];
                 Span<byte> outputBuffer = buffer.Span[_config.TokenKeySize..];
 
                 //Computes a random shared key
                 RandomHash.GetRandomBytes(secretBuffer);
 
-                //Encyrpt the private key to send to client
-                if (!rsa.TryEncrypt(secretBuffer, outputBuffer, ClientEncryptonPadding, out int bytesEncrypted))
+                ERRNO bytesEncrypted = TryEncryptClientData(publicKey, secretBuffer, outputBuffer);
+
+                //Encyrpt the secret key to send to client
+                if (!bytesEncrypted)
                 {
                     throw new InternalBufferTooSmallException("The internal buffer used to store the encrypted token is too small");
                 }
@@ -260,8 +265,8 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                 return new()
                 {
                     //Client token is the encrypted private key
-                    ClientToken = Convert.ToBase64String(outputBuffer[..bytesEncrypted]),
-                    //Store public key as the server token
+                    ClientToken = Convert.ToBase64String(outputBuffer[..(int)bytesEncrypted]),
+                    //Server token is the raw secret
                     ServerToken = VnEncoding.ToBase32String(secretBuffer)
                 };
             }
@@ -348,6 +353,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             
             return isValid;
         }
+        
         #endregion
 
         #region Cookies
@@ -480,7 +486,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
         {
             if (base64PubKey.IsEmpty)
             {
-                return false;
+                return ERRNO.E_FAIL;
             }
 
             //Alloc a buffer for decoding the public key
@@ -688,6 +694,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             return true;
         }
 
+       
         #endregion
 
 

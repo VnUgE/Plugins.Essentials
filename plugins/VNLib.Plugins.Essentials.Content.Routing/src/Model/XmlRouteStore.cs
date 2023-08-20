@@ -117,13 +117,13 @@ namespace VNLib.Plugins.Essentials.Content.Routing.Model
                 }
 
                 //read priv level attribute
-                string? privAtr = routeEl.Attributes["privilage"]?.Value;
-                _ = privAtr ?? throw new XmlException("Missing required attribute 'priv' in route element");
+                string? privAtr = routeEl.Attributes["privilege"]?.Value;
+                _ = privAtr ?? throw new XmlException("Missing required attribute 'privilege' in route element");
 
                 //Try to get the priv level enum value
                 if (ulong.TryParse(privAtr, out ulong priv))
                 {
-                    route.Privilage = priv;
+                    route.Privilege = priv;
                 }
                 else
                 {

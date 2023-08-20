@@ -66,7 +66,7 @@ namespace VNLib.Plugins.Essentials.Content.Routing.Model
                     .Next()
 
                 //Default to read-on
-                .WithColumn(r => r.Privilage)
+                .WithColumn(r => r.Privilege)
                     .WithDefault(Accounts.AccountUtil.READ_MSK)
                     .AllowNull(false)
                     .Next()

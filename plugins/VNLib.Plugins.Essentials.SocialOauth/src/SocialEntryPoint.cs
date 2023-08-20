@@ -51,13 +51,6 @@ namespace VNLib.Plugins.Essentials.SocialOauth
                 this.Route<GitHubOauth>();
                 Log.Information("Github social OAuth authentication loaded");
             }
-
-            if (this.HasConfigForType<Auth0>())
-            {
-                //Add the auth0 login endpoint
-                this.Route<Auth0>();
-                Log.Information("Auth0 social OAuth authentication loaded");
-            }
         }
        
 
