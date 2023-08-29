@@ -65,11 +65,14 @@ namespace VNLib.Plugins.Essentials.Accounts.Validators
         public ClientSecurityMessageValidator()
         {
             RuleFor(static t => t.ClientId)
-                .Length(min: 10, max: 100)
-                .WithMessage(errorMessage: "Your browser is not sending required security information");
+              .NotEmpty()
+              .WithMessage(errorMessage: "Your browser is not sending required security information")
+              .Length(min: 10, max: 100)
+              .WithMessage(errorMessage: "Your browser is not sending required security information");
 
             RuleFor(static t => t.PublicKey)
              .NotEmpty()
+             .WithMessage(errorMessage: "Your browser is not sending required security information")
              .Length(min: 50, max: 1000)
              .WithMessage(errorMessage: "Your browser is not sending required security information");
         }

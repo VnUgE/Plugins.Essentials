@@ -5,18 +5,18 @@
 * Package: VNLib.Plugins.Essentials.Accounts.Registration
 * File: RegistrationEntpoint.cs 
 *
-* RegistrationEntpoint.cs is part of VNLib.Plugins.Essentials.Accounts.Registration which is part of the larger 
-* VNLib collection of libraries and utilities.
+* RegistrationEntpoint.cs is part of VNLib.Plugins.Essentials.Accounts.Registration 
+* which is part of the larger VNLib collection of libraries and utilities.
 *
-* VNLib.Plugins.Essentials.Accounts.Registration is free software: you can redistribute it and/or modify 
-* it under the terms of the GNU Affero General Public License as 
-* published by the Free Software Foundation, either version 3 of the
-* License, or (at your option) any later version.
+* VNLib.Plugins.Essentials.Accounts.Registration is free software: you can 
+* redistribute it and/or modify it under the terms of the GNU Affero General 
+* Public License as published by the Free Software Foundation, either version 
+* 3 of the License, or (at your option) any later version.
 *
-* VNLib.Plugins.Essentials.Accounts.Registration is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-* GNU Affero General Public License for more details.
+* VNLib.Plugins.Essentials.Accounts.Registration is distributed in the
+* hope that it will be useful, but WITHOUT ANY WARRANTY; without even 
+* the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR 
+* PURPOSE. See the GNU Affero General Public License for more details.
 *
 * You should have received a copy of the GNU Affero General Public License
 * along with this program.  If not, see https://www.gnu.org/licenses/.
@@ -29,6 +29,7 @@ using System.Text.Json;
 using FluentValidation;
 
 using Emails.Transactional.Client;
+using Emails.Transactional.Client.Plugins;
 using Emails.Transactional.Client.Exceptions;
 
 using VNLib.Hashing;
@@ -45,7 +46,6 @@ using VNLib.Plugins.Extensions.Loading.Sql;
 using VNLib.Plugins.Extensions.Loading.Events;
 using VNLib.Plugins.Extensions.Loading.Users;
 using VNLib.Plugins.Extensions.Validation;
-using Emails.Transactional.Client.Extensions;
 using VNLib.Plugins.Essentials.Accounts.Registration.TokenRevocation;
 using static VNLib.Plugins.Essentials.Accounts.AccountUtil;
 
@@ -89,14 +89,15 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
             RegJwtValdidator = GetJwtValidator();
 
             Passwords = plugin.GetOrCreateSingleton<ManagedPasswordHashing>();
-            Users = plugin.GetOrCreateSingleton<UserManager>();
-            RevokedTokens = new(plugin.GetContextOptions());
+            Users = plugin.GetOrCreateSingleton<UserManager>();           
             Emails = plugin.GetOrCreateSingleton<TEmailConfig>();
+            RevokedTokens = new(plugin.GetContextOptions());
 
             //Begin the async op to get the signature key from the vault
             RegSignatureKey = plugin.GetSecretAsync("reg_sig_key")
                                 .ToLazy(static sr => sr.GetJsonWebKey());
         }
+
 
         private static IValidator<string> GetJwtValidator()
         {
@@ -111,7 +112,15 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
                 .IllegalCharacters();
             return val;
         }
-        
+
+        //Schedule cleanup interval
+        [AsyncInterval(Minutes = 5)]
+        public async Task OnIntervalAsync(ILogProvider log, CancellationToken cancellationToken)
+        {
+            //Cleanup tokens
+            await RevokedTokens.CleanTableAsync(RegExpiresSec, cancellationToken);
+        }
+
 
         protected override async ValueTask<VfReturnType> PostAsync(HttpEntity entity)
         {
@@ -319,12 +328,13 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
             {
                 //Get a new registration template
                 EmailTransactionRequest emailTemplate = Emails.GetTemplateRequest("Registration");
+
                 //Add the user's to address
-                emailTemplate.AddToAddress(emailAddress);
-                emailTemplate.AddVariable("username", emailAddress);
-                //Set the security code variable string
-                emailTemplate.AddVariable("reg_url", url);
-                emailTemplate.AddVariable("date", current.ToString("f"));
+                emailTemplate.AddToAddress(emailAddress)
+                    .AddVariable("username", emailAddress)
+                    //Set the security code variable string
+                    .AddVariable("reg_url", url)
+                    .AddVariable("date", current.ToString("f"));
               
                 //Send the email
                 TransactionResult result = await Emails.SendEmailAsync(emailTemplate);
@@ -356,14 +366,6 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
                 Log.Error(ex);
             }
         }
-
-
-        //Schedule cleanup interval 60 seconds
-        [AsyncInterval(Minutes = 1)]
-        public async Task OnIntervalAsync(ILogProvider log, CancellationToken cancellationToken)
-        {
-            //Cleanup tokens
-            await RevokedTokens.CleanTableAsync(RegExpiresSec, cancellationToken);
-        }
+       
     }
 }

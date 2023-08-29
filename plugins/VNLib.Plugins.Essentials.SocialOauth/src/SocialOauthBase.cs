@@ -144,6 +144,10 @@ namespace VNLib.Plugins.Essentials.SocialOauth
                 .Length(50, 1024)
                 .WithMessage("Request is not valid");
 
+            val.RuleFor(static s => s.LocalLanguage)
+                .Length(2, 10)
+                .WithMessage("Request is not valid");
+
             return val;
         }
 
@@ -621,7 +625,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth
             using JsonWebToken jwt = new();
 
             //Write claim body, we dont need a header
-            jwt.WritePayload(claim);
+            jwt.WritePayload(claim, Statics.SR_OPTIONS);
 
             //Generate signing key
             byte[] sigKey = RandomHash.GetRandomBytes(SIGNING_KEY_SIZE);
@@ -743,12 +747,6 @@ namespace VNLib.Plugins.Essentials.SocialOauth
 
         sealed class LoginClaim : IClientSecInfo
         {
-            [JsonPropertyName("public_key")]
-            public string? PublicKey { get; set; }
-
-            [JsonPropertyName("browser_id")]
-            public string? ClientId { get; set; }
-
             [JsonPropertyName("exp")]
             public long ExpirationSeconds { get; set; }
 
@@ -757,6 +755,16 @@ namespace VNLib.Plugins.Essentials.SocialOauth
 
             [JsonPropertyName("nonce")]
             public string? Nonce { get; set; }
+           
+            [JsonPropertyName("locallanguage")]
+            public string? LocalLanguage { get; set; }
+           
+            [JsonPropertyName("pubkey")]
+            public string? PublicKey { get; set; }
+
+            [JsonPropertyName("clientid")]
+            public string? ClientId { get; set; }
+          
 
             public void ComputeNonce(int nonceSize)
             {

@@ -25,6 +25,7 @@
 using System;
 using System.Linq;
 using System.Buffers;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
@@ -40,7 +41,7 @@ using VNLib.Plugins.Essentials.Content.Routing.Model;
 namespace VNLib.Plugins.Essentials.Content.Routing
 {
 
-    internal class Router : IPageRouter
+    internal sealed class Router : IPageRouter
     {
         private static readonly RouteComparer Comparer = new();
 
@@ -92,7 +93,7 @@ namespace VNLib.Plugins.Essentials.Content.Routing
             List<Route> collection = new();
 
             //Load all routes from the backing store and filter them
-            await Store.GetAllRoutesAsync(collection);
+            await Store.GetAllRoutesAsync(collection, CancellationToken.None);
 
             Logger.Debug("Found {r} routes in store", collection.Count);
 

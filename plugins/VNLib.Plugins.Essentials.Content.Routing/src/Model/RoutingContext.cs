@@ -31,7 +31,7 @@ using VNLib.Plugins.Extensions.Loading.Sql;
 
 namespace VNLib.Plugins.Essentials.Content.Routing.Model
 {
-    internal class RoutingContext : TransactionalDbContext, IDbTableDefinition
+    internal sealed class RoutingContext : TransactionalDbContext, IDbTableDefinition
     {
         public DbSet<Route> Routes { get; set; }
 
@@ -41,8 +41,8 @@ namespace VNLib.Plugins.Essentials.Content.Routing.Model
         {
         }
 
-        public RoutingContext()
-        {}
+        public RoutingContext():base()
+        { }
 
 #nullable enable
 

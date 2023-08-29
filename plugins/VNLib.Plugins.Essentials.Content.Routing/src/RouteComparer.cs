@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2022 Vaughn Nugent
+* Copyright (c) 2023 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Content.Routing
@@ -33,10 +33,10 @@ namespace VNLib.Plugins.Essentials.Content.Routing
     /// <summary>
     /// Sorts routing rules based on closest match path/hostname routing along with privilage priority
     /// </summary>
-    internal class RouteComparer : IComparer<Route>
+    internal sealed class RouteComparer : IComparer<Route>
     {
         //The idea is that hostnames without wildcards are exact, and hostnames with wildcards are "catch all"
-        public int Compare(Route x, Route y)
+        public int Compare(Route? x, Route? y)
         {
             int val = 0;
             //If x contains a wildcard in the hostname, then it is less than y

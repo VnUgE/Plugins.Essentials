@@ -428,7 +428,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 
         private sealed class JwtLoginValidator : ClientSecurityMessageValidator<JwtLoginMessage>
         {
-            public JwtLoginValidator() :base()
+            public JwtLoginValidator() : base()
             {
                 //Basic jwt validator
                 RuleFor(l => l.LoginJwt)
@@ -492,7 +492,6 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 
                 val.RuleFor(c => c.FailedCountTimeoutSec)
                     .GreaterThan(0);
-
                 
                 return val;
             }

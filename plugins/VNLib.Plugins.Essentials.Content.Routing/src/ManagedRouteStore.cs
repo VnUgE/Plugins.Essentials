@@ -22,6 +22,7 @@
 * along with this program.  If not, see https://www.gnu.org/licenses/.
 */
 
+using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 
@@ -50,13 +51,13 @@ namespace VNLib.Plugins.Essentials.Content.Routing
                 _routeStore = plugin.GetOrCreateSingleton<DbRouteStore>();
 
                 //Ensure the database is created
-                _ = plugin.ObserveWork(() => plugin.EnsureDbCreatedAsync<RoutingContext>(plugin), 500);
+                _ = plugin.ObserveWork(() => plugin.EnsureDbCreatedAsync<RoutingContext>(plugin), 1000);
             }
         }
 
-        public Task GetAllRoutesAsync(ICollection<Route> routes)
+        public Task GetAllRoutesAsync(ICollection<Route> routes, CancellationToken cancellation)
         {
-            return _routeStore.GetAllRoutesAsync(routes);
+            return _routeStore.GetAllRoutesAsync(routes, cancellation);
         }
     }
 }

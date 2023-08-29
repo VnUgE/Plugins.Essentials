@@ -24,6 +24,7 @@
 
 using System;
 using System.Linq;
+using System.Threading;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -31,12 +32,16 @@ using Microsoft.EntityFrameworkCore;
 
 using VNLib.Plugins.Extensions.Data;
 using VNLib.Plugins.Extensions.Loading.Sql;
+using VNLib.Plugins.Extensions.Data.Abstractions;
+using VNLib.Plugins.Extensions.Data.Extensions;
 
 namespace VNLib.Plugins.Essentials.Content.Routing.Model
 {
-    internal class DbRouteStore : DbStore<Route>, IRouteStore
+    internal sealed class DbRouteStore : DbStore<Route>, IRouteStore
     {
         private readonly DbContextOptions Options;
+
+        public override IDbQueryLookup<Route> QueryTable { get; } = new DbQueries();
 
         public DbRouteStore(PluginBase plugin)
         {
@@ -45,41 +50,42 @@ namespace VNLib.Plugins.Essentials.Content.Routing.Model
         }
 
         ///<inheritdoc/>
-        public Task GetAllRoutesAsync(ICollection<Route> routes)
+        public Task GetAllRoutesAsync(ICollection<Route> routes, CancellationToken cancellation)
         {
             //Get all routes as a single page from the database
-            return GetPageAsync(routes, 0, int.MaxValue);
+            return this.GetPageAsync(routes, 0, int.MaxValue, cancellation);
         }
 
         ///<inheritdoc/>
-        public override string RecordIdBuilder => Guid.NewGuid().ToString("N");
+        public override string GetNewRecordId() => Guid.NewGuid().ToString("N");
 
         ///<inheritdoc/>
-        protected override IQueryable<Route> GetCollectionQueryBuilder(TransactionalDbContext context, params string[] constraints)
-        {
-            string hostname = constraints[0];
-            return from route in context.Set<Route>()
-                   where route.Hostname == hostname
-                   select route;
-        }
+        public override IDbContextHandle GetNewContext() => new RoutingContext(Options);
 
         ///<inheritdoc/>
-        protected override IQueryable<Route> GetSingleQueryBuilder(TransactionalDbContext context, params string[] constraints)
-        {
-            string id = constraints[0];
-            return from route in context.Set<Route>()
-                   where route.Id == id
-                   select route;
-        }
-
-        ///<inheritdoc/>
-        public override TransactionalDbContext NewContext() => new RoutingContext(Options);
-
-        ///<inheritdoc/>
-        protected override void OnRecordUpdate(Route newRecord, Route currentRecord)
+        public override void OnRecordUpdate(Route newRecord, Route currentRecord)
         {
             throw new NotSupportedException();
         }
 
+        private sealed record class DbQueries : IDbQueryLookup<Route>
+        {
+            public IQueryable<Route> GetCollectionQueryBuilder(IDbContextHandle context, params string[] constraints)
+            {
+                string hostname = constraints[0];
+                return from route in context.Set<Route>()
+                       where route.Hostname == hostname
+                       select route;
+            }
+
+            public IQueryable<Route> GetSingleQueryBuilder(IDbContextHandle context, params string[] constraints)
+            {
+
+                string id = constraints[0];
+                return from route in context.Set<Route>()
+                       where route.Id == id
+                       select route;
+            }
+        }
     }
 }

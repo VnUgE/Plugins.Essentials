@@ -24,8 +24,6 @@
 
 using System.Text.Json.Serialization;
 
-#nullable enable
-
 namespace VNLib.Plugins.Essentials.Accounts.MFA
 {
     class FidoAuthenticatorSelection

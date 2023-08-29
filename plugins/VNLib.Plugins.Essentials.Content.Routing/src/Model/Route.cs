@@ -33,7 +33,7 @@ using VNLib.Plugins.Extensions.Data;
 namespace VNLib.Plugins.Essentials.Content.Routing.Model
 {
     [Index(nameof(Id), IsUnique = true)]
-    internal class Route : DbModelBase
+    internal sealed class Route : DbModelBase
     {
         public const FpRoutine RewriteRoutine = (FpRoutine)50;
 

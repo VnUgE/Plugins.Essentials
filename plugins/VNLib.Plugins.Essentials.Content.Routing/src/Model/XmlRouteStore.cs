@@ -57,7 +57,7 @@ namespace VNLib.Plugins.Essentials.Content.Routing.Model
         }
 
         ///<inheritdoc/>
-        public async Task GetAllRoutesAsync(ICollection<Route> routes)
+        public async Task GetAllRoutesAsync(ICollection<Route> routes, CancellationToken cancellation)
         {
             using VnMemoryStream memStream = new();
 
@@ -65,7 +65,7 @@ namespace VNLib.Plugins.Essentials.Content.Routing.Model
             await using (FileStream routeFile = new(_routeFile, FileMode.Open, FileAccess.Read, FileShare.Read))
             {
                 //Read the route file into memory
-                await routeFile.CopyToAsync(memStream, 4096, MemoryUtil.Shared, CancellationToken.None);
+                await routeFile.CopyToAsync(memStream, 8192, MemoryUtil.Shared, cancellation);
             }
 
             //Rewind the memory stream

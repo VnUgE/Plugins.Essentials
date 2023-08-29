@@ -27,6 +27,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 
 using VNLib.Plugins.Extensions.Data;
+using VNLib.Plugins.Extensions.Data.Abstractions;
 
 namespace VNLib.Plugins.Essentials.Accounts.Admin.Model
 {
@@ -40,29 +41,38 @@ namespace VNLib.Plugins.Essentials.Accounts.Admin.Model
             Options = options;
         }
 
-        //Item id's are not used
-        public override string RecordIdBuilder => "";
 
-        protected override IQueryable<User> GetCollectionQueryBuilder(TransactionalDbContext context, params string[] constraints)
-        {
-            return (from user in context.Set<User>()
-                    orderby user.Created descending
-                    select user);
-        }
+        ///<inheritdoc/>
+        public override IDbContextHandle GetNewContext() => new UserContext(Options);
 
-        protected override IQueryable<User> GetSingleQueryBuilder(TransactionalDbContext context, params string[] constraints)
-        {
-            string userId = constraints[0];
-            return (from user in context.Set<User>()
-                    where user.UserId == userId
-                    select user);
-        }
+        ///<inheritdoc/>
+        public override string GetNewRecordId() => string.Empty;    //IDs are not created here
 
-        public override TransactionalDbContext NewContext() => new UserContext(Options);
+        ///<inheritdoc/>
+        public override IDbQueryLookup<User> QueryTable { get; } = new DbQueries();
 
-        protected override void OnRecordUpdate(User newRecord, User currentRecord)
+        ///<inheritdoc/>
+        public override void OnRecordUpdate(User newRecord, User currentRecord)
         {
             currentRecord.Privilages = currentRecord.Privilages;
+        }
+
+        private sealed class DbQueries : IDbQueryLookup<User>
+        {
+            public IQueryable<User> GetCollectionQueryBuilder(IDbContextHandle context, params string[] constraints)
+            {
+                return (from user in context.Set<User>()
+                        orderby user.Created descending
+                        select user);
+            }
+
+            public IQueryable<User> GetSingleQueryBuilder(IDbContextHandle context, params string[] constraints)
+            {
+                string userId = constraints[0];
+                return (from user in context.Set<User>()
+                        where user.UserId == userId
+                        select user);
+            }
         }
     }
 }

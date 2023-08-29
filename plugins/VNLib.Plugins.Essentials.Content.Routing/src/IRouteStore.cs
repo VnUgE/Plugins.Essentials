@@ -22,6 +22,7 @@
 * along with this program.  If not, see https://www.gnu.org/licenses/.
 */
 
+using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 
@@ -36,6 +37,6 @@ namespace VNLib.Plugins.Essentials.Content.Routing
         /// </summary>
         /// <param name="routes">The collection to store loaded routes to</param>
         /// <returns>A task that completes when the routes are added to the collection</returns>
-        Task GetAllRoutesAsync(ICollection<Route> routes);
+        Task GetAllRoutesAsync(ICollection<Route> routes, CancellationToken cancellation);
     }
 }
