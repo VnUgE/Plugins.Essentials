@@ -42,8 +42,8 @@ using FluentValidation;
 
 using VNLib.Hashing;
 using VNLib.Hashing.IdentityUtility;
-using VNLib.Utils;
 using VNLib.Net.Http;
+using VNLib.Utils;
 using VNLib.Utils.Memory;
 using VNLib.Utils.Extensions;
 using VNLib.Plugins.Essentials.Users;
@@ -72,17 +72,20 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
         public static readonly RSAEncryptionPadding ClientEncryptonPadding = RSAEncryptionPadding.OaepSHA256;
 
         private readonly AccountSecConfig _config;
+        private readonly CookieHandler _cookieHandler;
 
         public AccountSecProvider(PluginBase plugin)
         {
             //Setup default config
             _config = new();
+            _cookieHandler = new(_config);
         }
 
         public AccountSecProvider(PluginBase pbase, IConfigScope config)
         {
             //Parse config if defined
             _config = config.DeserialzeAndValidate<AccountSecConfig>();
+            _cookieHandler = new(_config);
         }
 
         /*
@@ -92,8 +95,27 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
         ///<inheritdoc/>
         public ValueTask<HttpMiddlewareResult> ProcessAsync(HttpEntity entity)
         {
-            //Reconcile cookies on every request we enabled
-            ReconcileCookies(entity);
+            //Session must be set and web based for checks
+            if (entity.Session.IsSet && entity.Session.SessionType == SessionType.Web)
+            {
+                //See if the session might be elevated
+                if (!string.IsNullOrWhiteSpace(entity.Session.LoginHash))
+                {
+                    //If the session stored a user-agent, make sure it matches the connection
+                    if (entity.Session.UserAgent != null && !entity.Session.UserAgent.Equals(entity.Server.UserAgent, StringComparison.Ordinal))
+                    {
+                        entity.CloseResponse(System.Net.HttpStatusCode.Forbidden);
+                        return ValueTask.FromResult(HttpMiddlewareResult.Complete);
+                    }
+                }
+
+                //If the session is new, or not supposed to be logged in, clear the login cookies if they were set
+                if (entity.Session.IsNew || string.IsNullOrEmpty(entity.Session.LoginHash) || string.IsNullOrEmpty(entity.Session.Token))
+                {
+                    ExpireCookies(entity);
+                }
+            }
+
             //Always continue
             return ValueTask.FromResult(HttpMiddlewareResult.Continue);
         }
@@ -101,6 +123,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
 
         #region Interface Impl
 
+        ///<inheritdoc/>
         IClientAuthorization IAccountSecurityProvider.AuthorizeClient(HttpEntity entity, IClientSecInfo clientInfo, IUser user)
         {
             //Validate client info
@@ -124,7 +147,9 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
              * status for the user cookie. This is not required if the user is already
              * logged in
              */
-            string loginCookie = SetLoginCookie(entity, user.IsLocalAccount());
+
+            string loginCookie = SetLoginCookie(entity);
+            SetClientStatusCookie(entity, user.IsLocalAccount());
 
             //Store the login hash in the user's session
             entity.Session.LoginHash = loginCookie;
@@ -145,8 +170,9 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                 LoginSecurityString = loginCookie,
                 SecurityToken = authTokens,
             };
-        }       
+        }
 
+        ///<inheritdoc/>
         void IAccountSecurityProvider.InvalidateLogin(HttpEntity entity)
         {
             //Client should also destroy the session
@@ -158,6 +184,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             entity.Session[PUBLIC_KEY_SIG_KEY_ENTRY] = null!;
         }
 
+        ///<inheritdoc/>
         bool IAccountSecurityProvider.IsClientAuthorized(HttpEntity entity, AuthorzationCheckLevel level)
         {
             //Session must be loaded and not-new for an authorization to exist
@@ -177,6 +204,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             };
         }
 
+        ///<inheritdoc/>
         IClientAuthorization IAccountSecurityProvider.ReAuthorizeClient(HttpEntity entity)
         {
             //Confirm session is configured
@@ -214,12 +242,14 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             };
         }
 
+        ///<inheritdoc/>
         ERRNO IAccountSecurityProvider.TryEncryptClientData(HttpEntity entity, ReadOnlySpan<byte> data, Span<byte> outputBuffer)
         {
             //Recover the signed public key, already does session checks
             return TryGetPublicKey(entity, out string? pubKey) ? TryEncryptClientData(pubKey, data, outputBuffer) : ERRNO.E_FAIL;
         }
 
+        ///<inheritdoc/>
         ERRNO IAccountSecurityProvider.TryEncryptClientData(IClientSecInfo entity, ReadOnlySpan<byte> data, Span<byte> outputBuffer)
         {
             //Use the public key supplied by the csecinfo 
@@ -357,21 +387,6 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
         #endregion
 
         #region Cookies
-
-        private void ReconcileCookies(HttpEntity entity)
-        {
-            //Only handle cookies if session is loaded and is a web based session
-            if (!entity.Session.IsSet || entity.Session.SessionType != SessionType.Web)
-            {
-                return;
-            }
-            
-            //If the session is new, or not supposed to be logged in, clear the login cookies if they were set
-            if (entity.Session.IsNew || string.IsNullOrEmpty(entity.Session.LoginHash) || string.IsNullOrEmpty(entity.Session.Token))
-            {
-                ExpireCookies(entity);
-            }
-        }
         
         private bool VerifyLoginCookie(HttpEntity entity)
         {
@@ -421,48 +436,19 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             //Expire login cookie if set
             if (entity.Server.RequestCookies.ContainsKey(_config.LoginCookieName))
             {
-                HttpCookie pkCookie = new(_config.LoginCookieName, string.Empty)
-                {
-                    Domain = _config.CookieDomain,
-                    Path = _config.CookiePath,
-                    ValidFor = TimeSpan.Zero,
-                    SameSite = CookieSameSite.SameSite,
-                    HttpOnly = true,
-                    Secure = true
-                };
-
-                entity.Server.SetCookie(in pkCookie);
+                _cookieHandler.ExpireCookie(entity, _config.LoginCookieName);
             }
+
             //Expire the LI cookie if set
             if (entity.Server.RequestCookies.ContainsKey(_config.ClientStatusCookieName))
             {
-                HttpCookie pkCookie = new(_config.ClientStatusCookieName, string.Empty)
-                {
-                    Domain = _config.CookieDomain,
-                    Path = _config.CookiePath,
-                    ValidFor = TimeSpan.Zero,
-                    SameSite = CookieSameSite.SameSite,
-                    HttpOnly = true,
-                    Secure = true
-                };
-
-                entity.Server.SetCookie(in pkCookie);
+                _cookieHandler.ExpireCookie(entity, _config.ClientStatusCookieName);
             }
+
             //Expire pupkey cookie
             if (entity.Server.RequestCookies.ContainsKey(_config.PubKeyCookieName))
             {
-                //Init exipiration cookie
-                HttpCookie pkCookie = new(_config.PubKeyCookieName, string.Empty)
-                {
-                    Domain = _config.CookieDomain,
-                    Path = _config.CookiePath,
-                    ValidFor = TimeSpan.Zero,
-                    SameSite = CookieSameSite.SameSite,
-                    HttpOnly = true,
-                    Secure = true
-                };
-
-                entity.Server.SetCookie(in pkCookie);
+                _cookieHandler.ExpireCookie(entity, _config.PubKeyCookieName);
             }
         }
 
@@ -535,45 +521,24 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
         /// </summary>/
         /// <param name="ev">The event to log-in</param>
         /// <param name="localAccount">Does the session belong to a local user account</param>
-        private string SetLoginCookie(HttpEntity ev, bool? localAccount = null)
+        private string SetLoginCookie(HttpEntity ev)
         {
             //Get the new random cookie value
             string loginString = RandomHash.GetRandomBase64(_config.LoginCookieSize);
 
-            //Configure the login cookie
-            HttpCookie loginCookie = new(_config.LoginCookieName, loginString)
-            {
-                Domain = _config.CookieDomain,
-                Path = _config.CookiePath,
-                ValidFor = _config.AuthorizationValidFor,
-                SameSite = CookieSameSite.SameSite,
-                HttpOnly = true,
-                Secure = true
-            };
-
-            //Set login cookie and session login hash
-            ev.Server.SetCookie(in loginCookie);
-
-            //If not set get from session storage
-            localAccount ??= ev.Session.HasLocalAccount();
-
-            //setup status cookie
-            HttpCookie statusCookie = new(_config.ClientStatusCookieName, localAccount.Value ? "1" : "2")
-            {
-                Domain = _config.CookieDomain,
-                Path = _config.CookiePath,
-                ValidFor = _config.AuthorizationValidFor,
-                SameSite = CookieSameSite.SameSite,
-                Secure = true,
-                
-                //Allowed to be http
-                HttpOnly = false
-            };
-
-            //Set the client identifier cookie to a value indicating a local account
-            ev.Server.SetCookie(in statusCookie);
+            //Set the cookie for the login key
+            _cookieHandler.SetCookie(ev, _config.LoginCookieName, loginString, true);
 
             return loginString;
+        }
+
+        private void SetClientStatusCookie(HttpEntity entity, bool? localAccount = null)
+        {
+            //If not set get from session storage
+            localAccount ??= entity.Session.HasLocalAccount();
+
+            //set client status cookie via handler
+            _cookieHandler.SetCookie(entity, _config.ClientStatusCookieName, localAccount.Value ? "1" : "2", false);
         }
 
         #region Client Encryption Key
@@ -620,20 +585,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             //Compile the jwt for the cookie value
             string jwtValue = jwt.Compile();
 
-            //Setup cookie the same as login cookies
-            HttpCookie cookie = new(_config.PubKeyCookieName, jwtValue)
-            {
-                Domain = _config.CookieDomain,
-                Path = _config.CookiePath,
-                SameSite = CookieSameSite.SameSite,
-                ValidFor = _config.AuthorizationValidFor,
-
-                HttpOnly = true,
-                Secure = true,
-            };
-
-            //set the cookie
-            entity.Server.SetCookie(in cookie);
+            _cookieHandler.SetCookie(entity, _config.PubKeyCookieName, jwtValue, true);
 
             //Return the signing key
             return base32SigningKey;
@@ -650,7 +602,9 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             }
 
             //Get the jwt cookie
-            if (!entity.Server.GetCookie(_config.PubKeyCookieName, out string? pubKeyJwt))
+            string? pubKeyJwt = _cookieHandler.GetCookie(entity, _config.PubKeyCookieName);
+           
+            if (string.IsNullOrWhiteSpace(pubKeyJwt))
             {
                 return false;
             }
@@ -693,7 +647,6 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
 
             return true;
         }
-
        
         #endregion
 
@@ -840,8 +793,68 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
 
         private sealed class Authorization : IClientAuthorization
         {
+            ///<inheritdoc/>
             public string? LoginSecurityString { get; init; }
+
+            ///<inheritdoc/>
             public ClientSecurityToken SecurityToken { get; init; }
+        }
+
+        record class CookieHandler(AccountSecConfig Config)
+        {
+
+            /// <summary>
+            /// Expires a cookie with the given name
+            /// </summary>
+            /// <param name="entity">The entity to expire the cookie on</param>
+            /// <param name="cookieName">The name of the cookie to expire</param>
+            public void ExpireCookie(HttpEntity entity, string cookieName)
+            {
+                HttpCookie cookie = new(cookieName, string.Empty)
+                {
+                    Domain = Config.CookieDomain,
+                    Path = Config.CookiePath,
+                    ValidFor = TimeSpan.Zero,
+                    SameSite = CookieSameSite.SameSite,
+                    HttpOnly = true,
+                    Secure = true
+                };
+
+                entity.Server.SetCookie(in cookie);
+            }
+
+            /// <summary>
+            /// Sets a cookie with the given name and value
+            /// </summary>
+            /// <param name="entity">The entity to set the cookie on</param>
+            /// <param name="name">The name of the cookie to set</param>
+            /// <param name="value">The value of the cookie to set</param>
+            /// <param name="httpOnly">A value that indicates of the httponly flag should be set on the cookie</param>
+            public void SetCookie(HttpEntity entity, string name, string value, bool httpOnly)
+            {
+                HttpCookie cookie = new(name, value)
+                {
+                    Domain = Config.CookieDomain,
+                    Path = Config.CookiePath,
+                    ValidFor = Config.AuthorizationValidFor,
+                    SameSite = CookieSameSite.SameSite,
+                    HttpOnly = httpOnly,
+                    Secure = true
+                };
+                entity.Server.SetCookie(in cookie);
+            }
+
+            /// <summary>
+            /// Gets the value of a cookie with the given name
+            /// </summary>
+            /// <param name="entity">The entity to get the cookie from</param>
+            /// <param name="name">The name of the cooke to retrieve</param>
+            /// <returns>The cookie value if found, null otherwise</returns>
+            public string? GetCookie(HttpEntity entity, string name)
+            {
+                _ = entity.Server.GetCookie(name, out string? value);
+                return value;
+            }
         }
     }
 }

@@ -57,6 +57,16 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
             return !(string.IsNullOrWhiteSpace(user[TOTP_KEY_ENTRY]) && string.IsNullOrWhiteSpace(user[WEBAUTHN_KEY_ENTRY]));
         }
 
+        /// <summary>
+        /// Disables all forms of MFA for the current user
+        /// </summary>
+        /// <param name="user"></param>
+        public static void MFADisable(this IUser user)
+        {
+            user[TOTP_KEY_ENTRY] = null!;
+            user[WEBAUTHN_KEY_ENTRY] = null!;
+        }
+
         #region totp
 
         /// <summary>

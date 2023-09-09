@@ -31,7 +31,7 @@ using VNLib.Plugins.Essentials.Endpoints;
 namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 {
     [ConfigurationName("logout_endpoint")]
-    internal class LogoutEndpoint : ProtectedWebEndpoint
+    internal class LogoutEndpoint : UnprotectedWebEndpoint
     {
         
         public LogoutEndpoint(PluginBase pbase, IConfigScope config)
@@ -43,9 +43,29 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
         
         protected override VfReturnType Post(HttpEntity entity)
         {
-            entity.InvalidateLogin();
-            entity.CloseResponse(HttpStatusCode.OK);
-            return VfReturnType.VirtualSkip;
+            /*
+             * If a connection is not properly authorized to modify the session
+             * we can invalidate the client by detaching the session. This 
+             * should cause the session to remain in tact but the client will
+             * be detached.
+             * 
+             * This prevents attacks where connection with just a stolen session 
+             * id can cause the client's session to be invalidated. 
+             */
+           
+            if (entity.IsClientAuthorized(AuthorzationCheckLevel.Critical))
+            {
+                entity.InvalidateLogin();
+                entity.CloseResponse(HttpStatusCode.OK);
+                return VfReturnType.VirtualSkip;
+            }
+            else
+            {
+                //Detatch the session to cause client only invalidation
+                entity.Session.Detach();
+                entity.CloseResponse(HttpStatusCode.OK);
+                return VfReturnType.VirtualSkip;
+            }
         }
     }
 }
