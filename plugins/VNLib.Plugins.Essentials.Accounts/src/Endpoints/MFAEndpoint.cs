@@ -219,7 +219,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 string? mfaType = request.RootElement.GetProperty("type").GetString();
 
                 //get the user
-                using IUser? user = await Users.GetUserFromIDAsync(entity.Session.UserID);
+                using IUser? user = await Users.GetUserAndPassFromIDAsync(entity.Session.UserID);
                 if (user == null)
                 {
                     return VfReturnType.NotFound;
