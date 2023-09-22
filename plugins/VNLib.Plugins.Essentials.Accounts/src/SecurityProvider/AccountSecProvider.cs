@@ -93,7 +93,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
          */
 
         ///<inheritdoc/>
-        public ValueTask<HttpMiddlewareResult> ProcessAsync(HttpEntity entity)
+        public ValueTask<FileProcessArgs> ProcessAsync(HttpEntity entity)
         {
             //Session must be set and web based for checks
             if (entity.Session.IsSet && entity.Session.SessionType == SessionType.Web)
@@ -104,8 +104,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                     //If the session stored a user-agent, make sure it matches the connection
                     if (entity.Session.UserAgent != null && !entity.Session.UserAgent.Equals(entity.Server.UserAgent, StringComparison.Ordinal))
                     {
-                        entity.CloseResponse(System.Net.HttpStatusCode.Forbidden);
-                        return ValueTask.FromResult(HttpMiddlewareResult.Complete);
+                        return ValueTask.FromResult(FileProcessArgs.Deny);
                     }
                 }
 
@@ -116,8 +115,8 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                 }
             }
 
-            //Always continue
-            return ValueTask.FromResult(HttpMiddlewareResult.Continue);
+            //Always continue otherwise
+            return ValueTask.FromResult(FileProcessArgs.Continue);
         }
 
 
