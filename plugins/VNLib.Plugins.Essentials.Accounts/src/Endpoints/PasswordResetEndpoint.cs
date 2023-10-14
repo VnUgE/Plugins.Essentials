@@ -102,20 +102,19 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
         protected override async ValueTask<VfReturnType> PostAsync(HttpEntity entity)
         {
             ValErrWebMessage webm = new();
+
             //get the request body
             using PasswordResetMesage? pwReset = await entity.GetJsonFromFileAsync<PasswordResetMesage>();
 
             if (webm.Assert(pwReset != null, "No request specified"))
             {
-                entity.CloseResponseJson(HttpStatusCode.BadRequest, webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualClose(entity, webm, HttpStatusCode.BadRequest);
             }
 
             //Validate
             if(!ResetMessValidator.Validate(pwReset, webm))
             {
-                entity.CloseResponse(webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualOk(entity, webm);
             }
 
             //get the user's entry in the table
@@ -123,23 +122,20 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 
             if(webm.Assert(user != null, "An error has occured, please log-out and try again"))
             {
-                entity.CloseResponse(webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualOk(entity, webm);
             }
 
             //Make sure the account's origin is a local profile
             if (webm.Assert(user.IsLocalAccount(), "External accounts cannot be modified"))
             {
-                entity.CloseResponse(webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualOk(entity, webm);
             }
 
             //Verify the user's old password
             if (!Passwords.Verify(user.PassHash, pwReset.Current.AsSpan()))
             {
                 webm.Result = "Please check your current password";
-                entity.CloseResponse(webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualOk(entity, webm);
             }
 
             //Check if totp is enabled
@@ -150,8 +146,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                     //TOTP code is required
                     if(webm.Assert(pwReset.TotpCode.HasValue, "TOTP is enabled on this user account, you must enter your TOTP code."))
                     {
-                        entity.CloseResponse(webm);
-                        return VfReturnType.VirtualSkip;
+                        return VirtualOk(entity, webm);
                     }
 
                     //Veriy totp code
@@ -159,8 +154,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 
                     if (webm.Assert(verified, "Please check your TOTP code and try again"))
                     {
-                        entity.CloseResponse(webm);
-                        return VfReturnType.VirtualSkip;
+                        return VirtualOk(entity, webm);
                     }
                 }
                 //continue
@@ -174,8 +168,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             {
                 //error
                 webm.Result = "Your password could not be updated";
-                entity.CloseResponse(webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualOk(entity, webm);
             }
 
             //Publish to user database
@@ -184,8 +177,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             //delete the user's MFA entry so they can re-enable it
             webm.Result = "Your password has been updated";
             webm.Success = true;
-            entity.CloseResponse(webm);
-            return VfReturnType.VirtualSkip;
+            return VirtualOk(entity, webm);
         }
 
         private sealed class PasswordResetMesage : PrivateStringManager

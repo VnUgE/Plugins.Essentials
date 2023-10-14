@@ -39,12 +39,11 @@ using VNLib.Plugins.Essentials.Sessions;
 namespace VNLib.Plugins.Essentials.Accounts.MFA
 {
 
-    internal static class UserMFAExtensions
+    public static class UserMFAExtensions
     {
         public const string WEBAUTHN_KEY_ENTRY = "mfa.fido";
         public const string TOTP_KEY_ENTRY = "mfa.totp";
         public const string SESSION_SIG_KEY = "mfa.sig";
-
         public const string USER_PKI_ENTRY = "mfa.pki";
 
         /// <summary>
@@ -97,7 +96,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
         /// <param name="entry">The <see cref="MFAEntry"/> to modify the TOTP configuration of</param>
         /// <returns>The raw secret that was encrypted and stored in the <see cref="MFAEntry"/>, to send to the client</returns>
         /// <exception cref="OutOfMemoryException"></exception>
-        public static byte[] MFAGenreateTOTPSecret(this IUser user, MFAConfig config)
+        internal static byte[] MFAGenreateTOTPSecret(this IUser user, MFAConfig config)
         {
             _ = config.TOTPConfig ?? throw new NotSupportedException("The loaded configuration does not support TOTP");
             //Generate a random key
@@ -118,7 +117,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
         /// <returns>True if the user has TOTP configured and code matches against its TOTP secret entry, false otherwise</returns>
         /// <exception cref="FormatException"></exception>
         /// <exception cref="OutOfMemoryException"></exception>
-        public static bool VerifyTOTP(this MFAConfig config, IUser user, uint code)
+        internal static bool VerifyTOTP(this MFAConfig config, IUser user, uint code)
         {
             //Get the base32 TOTP secret for the user and make sure its actually set
             string base32Secret = user.MFAGetTOTPSecret();
@@ -126,13 +125,33 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
             {
                 return false;
             }
-            //Alloc buffer with zero o
-            using UnsafeMemoryHandle<byte> buffer = MemoryUtil.UnsafeAlloc(base32Secret.Length, true);
-            ERRNO count = VnEncoding.TryFromBase32Chars(base32Secret, buffer);
-            //Verify the TOTP using the decrypted secret
-            bool isValid = count && VerifyTOTP(code, buffer.AsSpan(0, count), config.TOTPConfig);
-            //Zero out the buffer
-            MemoryUtil.InitializeBlock(buffer.Span);
+
+            int length = base32Secret.Length;
+            bool isValid;
+
+            if (length > 256)
+            {
+                //Alloc buffer with zero o
+                using UnsafeMemoryHandle<byte> buffer = MemoryUtil.UnsafeAllocNearestPage(base32Secret.Length, true);
+
+                ERRNO count = VnEncoding.TryFromBase32Chars(base32Secret, buffer);
+                //Verify the TOTP using the decrypted secret
+                isValid = count && VerifyTOTP(code, buffer.AsSpan(0, count), config.TOTPConfig);
+                //Zero out the buffer
+                MemoryUtil.InitializeBlock(buffer.Span);
+            }
+            else
+            {
+                //stack alloc buffer
+                Span<byte> buffer = stackalloc byte[base32Secret.Length];
+
+                ERRNO count = VnEncoding.TryFromBase32Chars(base32Secret, buffer);
+                //Verify the TOTP using the decrypted secret
+                isValid = count && VerifyTOTP(code, buffer[..(int)count], config.TOTPConfig);
+                //Zero out the buffer
+                MemoryUtil.InitializeBlock(buffer);
+            }
+
             return isValid;
         }
 
@@ -202,8 +221,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
         #endregion
 
         #region PKI
-        const int JWK_KEY_BUFFER_SIZE = 2048;
-
+      
         /// <summary>
         /// Gets a value that determines if the user has PKI enabled
         /// </summary>
@@ -220,43 +238,46 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
         /// <returns>True if the user has PKI enabled, the key was recovered, the key id matches, and the JWT signature is verified</returns>
         public static bool PKIVerifyUserJWT(this IUser user, JsonWebToken jwt, string keyId)
         {
-            //Recover key data from user, it may not be enabled
-            using ReadOnlyJsonWebKey? jwk = RecoverKey(user);
+            /*
+             * Since multiple keys can be stored, we need to recover the key that matches the desired key id
+             */
+            PkiAuthPublicKey? pub = PkiGetAllPublicKeys(user)?.FirstOrDefault(p => keyId.Equals(p.KeyId, StringComparison.Ordinal));
 
-            if(jwk == null)
+            if(pub == null)
             {
                 return false;
             }
-
-            //Confim the key id matches
-            if(!keyId.Equals(jwk.KeyId, StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-
+           
             //verify the jwt
-            return jwt.VerifyFromJwk(jwk);
+            return jwt.VerifyFromJwk(pub);
         }
-
-        public static void PKISetUserKey(this IUser user, IReadOnlyDictionary<string, string>? keyFields) 
+       
+        /// <summary>
+        /// Stores an array of public keys in the user's account object
+        /// </summary>
+        /// <param name="user"></param>
+        /// <param name="authKeys">The array of jwk format keys to store for the user</param>
+        public static void PKISetPublicKeys(this IUser user, PkiAuthPublicKey[]? authKeys) 
         {
-            if(keyFields == null)
+            if(authKeys == null || authKeys.Length == 0)
             {
                 user[USER_PKI_ENTRY] = null!;
                 return;
             }
 
             //Serialize the key data
-            byte[] keyData = JsonSerializer.SerializeToUtf8Bytes(keyFields, Statics.SR_OPTIONS);
+            byte[] keyData = JsonSerializer.SerializeToUtf8Bytes(authKeys, Statics.SR_OPTIONS);
 
-            //convert to base32 string before writing user data
-            string base64 = Convert.ToBase64String(keyData);
-
-            //Store key data
-            user[USER_PKI_ENTRY] = base64;
+            //convert to base64 string before writing user data
+            user[USER_PKI_ENTRY] = VnEncoding.ToBase64UrlSafeString(keyData, false);
         }
 
-        private static ReadOnlyJsonWebKey? RecoverKey(IUser user)
+        /// <summary>
+        /// Gets all public keys stored in the user's account object
+        /// </summary>
+        /// <param name="user"></param>
+        /// <returns>The array of public keys if the exist</returns>
+        public static PkiAuthPublicKey[]? PkiGetAllPublicKeys(this IUser user)
         {
             string? keyData = user[USER_PKI_ENTRY];
 
@@ -264,25 +285,67 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
             {
                 return null;
             }
+            
+            //Alloc bin buffer for base64 conversion
+            using UnsafeMemoryHandle<byte> binBuffer = MemoryUtil.UnsafeAllocNearestPage(keyData.Length, true);
 
-            //Get buffer to recover the key data from
-            byte[] buffer = ArrayPool<byte>.Shared.Rent(JWK_KEY_BUFFER_SIZE);
-            try
+            //Recover base64 bytes from key data
+            ERRNO bytes = VnEncoding.Base64UrlDecode(keyData, binBuffer.Span);
+            if (!bytes)
             {
-                //Recover base64 bytes from key data
-                ERRNO bytes = VnEncoding.TryFromBase64Chars(keyData, buffer);
-                if (!bytes)
-                {
-                    return null;
-                }
-                //Recover json from the decoded binary data
-                return new ReadOnlyJsonWebKey(buffer.AsSpan(0, bytes));
+                return null;
             }
-            finally
+
+            //Deserialize the the key array
+            return JsonSerializer.Deserialize<PkiAuthPublicKey[]>(binBuffer.AsSpan(0, bytes), Statics.SR_OPTIONS);
+        }
+
+        /// <summary>
+        /// Removes a single pki key by it's id
+        /// </summary>
+        /// <param name="user"></param>
+        /// <param name="keyId">The id of the key to remove</param>
+        public static void PKIRemovePublicKey(this IUser user, string keyId)
+        {
+            //get all keys
+            PkiAuthPublicKey[]? keys = PkiGetAllPublicKeys(user);
+            if(keys == null)
             {
-                MemoryUtil.InitializeBlock(buffer.AsSpan());
-                ArrayPool<byte>.Shared.Return(buffer);
+                return;
             }
+
+            //remove the key
+            keys = keys.Where(k => !keyId.Equals(k.KeyId, StringComparison.Ordinal)).ToArray();
+
+            //store the new key array
+            PKISetPublicKeys(user, keys);
+        }
+
+        /// <summary>
+        /// Adds a single pki key to the user's account object, or overwrites
+        /// and existing key with the same id
+        /// </summary>
+        /// <param name="user"></param>
+        /// <param name="key">The key to add to the list of user-keys</param>
+        public static void PKIAddPublicKey(this IUser user, PkiAuthPublicKey key)
+        {
+            //get all keys
+            PkiAuthPublicKey[]? keys = PkiGetAllPublicKeys(user);
+
+            if (keys == null)
+            {
+                keys = new PkiAuthPublicKey[] { key };
+            }
+            else
+            {
+                //remove the key if it already exists, then append the new key
+                keys = keys.Where(k => !key.KeyId.Equals(k.KeyId, StringComparison.Ordinal))
+                    .Append(key)
+                    .ToArray();
+            }
+
+            //store the new key array
+            PKISetPublicKeys(user, keys);
         }
 
         #endregion
@@ -416,9 +479,9 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
             return new(upgradeJwt.Compile(), VnEncoding.ToBase32String(secret));
         }
 
-        public static void MfaUpgradeSecret(this in SessionInfo session, string? base32Signature) => session[SESSION_SIG_KEY] = base32Signature!;
+        internal static void MfaUpgradeSecret(this in SessionInfo session, string? base32Signature) => session[SESSION_SIG_KEY] = base32Signature!;
 
-        public static string? MfaUpgradeSecret(this in SessionInfo session) => session[SESSION_SIG_KEY];
+        internal static string? MfaUpgradeSecret(this in SessionInfo session) => session[SESSION_SIG_KEY];
     }
 
     readonly record struct MfaUpgradeMessage(string ClientJwt, string SessionKey);

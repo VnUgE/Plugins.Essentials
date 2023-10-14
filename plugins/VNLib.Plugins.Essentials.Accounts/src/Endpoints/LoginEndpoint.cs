@@ -75,20 +75,20 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
         private readonly IPasswordHashingProvider Passwords;
         private readonly MFAConfig MultiFactor;
         private readonly IUserManager Users;
-        private readonly uint MaxFailedLogins;
-        private readonly TimeSpan FailedCountTimeout;
+        private readonly FailedLoginLockout _lockout;
 
         public LoginEndpoint(PluginBase pbase, IConfigScope config)
         {
-            string? path = config["path"].GetString();
-            FailedCountTimeout = config["failed_count_timeout_sec"].GetTimeSpan(TimeParseType.Seconds);
-            MaxFailedLogins = config["failed_count_max"].GetUInt32();
+            string path = config.GetRequiredProperty("path", p => p.GetString()!);
+            TimeSpan duration = config["failed_count_timeout_sec"].GetTimeSpan(TimeParseType.Seconds);
+            uint maxLogins = config["failed_count_max"].GetUInt32();
 
             InitPathAndLog(path, pbase.Log);
 
             Passwords = pbase.GetOrCreateSingleton<ManagedPasswordHashing>();
             Users = pbase.GetOrCreateSingleton<UserManager>();
             MultiFactor = pbase.GetConfigElement<MFAConfig>();
+            _lockout = new(maxLogins, duration);
         }
 
         protected override ERRNO PreProccess(HttpEntity entity)
@@ -102,8 +102,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             //Conflict if user is logged in
             if (entity.IsClientAuthorized(AuthorzationCheckLevel.Any))
             {
-                entity.CloseResponse(HttpStatusCode.Conflict);
-                return VfReturnType.VirtualSkip;
+                return VirtualClose(entity, HttpStatusCode.Conflict);
             }
             
             //If mfa is enabled, allow processing via mfa
@@ -129,15 +128,13 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 
                 if (webm.Assert(loginMessage != null, "Invalid request data"))
                 {
-                    entity.CloseResponseJson(HttpStatusCode.BadRequest, webm);
-                    return VfReturnType.VirtualSkip;
+                    return VirtualClose(entity, webm, HttpStatusCode.BadRequest);
                 }
                 
                 //validate the message
                 if (!LmValidator.Validate(loginMessage, webm))
                 {
-                    entity.CloseResponseJson(HttpStatusCode.UnprocessableEntity, webm);
-                    return VfReturnType.VirtualSkip;
+                    return VirtualClose(entity, webm, HttpStatusCode.UnprocessableEntity);
                 }
                 
                 //Time to get the user
@@ -146,12 +143,13 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 //Make sure account exists
                 if (webm.Assert(user != null, INVALID_MESSAGE))
                 {
-                    entity.CloseResponse(webm);
-                    return VfReturnType.VirtualSkip;
+                    return VirtualOk(entity, webm);
                 }
-                
+
+                bool locked = _lockout.CheckOrClear(user, entity.RequestedTimeUtc);
+
                 //Make sure the account has not been locked out
-                if (webm.Assert(!UserLoginLocked(user, entity.RequestedTimeUtc), LOCKED_ACCOUNT_MESSAGE))
+                if (webm.Assert(locked == false, LOCKED_ACCOUNT_MESSAGE))
                 {
                     goto Cleanup;
                 }
@@ -167,13 +165,12 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 }
 
                 //Inc failed login count
-                user.FailedLoginIncrement(entity.RequestedTimeUtc);
+                _lockout.Increment(user, entity.RequestedTimeUtc);
                 webm.Result = INVALID_MESSAGE;
 
             Cleanup:
                 await user.ReleaseAsync();
-                entity.CloseResponse(webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualOk(entity ,webm);
             }
             catch (UserUpdateException uue)
             {
@@ -185,7 +182,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
         private bool LoginUser(HttpEntity entity, LoginMessage loginMessage, IUser user, MfaUpgradeWebm webm)
         {
             //Verify password before we tell the user the status of their account for security reasons
-            if (!Passwords.Verify(user.PassHash, loginMessage.Password))
+            if (!Passwords.Verify(user.PassHash!, loginMessage.Password))
             {
                 return false;
             }
@@ -274,8 +271,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             
             if (webm.Assert(request != null, "Invalid request data"))
             {
-                entity.CloseResponseJson(HttpStatusCode.BadRequest, webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualClose(entity, webm, HttpStatusCode.BadRequest);
             }
 
             //Recover upgrade jwt
@@ -283,8 +279,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 
             if (webm.Assert(upgradeJwt != null, "Missing required upgrade data"))
             {
-                entity.CloseResponseJson(HttpStatusCode.UnprocessableEntity, webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualClose(entity, webm, HttpStatusCode.UnprocessableEntity);
             }
             
             //Recover stored signature
@@ -292,8 +287,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 
             if(webm.Assert(!string.IsNullOrWhiteSpace(storedSig), MFA_ERROR_MESSAGE))
             {
-                entity.CloseResponse(webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualOk(entity, webm);
             }
 
             //Recover upgrade data from upgrade message
@@ -301,8 +295,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
            
             if (webm.Assert(upgrade != null, MFA_ERROR_MESSAGE))
             {
-                entity.CloseResponse(webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualOk(entity, webm);
             }
             
             //recover user account 
@@ -310,30 +303,28 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 
             if (webm.Assert(user != null, MFA_ERROR_MESSAGE))
             {
-                entity.CloseResponse(webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualOk(entity, webm);
             }
 
-            bool locked = UserLoginLocked(user, entity.RequestedTimeUtc);
+            bool locked = _lockout.CheckOrClear(user, entity.RequestedTimeUtc);
 
             //Make sure the account has not been locked out
-            if (!webm.Assert(locked == false, LOCKED_ACCOUNT_MESSAGE))
-            {
-                //process mfa login
-                LoginMfa(entity, user, request, upgrade, webm);
-            }
-            else
+            if (webm.Assert(locked == false, LOCKED_ACCOUNT_MESSAGE))
             {
                 //Locked, so clear stored signature
                 entity.Session.MfaUpgradeSecret(null);
+            }
+            else
+            {
+                //process mfa login
+                LoginMfa(entity, user, request, upgrade, webm);
             }
       
             //Update user on clean process
             await user.ReleaseAsync();
 
             //Close rseponse
-            entity.CloseResponse(webm);
-            return VfReturnType.VirtualSkip;
+            return VirtualOk(entity, webm);
         }
 
         private void LoginMfa(HttpEntity entity, IUser user, JsonDocument request, MFAUpgrade upgrade, MfaUpgradeWebm webm)
@@ -355,7 +346,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                             webm.Result = "Please check your code.";
 
                             //Increment flc and update the user in the store
-                            user.FailedLoginIncrement(entity.RequestedTimeUtc);                           
+                            _lockout.Increment(user, entity.RequestedTimeUtc);                           
                             return;
                         }
                         //Valid, complete                         
@@ -384,29 +375,6 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 
             //Write to log
             Log.Verbose("Successful login for user {uid}...", user.UserID[..8]);
-        }
-
-        public bool UserLoginLocked(IUser user, DateTimeOffset now)
-        {
-            //Recover last counter value
-            TimestampedCounter flc = user.FailedLoginCount();
-
-            if (flc.Count < MaxFailedLogins)
-            {
-                //Period exceeded
-                return false;
-            }
-
-            //See if the flc timeout period has expired
-            if (flc.LastModified.Add(FailedCountTimeout) < now)
-            {
-                //clear flc flag
-                user.ClearFailedLoginCount();
-                return false;
-            }
-
-            //Count has been exceeded, and has not timed out yet
-            return true;
         }
 
         private sealed class MfaUpgradeWebm : ValErrWebMessage

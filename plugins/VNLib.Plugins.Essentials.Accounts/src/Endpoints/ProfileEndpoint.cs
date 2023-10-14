@@ -59,13 +59,14 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
         {
             //get user data from database
             using IUser? user = await Users.GetUserFromIDAsync(entity.Session.UserID);
+
             //Make sure the account exists
             if (user == null || user.Status != UserStatus.Active)
             {
                 //Account was not found
-                entity.CloseResponse(HttpStatusCode.NotFound);
-                return VfReturnType.VirtualSkip;
+                return VirtualClose(entity, HttpStatusCode.NotFound);
             }
+
             //Get the stored profile
             AccountData? profile = user.GetProfile();
             //No profile found, so return an empty "profile"
@@ -76,9 +77,9 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 //created time in rfc1123 gmt time
                 Created = user.Created.ToString("R")
             };
+
             //Serialize the profile and return to user
-            entity.CloseResponseJson(HttpStatusCode.OK, profile);
-            return VfReturnType.VirtualSkip;
+            return VirtualOkJson(entity, profile);
         }
         protected override async ValueTask<VfReturnType> PostAsync(HttpEntity entity)
         {
@@ -89,41 +90,42 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 AccountData? updateMessage = await entity.GetJsonFromFileAsync<AccountData>(SR_OPTIONS);
                 if (webm.Assert(updateMessage != null, "Malformatted payload"))
                 {
-                    entity.CloseResponseJson(HttpStatusCode.BadRequest, webm);
-                    return VfReturnType.VirtualSkip;
+                    return VirtualClose(entity, HttpStatusCode.BadRequest);
                 }
+
                 //Validate the new account data
                 if (!AccountValidations.AccountDataValidator.Validate(updateMessage, webm))
                 {
-                    entity.CloseResponseJson(HttpStatusCode.UnprocessableEntity, webm);
-                    return VfReturnType.VirtualSkip;
+                    return VirtualClose(entity, webm, HttpStatusCode.UnprocessableEntity);
                 }
+
                 //Get the user from database
                 using IUser? user = await Users.GetUserFromIDAsync(entity.Session.UserID);
                 //Make sure the user exists
                 if (webm.Assert(user != null, "Account does not exist"))
                 {
                     //Should probably log the user out here
-                    entity.CloseResponseJson(HttpStatusCode.NotFound, webm);
-                    return VfReturnType.VirtualSkip;
+                    return VirtualClose(entity, webm, HttpStatusCode.NotFound);
                 }
+
                 //Overwite the current profile data (will also sanitize inputs)
                 user.SetProfile(updateMessage);
                 //Update the user only if successful
                 await user.ReleaseAsync();
+
                 webm.Result = "Successfully updated account";
                 webm.Success = true;
-                entity.CloseResponse(webm);
-                return VfReturnType.VirtualSkip;
+
+                return VirtualOk(entity, webm);
             }
             //Catch an account update exception
             catch (UserUpdateException uue)
             {
                 Log.Error(uue, "An error occured while the user account is being updated");
+
                 //Return message to client
                 webm.Result = "An error occured while updating your account, try again later";
-                entity.CloseResponseJson(HttpStatusCode.InternalServerError, webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualClose(entity, webm, HttpStatusCode.InternalServerError);
             }
         }
     }

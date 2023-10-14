@@ -63,17 +63,11 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 
         private static JwtLoginValidator LwValidator { get; } = new();
         private static IValidator<AuthenticationInfo> AuthValidator { get; } = AuthenticationInfo.GetValidator();
-        private static IValidator<ReadOnlyJsonWebKey> UserJwkValidator { get; } = GetKeyValidator();
+        private static IValidator<PkiAuthPublicKey> UserJwkValidator { get; } = GetKeyValidator();
 
         private readonly JwtEndpointConfig _config;
         private readonly IUserManager _users;
-
-
-        /*
-         * Default protections sessions should be fine (most strict)
-         * No cross-site/cross origin/bad referrer etc
-         */
-        //protected override ProtectionSettings EndpointProtectionSettings { get; } = new();
+        private readonly FailedLoginLockout _lockout;
         
 
         public PkiLoginEndpoint(PluginBase plugin, IConfigScope config)
@@ -84,6 +78,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             //Load config
             _config = config.DeserialzeAndValidate<JwtEndpointConfig>();
             _users = plugin.GetOrCreateSingleton<UserManager>();
+            _lockout = new((uint)_config.MaxFailedLogins, TimeSpan.FromSeconds(_config.FailedCountTimeoutSec));
 
             Log.Verbose("PKI endpoint enabled");
         }
@@ -98,8 +93,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             //Conflict if user is logged in
             if (entity.IsClientAuthorized(AuthorzationCheckLevel.Any))
             {
-                entity.CloseResponse(HttpStatusCode.Conflict);
-                return VfReturnType.VirtualSkip;
+                return VirtualClose(entity, HttpStatusCode.Conflict);
             }
 
             ValErrWebMessage webm = new();
@@ -109,15 +103,13 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 
             if(webm.Assert(login != null, INVALID_MESSAGE))
             {
-                entity.CloseResponse(webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualOk(entity, webm);
             }
 
             //Validate login message
             if(!LwValidator.Validate(login, webm))
             {
-                entity.CloseResponse(webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualOk(entity, webm);
             }
 
             IUser? user = null;
@@ -130,55 +122,30 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             catch (KeyNotFoundException)
             {
                 webm.Result = INVALID_MESSAGE;
-                entity.CloseResponse(webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualOk(entity, webm);
             }
             catch (FormatException)
             {
                 webm.Result = INVALID_MESSAGE;
-                entity.CloseResponse(webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualOk(entity, webm);
             }
 
             try
             {
-                AuthenticationInfo authInfo;
+                AuthenticationInfo authInfo = default;
 
-                //Get the signed payload message
-                using (JsonDocument payload = jwt.GetPayload())
+                //Get auth info from jwt
+                bool isValidAuth = GetAuthInfo(jwt, entity.RequestedTimeUtc, ref authInfo);
+
+                if(webm.Assert(isValidAuth, INVALID_MESSAGE))
                 {
-                    long unixSec = payload.RootElement.GetProperty("iat").GetInt64();
-
-                    DateTimeOffset clientIat = DateTimeOffset.FromUnixTimeSeconds(unixSec);
-
-                    if (clientIat.Add(_config.MaxJwtTimeDifference) < entity.RequestedTimeUtc)
-                    {
-                        webm.Result = INVALID_MESSAGE;
-                        entity.CloseResponse(webm);
-                        return VfReturnType.VirtualSkip;
-                    }
-
-                    if (clientIat.Subtract(_config.MaxJwtTimeDifference) > entity.RequestedTimeUtc)
-                    {
-                        webm.Result = INVALID_MESSAGE;
-                        entity.CloseResponse(webm);
-                        return VfReturnType.VirtualSkip;
-                    }
-
-                    //Recover the authenticator information
-                    authInfo = new()
-                    {
-                        EmailAddress = payload.RootElement.GetPropString("sub"),
-                        KeyId = payload.RootElement.GetPropString("keyid"),
-                        SerialNumber = payload.RootElement.GetPropString("serial"),
-                    };
+                    return VirtualOk(entity, webm);
                 }
 
                 //Validate auth info
                 if (!AuthValidator.Validate(authInfo, webm))
                 {
-                    entity.CloseResponse(webm);
-                    return VfReturnType.VirtualSkip;
+                    return VirtualOk(entity, webm);
                 }
 
                 //Get the user from the email address
@@ -186,40 +153,35 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 
                 if (webm.Assert(user != null, INVALID_MESSAGE))
                 {
-                    entity.CloseResponse(webm);
-                    return VfReturnType.VirtualSkip;
+                    return VirtualOk(entity, webm);
                 }
 
                 //Check failed login count
-                if(webm.Assert(UserLoginLocked(user, entity.RequestedTimeUtc) == false, INVALID_MESSAGE))
+                if(webm.Assert(_lockout.CheckOrClear(user, entity.RequestedTimeUtc) == false, INVALID_MESSAGE))
                 {
-                    entity.CloseResponse(webm);
-                    return VfReturnType.VirtualSkip;
+                    return VirtualOk(entity, webm);
                 }
 
                 //Now we can verify the signed message against the stored key
-                if (webm.Assert(user.PKIVerifyUserJWT(jwt, authInfo.KeyId) == true, INVALID_MESSAGE))
+                if (webm.Assert(user.PKIVerifyUserJWT(jwt, authInfo.KeyId!) == true, INVALID_MESSAGE))
                 {
                     //increment flc on invalid signature
-                    user.FailedLoginIncrement(entity.RequestedTimeUtc);
+                    _lockout.Increment(user, entity.RequestedTimeUtc);
                     await user.ReleaseAsync();
 
-                    entity.CloseResponse(webm);
-                    return VfReturnType.VirtualSkip;
+                    return VirtualOk(entity, webm);
                 }
 
                 //Account status must be active
                 if(webm.Assert(user.Status == UserStatus.Active, INVALID_MESSAGE))
                 {
-                    entity.CloseResponse(webm);
-                    return VfReturnType.VirtualSkip;
+                    return VirtualOk(entity, webm);
                 }
 
                 //Must be local account
                 if (webm.Assert(user.IsLocalAccount(), INVALID_MESSAGE))
                 {
-                    entity.CloseResponse(webm);
-                    return VfReturnType.VirtualSkip;
+                    return VirtualOk(entity, webm);
                 }
 
                 //User is has been authenticated
@@ -239,11 +201,14 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 };
 
                 //Close response, user is now logged-in
-                entity.CloseResponse(webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualOk(entity, webm);
             }
             catch
             {
+                /*
+                 * If an internal  error occurs after the authorization has been 
+                 * generated, we need to clear the login state that has been created. 
+                 */
                 entity.InvalidateLogin();
                 throw;
             }
@@ -254,9 +219,31 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             }          
         }
 
-        /*
-         * This endpoint also enables 
-         */
+        protected override async ValueTask<VfReturnType> GetAsync(HttpEntity entity)
+        {
+            //This endpoint requires valid authorization
+            if (!entity.IsClientAuthorized(AuthorzationCheckLevel.Critical))
+            {
+                return VirtualClose(entity, HttpStatusCode.Unauthorized);
+            }
+
+            ValErrWebMessage webm = new();
+
+            //Get current user
+            using IUser? user = await _users.GetUserFromIDAsync(entity.Session.UserID);
+
+            if (webm.Assert(user != null, "User account is invalid"))
+            {
+                return VirtualOk(entity);
+            }
+
+            //Get the uesr's stored keys
+            webm.Result = user.PkiGetAllPublicKeys();
+            webm.Success = true;
+
+            return VirtualOk(entity, webm);
+        }
+       
         protected override async ValueTask<VfReturnType> PatchAsync(HttpEntity entity)
         {
             //Check for config flag
@@ -267,29 +254,23 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             //This endpoint requires valid authorization
             if (!entity.IsClientAuthorized(AuthorzationCheckLevel.Critical))
             {
-                entity.CloseResponse(HttpStatusCode.Unauthorized);
-                return VfReturnType.VirtualSkip;
+                return VirtualClose(entity, HttpStatusCode.Unauthorized);
             }
 
             ValErrWebMessage webm = new();
 
             //Get the request body
-            using JsonDocument? request = await entity.GetJsonFromFileAsync();
+            PkiAuthPublicKey? pubKey = await entity.GetJsonFromFileAsync<PkiAuthPublicKey>();
 
-            if(webm.Assert(request != null, "The request message is not valid"))
-            {
-                entity.CloseResponseJson(HttpStatusCode.UnprocessableEntity, webm);
-                return VfReturnType.VirtualSkip;
+            if(webm.Assert(pubKey != null, "The request message is not valid"))
+            {                
+                return VirtualClose(entity, webm, HttpStatusCode.UnprocessableEntity);
             }
 
-            //Get the jwk from the request body
-            using ReadOnlyJsonWebKey jwk = new(request.RootElement);
-
             //Validate the user's jwk
-            if(!UserJwkValidator.Validate(jwk, webm))
+            if(!UserJwkValidator.Validate(pubKey, webm))
             {
-                entity.CloseResponse(webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualOk(entity, webm);
             }
 
             //Get the user account
@@ -298,50 +279,42 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             //Confirm not null, this should only happen if user is removed from table while still logged in
             if(webm.Assert(user != null, "You may not configure PKI authentication"))
             {
-                entity.CloseResponse(webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualOk(entity, webm);
             }
 
             //Local account is required
             if (webm.Assert(user.IsLocalAccount(), "You do not have a local account, you may not configure PKI authentication"))
             {
-                entity.CloseResponse(webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualOk(entity, webm);
             }
 
             try
             {
                 //Try to get the ECDA instance to confirm the key data could be recovered properly
-                using ECDsa? testAlg = jwk.GetECDsaPublicKey();
+                using ECDsa? testAlg = pubKey.GetECDsaPublicKey();
 
                 if (webm.Assert(testAlg != null, "Your JWK is not valid"))
                 {
                     webm.Result = "Your JWK is not valid";
-                    entity.CloseResponse(webm);
-                    return VfReturnType.VirtualSkip;
+                    return VirtualOk(entity, webm);
                 }
             }
             catch(Exception ex) 
             {
                 Log.Debug(ex);
                 webm.Result = "Your JWK is not valid";
-                entity.CloseResponse(webm);
-                return VfReturnType.VirtualSkip;
-            }
+                return VirtualOk(entity, webm);
+            }            
 
-            //Extract the user's EC key minimum parameters 
-            IReadOnlyDictionary<string, string> keyParams = ExtractKeyData(jwk);
-
-            //Update user's key params
-            user.PKISetUserKey(keyParams);
+            //Update user's key, or add it if it doesn't exist
+            user.PKIAddPublicKey(pubKey);
 
             //publish changes
             await user.ReleaseAsync();
 
             webm.Result = "Successfully updated your PKI authentication method";
             webm.Success = true;
-            entity.CloseResponse(webm);
-            return VfReturnType.VirtualSkip;
+            return VirtualOk(entity, webm);
         }
 
         protected override async ValueTask<VfReturnType> DeleteAsync(HttpEntity entity)
@@ -355,8 +328,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             //This endpoint requires valid authorization
             if (!entity.IsClientAuthorized(AuthorzationCheckLevel.Critical))
             {
-                entity.CloseResponse(HttpStatusCode.Unauthorized);
-                return VfReturnType.VirtualSkip;
+                return VirtualClose(entity, HttpStatusCode.Unauthorized);
             }
 
             ValErrWebMessage webm = new();
@@ -367,63 +339,63 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             //Confirm not null, this should only happen if user is removed from table while still logged in
             if (webm.Assert(user != null, "You may not configure PKI authentication"))
             {
-                entity.CloseResponse(webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualOk(entity, webm);
             }
 
             //Local account is required
             if (webm.Assert(user.IsLocalAccount(), "You do not have a local account, you may not configure PKI authentication"))
             {
-                entity.CloseResponse(webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualOk(entity, webm);
             }
 
-            //Remove the key
-            user.PKISetUserKey(null);
+            //try to get a single key id to delete
+            if(entity.QueryArgs.TryGetValue("id", out string? keyId))
+            {
+                //Remove only the specified key
+                user.PKIRemovePublicKey(keyId);
+                webm.Result = "You have successfully removed the key from your account";
+            }
+            else
+            {
+                //Delete all keys
+                user.PKISetPublicKeys(null);
+                webm.Result = "You have successfully disabled PKI login";
+            }
+         
             await user.ReleaseAsync();
 
-            webm.Result = "You have successfully disabled PKI login";
             webm.Success = true;
-            entity.CloseResponse(webm);
-            return VfReturnType.VirtualSkip;
+            return VirtualOk(entity, webm);
         }
 
-        public bool UserLoginLocked(IUser user, DateTimeOffset now)
+        private bool GetAuthInfo(JsonWebToken jwt, DateTimeOffset now, ref AuthenticationInfo authInfo)
         {
-            //Recover last counter value
-            TimestampedCounter flc = user.FailedLoginCount();
+            //Get the signed payload message
+            using JsonDocument payload = jwt.GetPayload();
 
-            if (flc.Count < _config.MaxFailedLogins)
+            long unixSec = payload.RootElement.GetProperty("iat").GetInt64();
+
+            DateTimeOffset clientIat = DateTimeOffset.FromUnixTimeSeconds(unixSec);
+
+            if (clientIat.Add(_config.MaxJwtTimeDifference) < now)
             {
-                //Period exceeded
                 return false;
             }
 
-            //See if the flc timeout period has expired
-            if (flc.LastModified.AddSeconds(_config.FailedCountTimeoutSec) < now)
+            if (clientIat.Subtract(_config.MaxJwtTimeDifference) > now)
             {
-                //clear flc flag
-                user.ClearFailedLoginCount();
                 return false;
             }
 
-            //Count has been exceeded, and has not timed out yet
+            //Recover the authenticator information
+            authInfo = new()
+            {
+                EmailAddress = payload.RootElement.GetPropString("sub"),
+                KeyId = payload.RootElement.GetPropString("keyid"),
+                SerialNumber = payload.RootElement.GetPropString("serial"),
+            };
+
             return true;
-        }
-
-        private static IReadOnlyDictionary<string, string> ExtractKeyData(ReadOnlyJsonWebKey key)
-        {
-            Dictionary<string, string> keyData = new();
-
-            keyData["kty"] = key.KeyType!;
-            keyData["use"] = "sig";
-            keyData["crv"] = key.GetKeyProperty("crv")!;
-            keyData["kid"] = key.KeyId!;
-            keyData["alg"] = key.Algorithm!;
-            keyData["x"] = key.GetKeyProperty("x")!;
-            keyData["y"] = key.GetKeyProperty("y")!;
-
-            return keyData;
         }
 
         private sealed class JwtLoginValidator : ClientSecurityMessageValidator<JwtLoginMessage>
@@ -529,21 +501,16 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             }
         }
 
-        private static IValidator<ReadOnlyJsonWebKey> GetKeyValidator()
+        private static IValidator<PkiAuthPublicKey> GetKeyValidator()
         {
-            InlineValidator<ReadOnlyJsonWebKey> val = new();
+            InlineValidator<PkiAuthPublicKey> val = new();
 
             val.RuleFor(a => a.KeyType)
                 .NotEmpty()
                 .Must(kt => "EC".Equals(kt, StringComparison.Ordinal))
                 .WithMessage("The supplied key is not an EC curve key");
 
-            val.RuleFor(a => a.Use)
-                .NotEmpty()
-                .Must(u => "sig".Equals(u, StringComparison.OrdinalIgnoreCase))
-                .WithMessage("Your key must be configured for signatures");
-
-            val.RuleFor(a => a.GetKeyProperty("crv"))
+            val.RuleFor(a => a.Curve)
                 .NotEmpty()
                 .WithName("crv")
                 .Must(p => AllowedCurves.Contains(p, StringComparer.Ordinal))
@@ -556,11 +523,12 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 
             val.RuleFor(a => a.Algorithm)
                 .NotEmpty()
+                .WithName("alg")
                 .Must(a => AllowedAlgs.Contains(a, StringComparer.Ordinal))
                 .WithMessage("Your key's signature algorithm is not supported");
 
             //Confirm the x axis parameter is valid
-            val.RuleFor(a => a.GetKeyProperty("x"))
+            val.RuleFor(a => a.X)
                 .NotEmpty()
                 .WithName("x")
                 .Length(10, 200)
@@ -568,9 +536,8 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 .IllegalCharacters()
                 .WithMessage("Your key's X EC point public key parameter conatins invaid characters");
 
-
             //Confirm the y axis point is valid
-            val.RuleFor(a => a.GetKeyProperty("y"))
+            val.RuleFor(a => a.Y)
                 .NotEmpty()
                 .WithName("y")
                 .Length(10, 200)

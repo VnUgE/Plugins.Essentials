@@ -23,11 +23,9 @@
 */
 
 using System;
-using System.Net;
 
 using VNLib.Utils.Extensions;
 using VNLib.Plugins.Essentials.Endpoints;
-using VNLib.Plugins.Essentials.Extensions;
 using VNLib.Plugins.Extensions.Loading;
 
 
@@ -51,12 +49,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             InitPathAndLog(path, pbase.Log);
         }
 
-        protected override VfReturnType Get(HttpEntity entity)
-        {
-            //Return okay
-            entity.CloseResponse(HttpStatusCode.OK);
-            return VfReturnType.VirtualSkip;
-        }
+        protected override VfReturnType Get(HttpEntity entity) => VirtualOk(entity);
 
         //Allow post to update user's credentials
         protected override VfReturnType Post(HttpEntity entity)
@@ -72,16 +65,13 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 //reauthorize the client
                 entity.ReAuthorizeClient(webm);
 
-                webm.Success = true;
-                
+                webm.Success = true;                
                 //Send the update message to the client
-                entity.CloseResponse(webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualOk(entity, webm);
             }
 
             //Return okay
-            entity.CloseResponse(HttpStatusCode.OK);
-            return VfReturnType.VirtualSkip;
+            return VirtualOk(entity);
         }
     }
 }

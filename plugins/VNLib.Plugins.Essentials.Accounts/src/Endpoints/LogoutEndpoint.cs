@@ -22,9 +22,6 @@
 * along with this program.  If not, see https://www.gnu.org/licenses/.
 */
 
-using System;
-using System.Net;
-
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Essentials.Endpoints;
 
@@ -56,16 +53,14 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             if (entity.IsClientAuthorized(AuthorzationCheckLevel.Critical))
             {
                 entity.InvalidateLogin();
-                entity.CloseResponse(HttpStatusCode.OK);
-                return VfReturnType.VirtualSkip;
             }
             else
             {
                 //Detatch the session to cause client only invalidation
                 entity.Session.Detach();
-                entity.CloseResponse(HttpStatusCode.OK);
-                return VfReturnType.VirtualSkip;
             }
+
+            return VirtualOk(entity);
         }
     }
 }
