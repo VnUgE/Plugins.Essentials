@@ -62,20 +62,6 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             Passwords = pbase.GetOrCreateSingleton<ManagedPasswordHashing>();
         }
 
-        private class TOTPUpdateMessage
-        {
-            [JsonPropertyName("issuer")]
-            public string? Issuer { get; set; }
-            [JsonPropertyName("digits")]
-            public int Digits { get; set; }
-            [JsonPropertyName("period")]
-            public int Period { get; set; }
-            [JsonPropertyName("secret")]
-            public string? Base64EncSecret { get; set; }
-            [JsonPropertyName("algorithm")]
-            public string? Algorithm { get; set; }
-        }
-
         protected override async ValueTask<VfReturnType> GetAsync(HttpEntity entity)
         {
             string[] enabledModes = new string[3];
@@ -102,8 +88,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             }
 
             //Return mfa modes as an array
-            entity.CloseResponseJson(HttpStatusCode.OK, enabledModes);
-            return VfReturnType.VirtualSkip;
+            return VirtualOkJson(entity, enabledModes);
         }
 
         protected override async ValueTask<VfReturnType> PutAsync(HttpEntity entity)
@@ -115,8 +100,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 
             if (webm.Assert(mfaRequest != null, "Invalid request"))
             {
-                entity.CloseResponseJson(HttpStatusCode.BadRequest, webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualClose(entity, webm, HttpStatusCode.BadRequest);
             }
             
             //Get the type argument
@@ -124,22 +108,19 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             if (string.IsNullOrWhiteSpace(mfaType))
             {
                 webm.Result = "MFA type was not specified";
-                entity.CloseResponseJson(HttpStatusCode.UnprocessableEntity, webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualClose(entity, webm, HttpStatusCode.UnprocessableEntity);
             }
             
             //Make sure the user's account origin is a local account
             if (webm.Assert(entity.Session.HasLocalAccount(), "Your account uses external authentication and MFA cannot be enabled"))
             {
-                entity.CloseResponse(webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualOk(entity, webm);
             }
 
             //Make sure mfa is loaded
             if (webm.Assert(MultiFactor != null, "MFA is not enabled on this server"))
             {
-                entity.CloseResponse(webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualOk(entity, webm);
             }
 
             //Get the user entry
@@ -147,8 +128,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 
             if (webm.Assert(user != null, "Please log-out and try again."))
             {
-                entity.CloseResponse(webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualOk(entity, webm);
             }
 
             //get the user's password challenge
@@ -157,16 +137,14 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 if (PrivateString.IsNullOrEmpty(password))
                 {
                     webm.Result = "Please check your password";
-                    entity.CloseResponseJson(HttpStatusCode.Unauthorized, webm);
-                    return VfReturnType.VirtualSkip;
+                    return VirtualClose(entity, webm, HttpStatusCode.Unauthorized);
                 }
 
                 //Verify password against the user
                 if (!user.VerifyPassword(password, Passwords))
                 {
                     webm.Result = "Please check your password";
-                    entity.CloseResponseJson(HttpStatusCode.Unauthorized, webm);
-                    return VfReturnType.VirtualSkip;
+                    return VirtualClose(entity, webm, HttpStatusCode.Unauthorized);
                 }
             }
 
@@ -178,8 +156,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                         //Confirm totp is enabled
                         if (webm.Assert(MultiFactor.TOTPEnabled, "TOTP is not enabled on the current server"))
                         {
-                            entity.CloseResponse(webm);
-                            return VfReturnType.VirtualSkip;
+                            return VirtualOk(entity, webm);
                         }
 
                         //Update TOTP secret for user
@@ -191,8 +168,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                     break;
             }
             //Close response
-            entity.CloseResponse(webm);
-            return VfReturnType.VirtualSkip;
+            return VirtualOk(entity, webm);
         }
 
         protected override async ValueTask<VfReturnType> PostAsync(HttpEntity entity)
@@ -201,19 +177,16 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             try
             {
                 //Check account type
-                if (!entity.Session.HasLocalAccount())
+                if (webm.Assert(entity.Session.HasLocalAccount(), "You are using external authentication. Operation failed."))
                 {
-                    webm.Result = "You are using external authentication. Operation failed.";
-                    entity.CloseResponseJson(HttpStatusCode.BadRequest, webm);
-                    return VfReturnType.VirtualSkip;
+                    return VirtualClose(entity, webm, HttpStatusCode.BadRequest);
                 }
                 
                 //get the request
                 using JsonDocument? request = await entity.GetJsonFromFileAsync();
                 if (webm.Assert(request != null, "Invalid request."))
                 {
-                    entity.CloseResponseJson(HttpStatusCode.BadRequest, webm);
-                    return VfReturnType.VirtualSkip;
+                    return VirtualClose(entity, webm, HttpStatusCode.BadRequest);
                 }
              
                 string? mfaType = request.RootElement.GetProperty("type").GetString();
@@ -234,16 +207,14 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                     if (PrivateString.IsNullOrEmpty(password))
                     {
                         webm.Result = "Please check your password";
-                        entity.CloseResponseJson(HttpStatusCode.Unauthorized, webm);
-                        return VfReturnType.VirtualSkip;
+                        return VirtualClose(entity, webm, HttpStatusCode.Unauthorized);
                     }
 
                     //Verify password against the user
                     if (!user.VerifyPassword(password, Passwords))
                     {
                         webm.Result = "Please check your password";
-                        entity.CloseResponseJson(HttpStatusCode.Unauthorized, webm);
-                        return VfReturnType.VirtualSkip;
+                        return VirtualClose(entity, webm, HttpStatusCode.Unauthorized);
                     }
                 }
 
@@ -272,14 +243,12 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 }
 
                 //Must write response while password is in scope
-                entity.CloseResponse(webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualOk(entity, webm);
             }
             catch (KeyNotFoundException)
             {
                 webm.Result = "The request was is missing required fields";
-                entity.CloseResponseJson(HttpStatusCode.UnprocessableEntity, webm);
-                return VfReturnType.BadRequest;
+                return VirtualClose(entity, webm, HttpStatusCode.UnprocessableEntity);
             }
         }
 
@@ -288,7 +257,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             //generate a new secret (passing the buffer which will get copied to an array because the pw bytes can be modified during encryption)
             byte[] secretBuffer = user.MFAGenreateTOTPSecret(MultiFactor);
             //Alloc output buffer
-            UnsafeMemoryHandle<byte> outputBuffer = MemoryUtil.UnsafeAlloc(4096, true);
+            IMemoryHandle<byte> outputBuffer = MemoryUtil.SafeAlloc(4096, true);
 
             try
             {
@@ -327,6 +296,20 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 outputBuffer.Dispose();
                 MemoryUtil.InitializeBlock(secretBuffer.AsSpan());
             }
+        }
+
+        private class TOTPUpdateMessage
+        {
+            [JsonPropertyName("issuer")]
+            public string? Issuer { get; set; }
+            [JsonPropertyName("digits")]
+            public int Digits { get; set; }
+            [JsonPropertyName("period")]
+            public int Period { get; set; }
+            [JsonPropertyName("secret")]
+            public string? Base64EncSecret { get; set; }
+            [JsonPropertyName("algorithm")]
+            public string? Algorithm { get; set; }
         }
     }
 }
