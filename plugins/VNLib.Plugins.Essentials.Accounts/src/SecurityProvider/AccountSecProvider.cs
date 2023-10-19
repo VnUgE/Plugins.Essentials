@@ -35,8 +35,8 @@ using System;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Security.Cryptography;
-using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
+using System.Diagnostics.CodeAnalysis;
 
 using FluentValidation;
 
@@ -45,6 +45,7 @@ using VNLib.Hashing.IdentityUtility;
 using VNLib.Net.Http;
 using VNLib.Utils;
 using VNLib.Utils.Memory;
+using VNLib.Utils.Logging;
 using VNLib.Utils.Extensions;
 using VNLib.Plugins.Essentials.Users;
 using VNLib.Plugins.Essentials.Sessions;
@@ -73,19 +74,22 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
 
         private readonly AccountSecConfig _config;
         private readonly CookieHandler _cookieHandler;
+        private readonly ILogProvider _logger;
 
         public AccountSecProvider(PluginBase plugin)
         {
             //Setup default config
             _config = new();
             _cookieHandler = new(_config);
+            _logger = plugin.Log.CreateScope("Security");
         }
 
-        public AccountSecProvider(PluginBase pbase, IConfigScope config)
+        public AccountSecProvider(PluginBase plugin, IConfigScope config)
         {
             //Parse config if defined
             _config = config.DeserialzeAndValidate<AccountSecConfig>();
             _cookieHandler = new(_config);
+            _logger = plugin.Log.CreateScope("Security");
         }
 
         /*
@@ -95,23 +99,42 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
         ///<inheritdoc/>
         public ValueTask<FileProcessArgs> ProcessAsync(HttpEntity entity)
         {
+
+            ref readonly SessionInfo session = ref entity.Session;
+
             //Session must be set and web based for checks
-            if (entity.Session.IsSet && entity.Session.SessionType == SessionType.Web)
+            if (session.IsSet && session.SessionType == SessionType.Web)
             {
-                //See if the session might be elevated
-                if (!string.IsNullOrWhiteSpace(entity.Session.LoginHash))
+                //Make sure the session has not expired yet                
+                if (OnMwCheckSessionExpired(entity, in session))
                 {
-                    //If the session stored a user-agent, make sure it matches the connection
-                    if (entity.Session.UserAgent != null && !entity.Session.UserAgent.Equals(entity.Server.UserAgent, StringComparison.Ordinal))
+                    //Expired
+                    ExpireCookies(entity);
+                    
+                    //Verbose because this is a normal occurance
+                    if (_logger.IsEnabled(LogLevel.Verbose))
                     {
-                        return ValueTask.FromResult(FileProcessArgs.Deny);
+                        _logger.Verbose("Session {id} expired", session.SessionID[..8]);
                     }
                 }
-
-                //If the session is new, or not supposed to be logged in, clear the login cookies if they were set
-                if (entity.Session.IsNew || string.IsNullOrEmpty(entity.Session.LoginHash) || string.IsNullOrEmpty(entity.Session.Token))
+                else
                 {
-                    ExpireCookies(entity);
+                    //See if the session might be elevated
+                    if (!string.IsNullOrWhiteSpace(session.Token))
+                    {
+                        //If the session stored a user-agent, make sure it matches the connection
+                        if (session.UserAgent != null && !session.UserAgent.Equals(entity.Server.UserAgent, StringComparison.Ordinal))
+                        {
+                            _logger.Debug("Denied authorized connection from {ip} because user-agent changed");
+                            return ValueTask.FromResult(FileProcessArgs.Deny);
+                        }
+                    }
+
+                    //If the session is new, or not supposed to be logged in, clear the login cookies if they were set
+                    if (session.IsNew || string.IsNullOrEmpty(session.Token))
+                    {
+                        ExpireCookies(entity);
+                    }
                 }
             }
 
@@ -119,6 +142,30 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             return ValueTask.FromResult(FileProcessArgs.Continue);
         }
 
+        /*
+         * Verify sessions on new connections to ensure they have not expired 
+         * and need to be regnerated or invalidated. If they are expired
+         * we need to cleanup any internal security flags/keys
+         */
+        private bool OnMwCheckSessionExpired(HttpEntity entity, in SessionInfo session)
+        {
+            if (session.Created.AddSeconds(_config.WebSessionValidForSeconds) < entity.RequestedTimeUtc)
+            {
+                //Invalidate the session, so its technically valid for this request, but will be cleared on this handle close cycle
+                session.Invalidate();
+
+                //Clear basic login status now so checks will fail later
+                session.Token = null!;
+                session.UserID = null!;
+                session.Privilages = 0;
+                session[PUBLIC_KEY_SIG_KEY_ENTRY] = null!;
+
+                return true;
+            }
+
+            //Not expired
+            return false;
+        }
 
         #region Interface Impl
 
@@ -138,37 +185,25 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                 throw new ArgumentException("The session is no configured for authorization");
             }
 
-            //Generate the new client token for the client's public key
-            ClientSecurityToken authTokens = GenerateToken(clientInfo.PublicKey);
+            return GenerateAuth(entity, clientInfo.PublicKey, user.IsLocalAccount());
+        }
 
-            /*
-             * Create thet login cookie value, we need to pass the initial user account
-             * status for the user cookie. This is not required if the user is already
-             * logged in
-             */
-
-            string loginCookie = SetLoginCookie(entity);
-            SetClientStatusCookie(entity, user.IsLocalAccount());
-
-            //Store the login hash in the user's session
-            entity.Session.LoginHash = loginCookie;
-            //Store the server token in the session
-            entity.Session.Token = authTokens.ServerToken;
-
-            /*
-             * The user's public key will be stored via a jwt cookie
-             * signed by this specific signing key, we will save the signing key
-             * in the session
-             */
-            string base32Key = SetPublicKeyCookie(entity, clientInfo.PublicKey);
-            entity.Session[PUBLIC_KEY_SIG_KEY_ENTRY] = base32Key;
-
-            //Return the new authorzation
-            return new Authorization()
+        ///<inheritdoc/>
+        IClientAuthorization IAccountSecurityProvider.ReAuthorizeClient(HttpEntity entity)
+        {
+            //Confirm session is configured
+            if (!entity.Session.IsSet || entity.Session.IsNew || entity.Session.SessionType != SessionType.Web)
             {
-                LoginSecurityString = loginCookie,
-                SecurityToken = authTokens,
-            };
+                throw new InvalidOperationException("The session is not configured for authorization");
+            }
+
+            //recover the client's public key
+            if (!TryGetPublicKey(entity, out string? pubKey))
+            {
+                throw new InvalidOperationException("The user does not have the required public key token stored");
+            }
+
+            return GenerateAuth(entity, pubKey, entity.Session.HasLocalAccount());
         }
 
         ///<inheritdoc/>
@@ -179,7 +214,6 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
 
             //Clear known security keys
             entity.Session.Token = null!;
-            entity.Session.LoginHash = null!;
             entity.Session[PUBLIC_KEY_SIG_KEY_ENTRY] = null!;
         }
 
@@ -195,49 +229,11 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             return level switch
             {
                 //Accept the client token or the cookie as any/medium 
-                AuthorzationCheckLevel.Any or AuthorzationCheckLevel.Medium => VerifyLoginCookie(entity) || VerifyClientToken(entity),
+                AuthorzationCheckLevel.Any or AuthorzationCheckLevel.Medium => VerifyClientToken(entity) || TryGetPublicKey(entity, out _),
                 //Critical requires that the client cookie is set and the token is set
-                AuthorzationCheckLevel.Critical => VerifyLoginCookie(entity) && VerifyClientToken(entity),
+                AuthorzationCheckLevel.Critical => TryGetPublicKey(entity, out _) && VerifyClientToken(entity),
                 //Default to false condition
                 _ => false,
-            };
-        }
-
-        ///<inheritdoc/>
-        IClientAuthorization IAccountSecurityProvider.ReAuthorizeClient(HttpEntity entity)
-        {
-            //Confirm session is configured
-            if (!entity.Session.IsSet || entity.Session.IsNew || entity.Session.SessionType != SessionType.Web)
-            {
-                throw new InvalidOperationException ("The session is not configured for authorization");
-            }
-
-            //recover the client's public key
-            if(!TryGetPublicKey(entity, out string? pubKey))
-            {
-                throw new InvalidOperationException("The user does not have the required public key token stored");
-            }
-
-            //Try to generate a new authorization
-            ClientSecurityToken authTokens = GenerateToken(pubKey);
-
-            //Set login cookies with stored session data
-            string loginCookie = SetLoginCookie(entity);
-
-            //Update the public key cookie
-            string signingKey = SetPublicKeyCookie(entity, pubKey);
-            //Store signing key
-            entity.Session[PUBLIC_KEY_SIG_KEY_ENTRY] = signingKey;
-
-            //Update token/login
-            entity.Session.LoginHash = loginCookie;
-            entity.Session.Token = authTokens.ServerToken;
-
-            //Return the new authorzation
-            return new Authorization()
-            {
-                LoginSecurityString = loginCookie,
-                SecurityToken = authTokens,
             };
         }
 
@@ -255,6 +251,26 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             return TryEncryptClientData(entity.PublicKey, data, outputBuffer);
         }
 
+        private IClientAuthorization GenerateAuth(HttpEntity entity, string publicKey, bool localAccount)
+        {
+            //Try to generate a new authorization
+            GenerateToken(publicKey, out string serverToken, out string clientToken);
+
+            /*
+            * The user's public key will be stored via a jwt cookie
+            * signed by this specific signing key, we will save the signing key
+            * in the session
+            */
+            entity.Session[PUBLIC_KEY_SIG_KEY_ENTRY] = SetPublicKeyCookie(entity, publicKey);
+            entity.Session.Token = serverToken;
+
+            //set client status cookie via handler
+            _cookieHandler.SetCookie(entity, _config.ClientStatusCookieName, localAccount ? "1" : "2", false);
+
+            //Return the new authorzation
+            return new EncryptedTokenAuthorization(clientToken);
+        }
+
         #endregion
 
         #region Security Tokens
@@ -270,7 +286,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
          * 
          */
 
-        private ClientSecurityToken GenerateToken(ReadOnlySpan<char> publicKey)
+        private void GenerateToken(ReadOnlySpan<char> publicKey, out string serverToken, out string clientToken)
         {
             //Alloc buffer for encode/decode
             using IMemoryHandle<byte> buffer = MemoryUtil.SafeAllocNearestPage(4000, true);
@@ -289,15 +305,12 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                 {
                     throw new InternalBufferTooSmallException("The internal buffer used to store the encrypted token is too small");
                 }
+                
+                //Client token is the encrypted secret key
+                clientToken = Convert.ToBase64String(outputBuffer[..(int)bytesEncrypted]);
 
-                //Convert the tokens to base64 encoding and return the new cst
-                return new()
-                {
-                    //Client token is the encrypted private key
-                    ClientToken = Convert.ToBase64String(outputBuffer[..(int)bytesEncrypted]),
-                    //Server token is the raw secret
-                    ServerToken = VnEncoding.ToBase32String(secretBuffer)
-                };
+                //Encode base64 url safe
+                serverToken = VnEncoding.ToBase64UrlSafeString(secretBuffer, false);
             }
             finally
             {
@@ -339,7 +352,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                 using (UnsafeMemoryHandle<byte> decodeBuffer = MemoryUtil.UnsafeAllocNearestPage(_config.TokenKeySize, true))
                 {
                     //Recover the key from base32
-                    ERRNO count = VnEncoding.TryFromBase32Chars(sharedKey, decodeBuffer.Span);
+                    ERRNO count = VnEncoding.Base64UrlDecode(sharedKey, decodeBuffer.Span);
 
                     if (!count)
                     {
@@ -386,58 +399,9 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
         #endregion
 
         #region Cookies
-        
-        private bool VerifyLoginCookie(HttpEntity entity)
-        {
-            //Sessions must be loaded
-            if (!entity.Session.IsSet || entity.Session.IsNew)
-            {
-                return false;
-            }
-
-            //Try to get the login string from the request cookies
-            if (!entity.Server.RequestCookies.TryGetNonEmptyValue(_config.LoginCookieName, out string? cookie))
-            {
-                return false;
-            }
-
-            //Make sure a login hash is stored
-            if (string.IsNullOrWhiteSpace(entity.Session.LoginHash))
-            {
-                return false;
-            }
-
-
-            //Alloc buffer for decoding the base64 signatures
-            using UnsafeMemoryHandle<byte> buffer = MemoryUtil.UnsafeAllocNearestPage(2 * _config.LoginCookieSize, true);
-
-            //Slice up buffers 
-            Span<byte> cookieBuffer = buffer.Span[.._config.LoginCookieSize];
-            Span<byte> sessionBuffer = buffer.AsSpan(_config.LoginCookieSize, _config.LoginCookieSize);
-            
-            //Convert cookie and session hash value
-            if (Convert.TryFromBase64Chars(cookie, cookieBuffer, out int cookieBytesWriten)
-                && Convert.TryFromBase64Chars(entity.Session.LoginHash, sessionBuffer, out int hashBytesWritten))
-            {
-                //Do a fixed time equal (probably overkill, but should not matter too much)
-                if (CryptographicOperations.FixedTimeEquals(cookieBuffer[..cookieBytesWriten], sessionBuffer[..hashBytesWritten]))
-                {
-                    return true;
-                }
-            }
-            //Clear login cookie if failed
-            ExpireCookies(entity);
-            return false;
-        }
 
         private void ExpireCookies(HttpEntity entity)
         {
-            //Expire login cookie if set
-            if (entity.Server.RequestCookies.ContainsKey(_config.LoginCookieName))
-            {
-                _cookieHandler.ExpireCookie(entity, _config.LoginCookieName);
-            }
-
             //Expire the LI cookie if set
             if (entity.Server.RequestCookies.ContainsKey(_config.ClientStatusCookieName))
             {
@@ -515,30 +479,6 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
         
         #endregion
 
-        /// <summary>
-        /// Stores the login key as a cookie in the current session as long as the session exists
-        /// </summary>/
-        /// <param name="ev">The event to log-in</param>
-        /// <param name="localAccount">Does the session belong to a local user account</param>
-        private string SetLoginCookie(HttpEntity ev)
-        {
-            //Get the new random cookie value
-            string loginString = RandomHash.GetRandomBase64(_config.LoginCookieSize);
-
-            //Set the cookie for the login key
-            _cookieHandler.SetCookie(ev, _config.LoginCookieName, loginString, true);
-
-            return loginString;
-        }
-
-        private void SetClientStatusCookie(HttpEntity entity, bool? localAccount = null)
-        {
-            //If not set get from session storage
-            localAccount ??= entity.Session.HasLocalAccount();
-
-            //set client status cookie via handler
-            _cookieHandler.SetCookie(entity, _config.ClientStatusCookieName, localAccount.Value ? "1" : "2", false);
-        }
 
         #region Client Encryption Key
 
@@ -658,14 +598,6 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             {
                 InlineValidator<AccountSecConfig> val = new();
 
-                val.RuleFor(c => c.LoginCookieName)
-                    .Length(1, 50)
-                    .IllegalCharacters();
-
-                val.RuleFor(c => c.LoginCookieSize)
-                    .InclusiveBetween(8, 4096)
-                    .WithMessage("The login cookie size must be a sensable value between 8 bytes and 4096 bytes long");
-
                 //Cookie domain may be null/emmpty
                 val.RuleFor(c => c.CookieDomain);
 
@@ -702,20 +634,12 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                     .InclusiveBetween(8, 512)
                     .WithMessage("You should choose an OTP symmetric key size between 8 and 512 bytes");
 
+                val.RuleFor(c => c.WebSessionValidForSeconds)
+                    .InclusiveBetween((uint)1, uint.MaxValue)
+                    .WithMessage("You must specify a valid value for a web session timeout in seconds");
+
                 return val;
             }
-
-            /// <summary>
-            /// The name of the random security cookie
-            /// </summary>
-            [JsonPropertyName("login_cookie_name")]
-            public string LoginCookieName { get; set; } = "VNLogin";
-
-            /// <summary>
-            /// The size (in bytes) of the randomly generated security cookie
-            /// </summary>
-            [JsonPropertyName("login_cookie_size")]
-            public int LoginCookieSize { get; set; } = 64;
 
             /// <summary>
             /// The domain all authoization cookies will be set for
@@ -776,6 +700,12 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             [JsonIgnore]
             internal TimeSpan SignedTokenTimeDiff { get; set; } = TimeSpan.FromSeconds(30);
 
+            /// <summary>
+            /// The amount of time a web session is valid for
+            /// </summary>
+            [JsonPropertyName("session_valid_for_sec")]
+            public uint WebSessionValidForSeconds { get; set; } = 3600;
+
             [JsonPropertyName("otp_time_diff_sec")]
             public uint SigTokenTimeDifSeconds
             {
@@ -790,13 +720,13 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             }
         }
 
-        private sealed class Authorization : IClientAuthorization
+        private sealed record class EncryptedTokenAuthorization(string ClientAuthToken) : IClientAuthorization
         {
             ///<inheritdoc/>
-            public string? LoginSecurityString { get; init; }
+            public object GetClientAuthData() => ClientAuthToken;
 
             ///<inheritdoc/>
-            public ClientSecurityToken SecurityToken { get; init; }
+            public string GetClientAuthDataString() => ClientAuthToken;            
         }
 
         record class CookieHandler(AccountSecConfig Config)
@@ -816,7 +746,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                     ValidFor = TimeSpan.Zero,
                     SameSite = CookieSameSite.SameSite,
                     HttpOnly = true,
-                    Secure = true
+                    Secure = entity.IsSecure
                 };
 
                 entity.Server.SetCookie(in cookie);
@@ -838,7 +768,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                     ValidFor = Config.AuthorizationValidFor,
                     SameSite = CookieSameSite.SameSite,
                     HttpOnly = httpOnly,
-                    Secure = true
+                    Secure = entity.IsSecure
                 };
                 entity.Server.SetCookie(in cookie);
             }

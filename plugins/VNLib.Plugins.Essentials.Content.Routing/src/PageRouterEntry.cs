@@ -41,7 +41,7 @@ namespace VNLib.Plugins.Essentials.Content.Routing
         public void ConfigureServices(IServiceContainer services)
         {
             //Deploy the page router to the host
-            services.AddService(typeof(IPageRouter), PageRouter);
+            services.AddService<IPageRouter>(PageRouter);
         }
 
         protected override void OnLoad()
