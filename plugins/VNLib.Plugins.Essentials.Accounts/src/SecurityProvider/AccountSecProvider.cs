@@ -81,7 +81,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             //Setup default config
             _config = new();
             _cookieHandler = new(_config);
-            _logger = plugin.Log.CreateScope("Security");
+            _logger = plugin.Log.CreateScope("Acnt-Sec");
         }
 
         public AccountSecProvider(PluginBase plugin, IConfigScope config)
@@ -89,7 +89,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             //Parse config if defined
             _config = config.DeserialzeAndValidate<AccountSecConfig>();
             _cookieHandler = new(_config);
-            _logger = plugin.Log.CreateScope("Security");
+            _logger = plugin.Log.CreateScope("Acnt-Sec);
         }
 
         /*
@@ -391,6 +391,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             {
                 //we may catch the format exception for a malformatted jwt
                 isValid = false;
+                _logger.Debug("Client security OTP JWT not valid from {ip}", entity.TrustedRemoteIp);
             }
             
             return isValid;
@@ -556,35 +557,46 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                 return false;
             }
 
-            //Parse the jwt
-            using JsonWebToken jwt = JsonWebToken.Parse(pubKeyJwt);
-
-            //Recover the signing key bytes
-            byte[] signingKey = VnEncoding.FromBase32String(base32Sig)!;
-
-            //verify the client signature
-            if (!jwt.Verify(signingKey, ClientTokenHmacType))
+            try
             {
-                return false;
+
+                //Parse the jwt
+                using JsonWebToken jwt = JsonWebToken.Parse(pubKeyJwt);
+
+                //Recover the signing key bytes
+                byte[] signingKey = VnEncoding.FromBase32String(base32Sig)!;
+
+                //verify the client signature
+                if (!jwt.Verify(signingKey, ClientTokenHmacType))
+                {
+                    return false;
+                }
+
+                //Verify expiration
+                using JsonDocument payload = jwt.GetPayload();
+
+                //Get the expiration time from the jwt
+                long expTimeSec = payload.RootElement.GetProperty("exp").GetInt64();
+                DateTimeOffset expired = DateTimeOffset.FromUnixTimeSeconds(expTimeSec);
+
+                //Check if expired
+                if (expired.Ticks < entity.RequestedTimeUtc.Ticks)
+                {
+                    return false;
+                }
+
+                //Store the public key
+                pubKey = payload.RootElement.GetProperty("sub").GetString()!;
+
+                return true;
+            }
+            catch (FormatException)
+            {
+                //JWT is invalid and could not be parsed
+                _logger.Debug("Client public key JWT or message body was not valid from {ip}", entity.TrustedRemoteIp);
             }
 
-            //Verify expiration
-            using JsonDocument payload = jwt.GetPayload();
-
-            //Get the expiration time from the jwt
-            long expTimeSec = payload.RootElement.GetProperty("exp").GetInt64();
-            DateTimeOffset expired = DateTimeOffset.FromUnixTimeSeconds(expTimeSec);
-
-            //Check if expired
-            if (expired.Ticks < entity.RequestedTimeUtc.Ticks)
-            {
-                return false;
-            }
-
-            //Store the public key
-            pubKey = payload.RootElement.GetProperty("sub").GetString()!;
-
-            return true;
+            return false;
         }
        
         #endregion
