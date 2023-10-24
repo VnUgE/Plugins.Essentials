@@ -89,7 +89,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             //Parse config if defined
             _config = config.DeserialzeAndValidate<AccountSecConfig>();
             _cookieHandler = new(_config);
-            _logger = plugin.Log.CreateScope("Acnt-Sec);
+            _logger = plugin.Log.CreateScope("Acnt-Sec");
         }
 
         /*
@@ -97,7 +97,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
          */
 
         ///<inheritdoc/>
-        public ValueTask<FileProcessArgs> ProcessAsync(HttpEntity entity)
+        ValueTask<FileProcessArgs> IHttpMiddleware.ProcessAsync(HttpEntity entity)
         {
 
             ref readonly SessionInfo session = ref entity.Session;
