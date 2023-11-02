@@ -58,6 +58,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
 {
 
     [ConfigurationName("account_security", Required = false)]
+    [MiddlewareImpl(MiddlewareImplOptions.SecurityCritical)]
     internal class AccountSecProvider : IAccountSecurityProvider, IHttpMiddleware
     {
         private const int PUB_KEY_JWT_NONCE_SIZE = 16;
@@ -125,7 +126,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                         //If the session stored a user-agent, make sure it matches the connection
                         if (session.UserAgent != null && !session.UserAgent.Equals(entity.Server.UserAgent, StringComparison.Ordinal))
                         {
-                            _logger.Debug("Denied authorized connection from {ip} because user-agent changed");
+                            _logger.Debug("Denied authorized connection from {ip} because user-agent changed", entity.TrustedRemoteIp);
                             return ValueTask.FromResult(FileProcessArgs.Deny);
                         }
                     }

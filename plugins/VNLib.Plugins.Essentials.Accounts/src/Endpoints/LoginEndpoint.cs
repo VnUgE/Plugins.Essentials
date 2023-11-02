@@ -80,8 +80,8 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
         public LoginEndpoint(PluginBase pbase, IConfigScope config)
         {
             string path = config.GetRequiredProperty("path", p => p.GetString()!);
-            TimeSpan duration = config["failed_count_timeout_sec"].GetTimeSpan(TimeParseType.Seconds);
-            uint maxLogins = config["failed_count_max"].GetUInt32();
+            TimeSpan duration = config["failed_attempt_timeout_sec"].GetTimeSpan(TimeParseType.Seconds);
+            uint maxLogins = config["max_login_attempts"].GetUInt32();
 
             InitPathAndLog(path, pbase.Log);
 

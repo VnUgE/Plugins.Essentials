@@ -26,6 +26,8 @@ using System;
 using System.Text.Json;
 using System.ComponentModel.Design;
 
+using FluentValidation.Results;
+
 using VNLib.Utils;
 using VNLib.Utils.Memory;
 using VNLib.Utils.Logging;
@@ -46,14 +48,14 @@ namespace VNLib.Plugins.Essentials.Accounts
 
         public override string PluginName => "Essentials.Accounts";
 
-        private bool SetupMode => PluginConfig.TryGetProperty("setup_mode", out JsonElement el) && el.GetBoolean();
+        private bool SetupMode => HostArgs.HasArgument("--account-setup");
 
         private AccountSecProvider? _securityProvider;
 
         [ServiceConfigurator]
         public void ConfigureServices(IServiceContainer services)
         {
-            //Export the build in security provider 
+            //Export the built in security provider and add it as a middleware item as well
             if (_securityProvider != null)
             {
                 services.AddService(typeof(IAccountSecurityProvider), _securityProvider);
@@ -164,6 +166,7 @@ Commands:
     disable-mfa -u <username>                                       Disable a user's MFA configuration
     enable-totp -u <username> -s <base32 secret>                    Enable TOTP MFA for a user
     set-privilege -u <username> -l <priv level>                     Set a user's privilege level
+    add-pubkey -u <username>                                        Add a JWK public key to a user's profile
     help                                                            Display this help message
 ";
                         Log.Information(help, PluginName);
@@ -304,6 +307,58 @@ Commands:
 
                             //Update the totp secret and flush changes
                             user.MFASetTOTPSecret(secret);
+                            await user.ReleaseAsync();
+
+                            Log.Information("Successfully set TOTP secret for {id}", username);
+                        }
+                        break;
+                    case "add-pubkey":
+                        {
+
+                            if (string.IsNullOrWhiteSpace(username))
+                            {
+                                Log.Warn("You are missing required argument values. Format 'add-pubkey -u <username>");
+                                break;
+                            }
+
+                            Console.WriteLine("Enter public key JWK...");
+
+                            //Wait for pubkey
+                            string? pubkeyJwk = Console.ReadLine();
+
+                            if(string.IsNullOrWhiteSpace(pubkeyJwk))
+                            {
+                                Log.Warn("No public key supplied.");
+                                break;
+                            }
+
+                            //Get user
+                            using IUser? user = await Users.GetUserFromEmailAsync(username);
+
+                            if (user == null)
+                            {
+                                Log.Warn("The specified user does not exist");
+                                break;
+                            }
+
+                            PkiAuthPublicKey? pubkey = JsonSerializer.Deserialize<PkiAuthPublicKey>(pubkeyJwk);
+                            if (pubkey == null)
+                            {
+                                Log.Error("You public key is not a JSON object");
+                                break;
+                            }
+
+                            //Validate
+                            ValidationResult res = PkiLoginEndpoint.UserJwkValidator.Validate(pubkey);
+                            if (!res.IsValid)
+                            {
+                                Log.Error("The public key JWK is not valid:\n{errors}", res.ToDictionary());
+                                break;
+                            }
+
+
+                            //Add/update the public key and flush changes
+                            user.PKIAddPublicKey(pubkey);
                             await user.ReleaseAsync();
 
                             Log.Information("Successfully set TOTP secret for {id}", username);

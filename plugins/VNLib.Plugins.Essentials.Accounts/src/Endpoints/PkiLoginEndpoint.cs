@@ -63,7 +63,11 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 
         private static JwtLoginValidator LwValidator { get; } = new();
         private static IValidator<AuthenticationInfo> AuthValidator { get; } = AuthenticationInfo.GetValidator();
-        private static IValidator<PkiAuthPublicKey> UserJwkValidator { get; } = GetKeyValidator();
+        
+        /// <summary>
+        /// A validator used to validate <see cref="PkiAuthPublicKey"/> instances
+        /// </summary>
+        public static IValidator<PkiAuthPublicKey> UserJwkValidator { get; } = GetKeyValidator();
 
         private readonly JwtEndpointConfig _config;
         private readonly IUserManager _users;
