@@ -24,24 +24,18 @@
 
 using System;
 using System.Net;
-using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Security.Cryptography;
 using System.Text.Json.Serialization;
-using System.Runtime.InteropServices;
-using System.Diagnostics.CodeAnalysis;
 
 using FluentValidation;
 
 using RestSharp;
 
 using VNLib.Net.Http;
-using VNLib.Hashing;
-using VNLib.Hashing.IdentityUtility;
 using VNLib.Utils;
-using VNLib.Utils.Memory;
 using VNLib.Utils.Logging;
 using VNLib.Utils.Extensions;
 using VNLib.Net.Rest.Client.Construction;
@@ -67,10 +61,9 @@ namespace VNLib.Plugins.Essentials.SocialOauth
         const string AUTH_ERROR_MESSAGE = "You have no pending authentication requests.";
 
         const string AUTH_GRANT_SESSION_NAME = "auth";
-        const string SESSION_SIG_KEY_NAME = "soa.sig";
         const string SESSION_TOKEN_KEY_NAME = "soa.tkn";
         const string CLAIM_COOKIE_NAME = "extern-claim";
-        const int SIGNING_KEY_SIZE = 32;
+       
 
         /// <summary>
         /// The client configuration struct passed during base class construction
@@ -78,7 +71,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth
         protected virtual OauthClientConfig Config { get; }
         
         ///<inheritdoc/>
-        protected override ProtectionSettings EndpointProtectionSettings { get; } = new();
+        protected override ProtectionSettings EndpointProtectionSettings { get; } 
 
         /// <summary>
         /// The site adapter used to make requests to the OAuth2 provider
@@ -90,14 +83,10 @@ namespace VNLib.Plugins.Essentials.SocialOauth
         /// </summary>
         protected IUserManager Users { get; }
 
-        /// <summary>
-        /// The password hashing provider used to hash user passwords
-        /// </summary>
-        protected IPasswordHashingProvider Passwords { get; }
-
         private readonly IValidator<LoginClaim> ClaimValidator;
         private readonly IValidator<string> NonceValidator;
         private readonly IValidator<AccountData> AccountDataValidator;
+        private readonly ClientClaimManager _claims;
 
         protected SocialOauthBase(PluginBase plugin, IConfigScope config)
         {
@@ -112,7 +101,18 @@ namespace VNLib.Plugins.Essentials.SocialOauth
             InitPathAndLog(Config.EndpointPath, plugin.Log);
 
             Users = plugin.GetOrCreateSingleton<UserManager>();
-            Passwords = plugin.GetOrCreateSingleton<ManagedPasswordHashing>();
+
+
+            //Setup cookie controller and claim manager
+            SingleCookieController cookies = new(CLAIM_COOKIE_NAME, Config.InitClaimValidFor)
+            {
+                Secure = true,
+                HttpOnly = true,
+                SameSite = CookieSameSite.None,
+                Path = Path
+            };
+
+            _claims = new(cookies);
 
             //Define the site adapter
             SiteAdapter = new();
@@ -128,7 +128,6 @@ namespace VNLib.Plugins.Essentials.SocialOauth
                 .WithParameter("grant_type", "authorization_code")
                 .WithParameter("code", r => r.Code)
                 .WithParameter("redirect_uri", r => r.RedirectUrl);
-
         }
 
         private static IValidator<LoginClaim> GetClaimValidator()
@@ -197,9 +196,15 @@ namespace VNLib.Plugins.Essentials.SocialOauth
         {
             //Create new request object
             GetTokenRequest req = new(code, $"{ev.Server.RequestUri.Scheme}://{ev.Server.RequestUri.Authority}{Path}");
-          
+
             //Execute request and attempt to recover the authorization response
-            OAuthAccessState? response = await SiteAdapter.ExecuteAsync(req, cancellationToken).AsJson<OAuthAccessState>();
+            Oauth2TokenResult? response = await SiteAdapter.ExecuteAsync(req, cancellationToken).AsJson<Oauth2TokenResult>();
+
+            if(response?.Error != null)
+            {
+                Log.Debug("Error result from {conf} code {code} description: {err}", Config.AccountOrigin, response.Error, response.ErrorDescription);
+                return null;
+            }
          
             return response;
         }
@@ -262,17 +267,16 @@ namespace VNLib.Plugins.Essentials.SocialOauth
             //Build the redirect uri
             webm.Result = new LoginUriBuilder(Config)
                 .WithEncoding(entity.Server.Encoding)
-                .WithUrl(entity.IsSecure ? "https" : "http", entity.Server.RequestUri.Authority, Path)
+                .WithUrl(entity.Server.RequestUri.Scheme, entity.Server.RequestUri.Authority, Path)
                 .WithNonce(claim.Nonce!)
                 .Encrypt(entity, claim);
 
             //Sign and set the claim cookie
-            SignAndSetCookie(entity, claim);
+            _claims.SignAndSetCookie(entity, claim);
 
             webm.Success = true;
             //Response
-            entity.CloseResponse(webm);
-            return VfReturnType.VirtualSkip;
+            return VirtualOk(entity, webm);
         }
 
         /*
@@ -295,16 +299,16 @@ namespace VNLib.Plugins.Essentials.SocialOauth
                 //Check for security navigation headers. This should be a browser redirect,
                 if (!entity.Server.IsNavigation() || !entity.Server.IsUserInvoked())
                 {
-                    ClearClaimData(entity);
+                    _claims.ClearClaimData(entity);
                     //The connection was not a browser redirect
                     entity.Redirect(RedirectType.Temporary, $"{Path}?result=bad_sec");
                     return VfReturnType.VirtualSkip;
                 }
 
                 //Try to get the claim from the state parameter
-                if (!VerifyAndGetClaim(entity, out LoginClaim? claim))
+                if (!_claims.VerifyAndGetClaim(entity, out LoginClaim? claim))
                 {
-                    ClearClaimData(entity);
+                    _claims.ClearClaimData(entity);
                     entity.Redirect(RedirectType.Temporary, $"{Path}?result=expired");
                     return VfReturnType.VirtualSkip;
                 }
@@ -312,7 +316,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth
                 //Confirm the nonce matches the claim
                 if (string.CompareOrdinal(claim.Nonce, state) != 0)
                 {
-                    ClearClaimData(entity);
+                    _claims.ClearClaimData(entity);
                     entity.Redirect(RedirectType.Temporary, $"{Path}?result=invalid");
                     return VfReturnType.VirtualSkip;
                 }
@@ -323,7 +327,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth
                 //Token may be null
                 if (token == null)
                 {
-                    ClearClaimData(entity);
+                    _claims.ClearClaimData(entity);
                     entity.Redirect(RedirectType.Temporary, $"{Path}?result=invalid");
                     return VfReturnType.VirtualSkip;
                 }
@@ -335,7 +339,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth
                 entity.Session.SetObject(SESSION_TOKEN_KEY_NAME, token);
 
                 //Sign and set cookie
-                SignAndSetCookie(entity, claim);
+                _claims.SignAndSetCookie(entity, claim);
                   
                 //Prepare redirect
                 entity.Redirect(RedirectType.Temporary, $"{Path}?result=authorized&nonce={claim.Nonce}");
@@ -345,7 +349,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth
             //Check to see if there was an error code set
             if (entity.QueryArgs.TryGetNonEmptyValue("error", out string? errorCode))
             {
-                ClearClaimData(entity);
+                _claims.ClearClaimData(entity);
                 Log.Debug("{Type} error {err}:{des}", Config.AccountOrigin, errorCode, entity.QueryArgs["error_description"]);
                 entity.Redirect(RedirectType.Temporary, $"{Path}?result=error");
                 return VfReturnType.VirtualSkip;
@@ -362,51 +366,44 @@ namespace VNLib.Plugins.Essentials.SocialOauth
         protected override async ValueTask<VfReturnType> PostAsync(HttpEntity entity)
         {
             ValErrWebMessage webm = new();
-            
+
             //Get the finalization message
             using JsonDocument? request = await entity.GetJsonFromFileAsync();
             
             if (webm.Assert(request != null, "Request message is required"))
             {
-                entity.CloseResponseJson(HttpStatusCode.BadRequest, webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualClose(entity, webm, HttpStatusCode.BadRequest);
             }
             
             //Recover the nonce
             string? base32Nonce = request.RootElement.GetPropString("nonce");
 
-            if(webm.Assert(base32Nonce != null, message: "Nonce parameter is required"))
+            if(webm.Assert(base32Nonce != null, "Nonce parameter is required"))
             {
-                entity.CloseResponseJson(HttpStatusCode.UnprocessableEntity, webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualClose(entity, webm, HttpStatusCode.UnprocessableEntity);
             }
             
             //Validate nonce
             if (!NonceValidator.Validate(base32Nonce, webm))
             {
-                entity.CloseResponseJson(HttpStatusCode.UnprocessableEntity, webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualClose(entity, webm, HttpStatusCode.UnprocessableEntity);
             }
 
             //Recover the access token
-            bool cookieValid = VerifyAndGetClaim(entity, out LoginClaim? claim);
-
-            if (webm.Assert(cookieValid, AUTH_ERROR_MESSAGE))
+            if (webm.Assert(_claims.VerifyAndGetClaim(entity, out LoginClaim? claim), AUTH_ERROR_MESSAGE))
             {
-                entity.CloseResponse(webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualOk(entity, webm);
             }
 
             //We can clear the client's access claim
-            ClearClaimData(entity);
+            _claims.ClearClaimData(entity);
 
             //Confirm nonce matches the client's nonce string
             bool nonceValid = string.CompareOrdinal(claim.Nonce, base32Nonce) == 0;
 
             if (webm.Assert(nonceValid, AUTH_ERROR_MESSAGE))
             {
-                entity.CloseResponse(webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualOk(entity, webm);
             }
 
             //Safe to recover the access token
@@ -417,90 +414,99 @@ namespace VNLib.Plugins.Essentials.SocialOauth
             
             if(webm.Assert(userLogin?.UserId != null, AUTH_ERROR_MESSAGE))
             {
-                entity.CloseResponse(webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualOk(entity, webm);
             }
+
+            //Convert the platform user-id to a database-safe user-id
+            string computedId = Users.ComputeSafeUserId(userLogin.UserId!);
             
             //Fetch the user from the database
-            IUser? user = await Users.GetUserFromIDAsync(userLogin.UserId, entity.EventCancellation);
+            IUser? user = await Users.GetUserFromIDAsync(computedId, entity.EventCancellation);
             
+            /*
+             * If a user is not found, we can optionally create a new user account
+             * if the configuration allows it.
+             */
             if(user == null)
             {
+                //make sure registration is enabled
+                if (webm.Assert(Config.AllowRegistration, AUTH_ERROR_MESSAGE))
+                {
+                    return VirtualOk(entity, webm);
+                }
+
                 //Get the clients personal info to being login process
                 AccountData? userAccount = await GetAccountDataAsync(token, entity.EventCancellation);
 
                 if (webm.Assert(userAccount != null, AUTH_ERROR_MESSAGE))
                 {
-                    entity.CloseResponse(webm);
-                    return VfReturnType.VirtualSkip;
+                    return VirtualOk(entity, webm);
                 }
 
                 //Validate the account data
                 if (webm.Assert(AccountDataValidator.Validate(userAccount).IsValid, AUTH_ERROR_MESSAGE))
                 {
-                    entity.CloseResponse(webm);
-                    return VfReturnType.VirtualSkip;
+                    return VirtualOk(entity, webm);
                 }
 
-                //make sure registration is enabled
-                if (webm.Assert(Config.AllowRegistration, AUTH_ERROR_MESSAGE))
-                {
-                    entity.CloseResponse(webm);
-                    return VfReturnType.VirtualSkip;
-                }
-              
-                //Generate a new random passowrd incase the user wants to use a local account to log in sometime in the future
-                using PrivateString passhash = Passwords.GetRandomPassword(Config.RandomPasswordSize);
-                try
-                {
-                    //Create the user with the specified email address, minimum privilage level, and an empty password
-                    user = await Users.CreateUserAsync(userLogin.UserId!, userAccount.EmailAddress, AccountUtil.MINIMUM_LEVEL, passhash, entity.EventCancellation);
-                    //Set active status
-                    user.Status = UserStatus.Active;
-                    //Store the new profile
-                    user.SetProfile(userAccount);
-                    //Set the account creation origin
-                    user.SetAccountOrigin(Config.AccountOrigin);
-                }
-                catch(UserCreationFailedException)
-                {
-                    Log.Warn("Failed to create new user from new OAuth2 login, because a creation exception occured");
-                    webm.Result = "Please try again later";
-                    entity.CloseResponse(webm);
-                    return VfReturnType.VirtualSkip;
-                }
-            }
-            else
-            {
-                //Check for local only
-                if (webm.Assert(!user.LocalOnly, AUTH_ERROR_MESSAGE))
-                {
-                    entity.CloseResponse(webm);
-                    return VfReturnType.VirtualSkip;
-                }
+                //See if user by email address exists
+                user = await Users.GetUserFromEmailAsync(userAccount.EmailAddress!, entity.EventCancellation);
 
-                //Make sure local accounts are allowed
-                if (webm.Assert(!user.IsLocalAccount() || Config.AllowForLocalAccounts, AUTH_ERROR_MESSAGE))
+                if (user == null)
                 {
-                    entity.CloseResponse(webm);
-                    return VfReturnType.VirtualSkip;
-                }
+                    //Create the new user account
+                    UserCreationRequest creation = new()
+                    {
+                        EmailAddress = userAccount.EmailAddress!,
+                        InitialStatus = UserStatus.Active,
+                    };
 
-                //Reactivate inactive accounts
-                if(user.Status == UserStatus.Inactive)
-                {
-                    user.Status = UserStatus.Active;
-                }                
+                    try
+                    {
+                        //Create the user with the specified email address, minimum privilage level, and an empty password
+                        user = await Users.CreateUserAsync(creation, computedId, entity.EventCancellation);
+
+                        //Store the new profile and origin
+                        user.SetProfile(userAccount);
+                        user.SetAccountOrigin(Config.AccountOrigin);
+                    }
+                    catch (UserCreationFailedException)
+                    {
+                        Log.Warn("Failed to create new user from new OAuth2 login, because a creation exception occured");
+                        webm.Result = "Please try again later";
+                        return VirtualOk(entity, webm);
+                    }
+
+                    //Skip check since we just created the user
+                    goto Authorize;
+                }
                 
-                //Make sure the account is active                
-                if(webm.Assert(user.Status == UserStatus.Active, AUTH_ERROR_MESSAGE))
-                {
-                    entity.CloseResponse(webm);
-                    return VfReturnType.VirtualSkip;
-                }
+                /*
+                * User account already exists via email address but not 
+                * user-id
+                */
             }
 
-            //Finalze login
+            //Make sure local accounts are allowed
+            if (webm.Assert(!user.IsLocalAccount() || Config.AllowForLocalAccounts, AUTH_ERROR_MESSAGE))
+            {
+                return VirtualOk(entity, webm);
+            }
+
+            //Reactivate inactive accounts
+            if (user.Status == UserStatus.Inactive)
+            {
+                user.Status = UserStatus.Active;
+            }
+
+            //Make sure the account is active                
+            if (webm.Assert(user.Status == UserStatus.Active, AUTH_ERROR_MESSAGE))
+            {
+                return VirtualOk(entity, webm);
+            }
+
+        Authorize:
+
             try
             {
                 //Generate authoization
@@ -517,8 +523,10 @@ namespace VNLib.Plugins.Essentials.SocialOauth
 
                 //Set the success flag
                 webm.Success = true;
+
                 //Write to log
-                Log.Debug("Successful login for user {uid}... from {ip}", user.UserID[..8], entity.TrustedRemoteIp);
+                Log.Debug("Successful social login for user {uid}... from {ip}", user.UserID[..8], entity.TrustedRemoteIp);
+
                 //release the user 
                 await user.ReleaseAsync();
             }
@@ -541,248 +549,24 @@ namespace VNLib.Plugins.Essentials.SocialOauth
                 //destroy any login data on failure
                 entity.InvalidateLogin();
                 
-                Log.Error(uue);
+                Log.Error("Failed to update the user's account cause:\n{err}",uue);
             }
             finally
             {
                 user.Dispose();
             }
-            entity.CloseResponse(webm);
-            return VfReturnType.VirtualSkip;
+            return VirtualOk(entity, webm);
         }
-
-        private static bool VerifyAndGetClaim(HttpEntity entity, [NotNullWhen(true)] out LoginClaim? claim)
-        {
-            claim = null;
-
-            //Try to get the cookie
-            if (!entity.Server.GetCookie(CLAIM_COOKIE_NAME, out string? cookieValue))
-            {
-                return false;
-            }
-
-            //Recover the signing key from the user's session
-            string sigKey = entity.Session[SESSION_SIG_KEY_NAME];
-            byte[]? key = VnEncoding.FromBase32String(sigKey);
-
-            if (key == null)
-            {
-                return false;
-            }
-
-            try
-            {
-                //Try to parse the jwt
-                using JsonWebToken jwt = JsonWebToken.Parse(cookieValue);
-
-                //Verify the jwt
-                if (!jwt.Verify(key, HashAlg.SHA256))
-                {
-                    return false;
-                }
-
-                //Recover the clam from the jwt
-                claim = jwt.GetPayload<LoginClaim>();
-
-                //Verify the expiration time
-                return claim.ExpirationSeconds > entity.RequestedTimeUtc.ToUnixTimeSeconds();
-            }
-            catch (FormatException)
-            {
-                //JWT was corrupted and could not be parsed
-                return false;
-            }
-            finally
-            {
-                MemoryUtil.InitializeBlock(key.AsSpan());
-            }
-        }
-
-        private static void ClearClaimData(HttpEntity entity)
-        {
-            //Remove the upgrade cookie
-            if (entity.Server.RequestCookies.ContainsKey(CLAIM_COOKIE_NAME))
-            {
-                //Expire cookie
-                HttpCookie cookie = new(CLAIM_COOKIE_NAME, string.Empty)
-                {
-                    Secure = true,
-                    HttpOnly = true,
-                    ValidFor = TimeSpan.Zero,
-                    SameSite = CookieSameSite.SameSite
-                };
-
-                entity.Server.SetCookie(in cookie);
-            }
-
-            //Clear the signing key from the session
-            entity.Session[SESSION_SIG_KEY_NAME] = null!;
-        }
-
-        private void SignAndSetCookie(HttpEntity entity, LoginClaim claim)
-        {
-            //Setup Jwt
-            using JsonWebToken jwt = new();
-
-            //Write claim body, we dont need a header
-            jwt.WritePayload(claim, Statics.SR_OPTIONS);
-
-            //Generate signing key
-            byte[] sigKey = RandomHash.GetRandomBytes(SIGNING_KEY_SIZE);
-
-            //Sign the jwt
-            jwt.Sign(sigKey, HashAlg.SHA256);
-
-            //Build and set cookie
-            HttpCookie cookie = new(CLAIM_COOKIE_NAME, jwt.Compile())
-            {
-                Secure = true,
-                HttpOnly = true,
-                ValidFor = Config.InitClaimValidFor,
-                SameSite = CookieSameSite.SameSite,
-                Path = this.Path
-            };
-
-            entity.Server.SetCookie(in cookie);
-
-            //Encode and store the signing key in the clien't session
-            entity.Session[SESSION_SIG_KEY_NAME] = VnEncoding.ToBase32String(sigKey);
-
-            //Clear the signing key
-            MemoryUtil.InitializeBlock(sigKey.AsSpan());
-        }
-
-        /*
-         * Construct the client's redirect url based on their login claim, which contains
-         * a public key which can be used to encrypt the url so that only the client 
-         * private-key holder can decrypt the url and redirect themselves to the 
-         * target OAuth website. 
-         * 
-         * The result is an encrypted nonce that should guard against replay attacks and MITM
-         */
-
-        sealed record class LoginUriBuilder(OauthClientConfig Config)
-        {
-            private string? redirectUrl;
-            private string? nonce;
-            private Encoding _encoding = Encoding.UTF8;
-          
-            public LoginUriBuilder WithUrl(ReadOnlySpan<char> scheme, ReadOnlySpan<char> authority, ReadOnlySpan<char> path)
-            {
-                //Alloc stack buffer for url
-                Span<char> buffer = stackalloc char[1024];
-
-                //buffer writer for easier syntax
-                ForwardOnlyWriter<char> writer = new(buffer);
-                //first build the redirect url to re-encode it
-                writer.Append(scheme);
-                writer.Append("://");
-                //Create redirect url (current page, default action is to authorize the client)
-                writer.Append(authority);
-                writer.Append(path);
-                //url encode the redirect path and save it for later
-                redirectUrl = Uri.EscapeDataString(writer.ToString());
-
-                return this;
-            }
-
-            public LoginUriBuilder WithEncoding(Encoding encoding) 
-            {
-                _encoding = encoding;
-                return this;
-            }
-
-            public LoginUriBuilder WithNonce(string base32Nonce)
-            {
-                nonce = base32Nonce;
-                return this;
-            }            
-
-            public string Encrypt(HttpEntity client, IClientSecInfo secInfo)
-            {
-                //Alloc buffer and split it into binary and char buffers
-                using UnsafeMemoryHandle<byte> buffer = MemoryUtil.UnsafeAllocNearestPage(8000);
-
-                Span<byte> binBuffer = buffer.Span[2048..];
-                Span<char> charBuffer = MemoryMarshal.Cast<byte, char>(buffer.Span[..2048]);            
-
-
-                /*
-                 * Build the character uri so we can encode it to binary, 
-                 * encrypt it and return it to the client
-                 */
-
-                ForwardOnlyWriter<char> writer = new(charBuffer);
-
-                //Append the config redirect path
-                writer.Append(Config.AccessCodeUrl.OriginalString);
-                //begin query arguments
-                writer.Append("&client_id=");
-                writer.Append(Config.ClientID.Value);
-                //add the redirect url
-                writer.Append("&redirect_uri=");
-                writer.Append(redirectUrl);
-                //Append the state parameter
-                writer.Append("&state=");
-                writer.Append(nonce);
-
-                //Collect the written character data
-                ReadOnlySpan<char> url = writer.AsSpan();
-
-                //Separate bin buffers for encryption and encoding
-                Span<byte> encryptionBuffer = binBuffer[1024..];
-                Span<byte> encodingBuffer = binBuffer[..1024];
-
-                //Encode the url to binary
-                int byteCount = _encoding.GetBytes(url, encodingBuffer);
-
-                //Encrypt the binary data
-                ERRNO count = client.TryEncryptClientData(secInfo, encodingBuffer[..byteCount], encryptionBuffer);
-
-                //base64 encode the encrypted
-                return Convert.ToBase64String(encryptionBuffer[0..(int)count]);
-            }
-        }
+     
       
-
-        sealed class LoginClaim : IClientSecInfo
+        sealed class Oauth2TokenResult: OAuthAccessState
         {
-            [JsonPropertyName("exp")]
-            public long ExpirationSeconds { get; set; }
+            [JsonPropertyName("error")]
+            public string? Error { get; set; }
 
-            [JsonPropertyName("iat")]
-            public long IssuedAtTime { get; set; }
-
-            [JsonPropertyName("nonce")]
-            public string? Nonce { get; set; }
-           
-            [JsonPropertyName("locallanguage")]
-            public string? LocalLanguage { get; set; }
-           
-            [JsonPropertyName("pubkey")]
-            public string? PublicKey { get; set; }
-
-            [JsonPropertyName("clientid")]
-            public string? ClientId { get; set; }
-          
-
-            public void ComputeNonce(int nonceSize)
-            {
-                //Alloc nonce buffer
-                using UnsafeMemoryHandle<byte> buffer = MemoryUtil.UnsafeAlloc(nonceSize);
-                try
-                {
-                    //fill the buffer with random data
-                    RandomHash.GetRandomBytes(buffer.Span);
-
-                    //Base32-Encode nonce and save it
-                    Nonce = VnEncoding.ToBase32String(buffer.Span);
-                }
-                finally
-                {
-                    MemoryUtil.InitializeBlock(buffer.Span);
-                }
-            }
+            [JsonPropertyName("error_description")]
+            public string? ErrorDescription { get; set; }
         }
+
     }
 }

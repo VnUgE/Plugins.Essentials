@@ -25,6 +25,7 @@
 using System;
 using System.Net;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Security.Cryptography;
 using System.Text.Json.Serialization;
@@ -32,7 +33,6 @@ using System.Text.Json.Serialization;
 using FluentValidation;
 
 using VNLib.Utils;
-using VNLib.Utils.Memory;
 using VNLib.Utils.Logging;
 using VNLib.Utils.Extensions;
 using VNLib.Plugins.Essentials.Users;
@@ -44,6 +44,7 @@ using VNLib.Plugins.Essentials.Accounts.Validators;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Users;
 using static VNLib.Plugins.Essentials.Statics;
+
 
 /*
   * Password only log-ins should be immune to repeat attacks on the same backend, because sessions are 
@@ -71,8 +72,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
         public const string MFA_ERROR_MESSAGE = "Invalid or expired request.";
 
         private static readonly LoginMessageValidation LmValidator = new();
-       
-        private readonly IPasswordHashingProvider Passwords;
+        
         private readonly MFAConfig MultiFactor;
         private readonly IUserManager Users;
         private readonly FailedLoginLockout _lockout;
@@ -84,8 +84,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             uint maxLogins = config["max_login_attempts"].GetUInt32();
 
             InitPathAndLog(path, pbase.Log);
-
-            Passwords = pbase.GetOrCreateSingleton<ManagedPasswordHashing>();
+           
             Users = pbase.GetOrCreateSingleton<UserManager>();
             MultiFactor = pbase.GetConfigElement<MFAConfig>();
             _lockout = new(maxLogins, duration);
@@ -136,9 +135,8 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 {
                     return VirtualClose(entity, webm, HttpStatusCode.UnprocessableEntity);
                 }
-                
-                //Time to get the user
-                using IUser? user = await Users.GetUserAndPassFromEmailAsync(loginMessage.UserName);
+               
+                using IUser? user = await Users.GetUserFromEmailAsync(loginMessage.UserName);
 
                 //Make sure account exists
                 if (webm.Assert(user != null, INVALID_MESSAGE))
@@ -155,14 +153,24 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 }
                 
                 //Only allow local accounts
-                if (user.IsLocalAccount() && !PrivateString.IsNullOrEmpty(user.PassHash))
+                if (!user.IsLocalAccount())
                 {
-                    //If login return true, the response has been set and we should return
-                    if (LoginUser(entity, loginMessage, user, webm))
-                    {
-                        goto Cleanup;
-                    }
+                    goto Failed;
                 }
+
+                //Validate password
+                if (await ValidatePasswordAsync(user, loginMessage, entity.EventCancellation) == false)
+                {
+                    goto Failed;
+                }
+
+                //If login return true, the response has been set and we should return
+                if (LoginUser(entity, loginMessage, user, webm))
+                {
+                    goto Cleanup;
+                }
+
+            Failed:
 
                 //Inc failed login count
                 _lockout.Increment(user, entity.RequestedTimeUtc);
@@ -177,28 +185,24 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 Log.Warn(uue);
                 return VfReturnType.Error;
             }
-        }        
+        }   
+        
+        private async Task<bool> ValidatePasswordAsync(IUser user, LoginMessage login, CancellationToken cancellation)
+        {
+            //Validate password against store
+            ERRNO valResult = await Users.ValidatePasswordAsync(user, login.Password!, PassValidateFlags.None, cancellation);
+
+            //Valid results are greater than 0;
+            return valResult > 0;
+        }
 
         private bool LoginUser(HttpEntity entity, LoginMessage loginMessage, IUser user, MfaUpgradeWebm webm)
         {
-            //Verify password before we tell the user the status of their account for security reasons
-            if (!Passwords.Verify(user.PassHash!, loginMessage.Password))
-            {
-                return false;
-            }
-
             //Only allow active users
             if (user.Status != UserStatus.Active)
             {
                 //This is an unhandled case, and should never happen, but just incase write a warning to the log
                 Log.Warn("Account {uid} has invalid status key and a login was attempted from {ip}", user.UserID, entity.TrustedRemoteIp);
-                return false;
-            }
-
-            //Is the account restricted to a local network connection?
-            if (user.LocalOnly && !entity.IsLocalConnection)
-            {
-                Log.Information("User {uid} attempted a login from a non-local network with the correct password. Access was denied", user.UserID);
                 return false;
             }
 

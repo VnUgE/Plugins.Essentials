@@ -47,10 +47,10 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
     internal sealed class MFAEndpoint : ProtectedWebEndpoint
     {
         public const int TOTP_URL_MAX_CHARS = 1024;
+        private const string CHECK_PASSWORD = "Please check your password";
 
         private readonly IUserManager Users;
         private readonly MFAConfig? MultiFactor;
-        private readonly IPasswordHashingProvider Passwords;
 
         public MFAEndpoint(PluginBase pbase, IConfigScope config)
         {
@@ -59,7 +59,6 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 
             Users = pbase.GetOrCreateSingleton<UserManager>();
             MultiFactor = pbase.GetConfigElement<MFAConfig>();
-            Passwords = pbase.GetOrCreateSingleton<ManagedPasswordHashing>();
         }
 
         protected override async ValueTask<VfReturnType> GetAsync(HttpEntity entity)
@@ -124,7 +123,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             }
 
             //Get the user entry
-            using IUser? user = await Users.GetUserAndPassFromIDAsync(entity.Session.UserID);
+            using IUser? user = await Users.GetUserFromIDAsync(entity.Session.UserID);
 
             if (webm.Assert(user != null, "Please log-out and try again."))
             {
@@ -134,16 +133,16 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             //get the user's password challenge
             using (PrivateString? password = (PrivateString?)mfaRequest.RootElement.GetPropString("password"))
             {
-                if (PrivateString.IsNullOrEmpty(password))
+                if (webm.Assert(!PrivateString.IsNullOrEmpty(password), CHECK_PASSWORD))
                 {
-                    webm.Result = "Please check your password";
                     return VirtualClose(entity, webm, HttpStatusCode.Unauthorized);
                 }
 
                 //Verify password against the user
-                if (!user.VerifyPassword(password, Passwords))
+                ERRNO result = await Users.ValidatePasswordAsync(user, password, PassValidateFlags.None, entity.EventCancellation);
+
+                if (webm.Assert(result > 0, CHECK_PASSWORD))
                 {
-                    webm.Result = "Please check your password";
                     return VirtualClose(entity, webm, HttpStatusCode.Unauthorized);
                 }
             }
@@ -192,7 +191,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 string? mfaType = request.RootElement.GetProperty("type").GetString();
 
                 //get the user
-                using IUser? user = await Users.GetUserAndPassFromIDAsync(entity.Session.UserID);
+                using IUser? user = await Users.GetUserFromIDAsync(entity.Session.UserID);
                 if (user == null)
                 {
                     return VfReturnType.NotFound;
@@ -204,16 +203,16 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                  */
                 using (PrivateString? password = (PrivateString?)request.RootElement.GetPropString("password"))
                 {
-                    if (PrivateString.IsNullOrEmpty(password))
+                    if (webm.Assert(!PrivateString.IsNullOrEmpty(password), CHECK_PASSWORD))
                     {
-                        webm.Result = "Please check your password";
                         return VirtualClose(entity, webm, HttpStatusCode.Unauthorized);
                     }
 
                     //Verify password against the user
-                    if (!user.VerifyPassword(password, Passwords))
+                    ERRNO result = await Users.ValidatePasswordAsync(user, password, PassValidateFlags.None, entity.EventCancellation);
+                   
+                    if (webm.Assert(result > 0, CHECK_PASSWORD))
                     {
-                        webm.Result = "Please check your password";
                         return VirtualClose(entity, webm, HttpStatusCode.Unauthorized);
                     }
                 }
@@ -221,8 +220,9 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 //Check for totp disable
                 if ("totp".Equals(mfaType, StringComparison.OrdinalIgnoreCase))
                 {
-                    //Clear the TOTP secret
+                    //Clear the TOTP secret to disable it
                     user.MFASetTOTPSecret(null);
+
                     //write changes
                     await user.ReleaseAsync();
                     webm.Result = "Successfully disabled your TOTP authentication";

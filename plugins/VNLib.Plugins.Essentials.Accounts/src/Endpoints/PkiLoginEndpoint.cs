@@ -204,6 +204,9 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                     EmailAddress = user.EmailAddress,
                 };
 
+                //Write to log
+                Log.Verbose("Successful login for user {uid}...", user.UserID[..8]);
+
                 //Close response, user is now logged-in
                 return VirtualOk(entity, webm);
             }
@@ -422,8 +425,10 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
         {
             [JsonPropertyName("pubkey")]
             public string? PublicKey { get; set; }
+
             [JsonPropertyName("clientid")]
             public string? ClientId { get; set; }
+
             [JsonPropertyName("login")]
             public string? LoginJwt { get; set; }
         }

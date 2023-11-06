@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2022 Vaughn Nugent
+* Copyright (c) 2023 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts.Registration
@@ -34,7 +34,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration
         /// <summary>
         /// Central password requirement validator
         /// </summary>
-        public static IValidator<string> PasswordValidator { get; } = GetPassVal();
+        public static IValidator<string?> PasswordValidator { get; } = GetPassVal();
 
         public static IValidator<AccountData> AccountDataValidator { get; } = GetAcVal();
 
@@ -43,9 +43,9 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration
         /// </summary>
         public static IValidator<RegRequestMessage> RegRequestValidator { get; } = GetRequestValidator();
 
-        static IValidator<string> GetPassVal()
+        static IValidator<string?> GetPassVal()
         {
-            InlineValidator<string> passVal = new();
+            InlineValidator<string?> passVal = new();
 
             passVal.RuleFor(static password => password)
                 .NotEmpty()

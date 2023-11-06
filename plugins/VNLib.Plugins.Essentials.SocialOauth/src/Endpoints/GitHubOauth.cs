@@ -65,19 +65,16 @@ namespace VNLib.Plugins.Essentials.SocialOauth.Endpoints
                 .WithEndpoint<GetEmailRequest>()
                 .WithMethod(Method.Get)
                 .WithUrl(UserEmailUrl)
-                .WithHeader("Authorization", at => $"{at.AccessToken.Type} {at.AccessToken.Token}")
-                .WithHeader("Accept", GITHUB_V3_ACCEPT);
+                .WithHeader("Accept", GITHUB_V3_ACCEPT)
+                .WithHeader("Authorization", at => $"{at.AccessToken.Type} {at.AccessToken.Token}");
         }
-       
+
         /*
          * Creates a repeatable, and source specific user id for 
          * GitHub users. This format is identical to the algorithim used
          * in the Auth0 Github connection, so it is compatible with Auth0
          */
-        private static string GetUserIdFromPlatform(int userId)
-        {
-            return ManagedHash.ComputeHash($"github|{userId}", HashAlg.SHA1, HashEncodingMode.Hexadecimal);
-        }
+        private static string GetUserIdFromPlatform(int userId) => $"github|{userId}";
 
 
         protected override async Task<UserLoginData?> GetLoginDataAsync(IOAuthAccessState accessToken, CancellationToken cancellationToken)

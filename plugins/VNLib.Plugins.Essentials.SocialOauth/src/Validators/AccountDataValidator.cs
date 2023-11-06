@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2022 Vaughn Nugent
+* Copyright (c) 2023 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.SocialOauth
@@ -27,8 +27,6 @@ using FluentValidation;
 using VNLib.Plugins.Essentials.Accounts;
 using VNLib.Plugins.Extensions.Validation;
 
-#nullable enable
-
 namespace VNLib.Plugins.Essentials.SocialOauth.Validators
 {
     internal class AccountDataValidator : AbstractValidator<AccountData>
@@ -39,36 +37,47 @@ namespace VNLib.Plugins.Essentials.SocialOauth.Validators
                 .NotEmpty()
                 .WithMessage("Your account does not have an email address assigned to it");
 
-            RuleFor(t => t.EmailAddress)
-                .EmailAddress()
-                .WithMessage("Your account does not have a valid email address assigned to it");
+            RuleFor(t => t.City)
+                .MaximumLength(35)
+                .AlphaOnly()
+                .When(t => t.City?.Length > 0);
 
-            //Validate city
-            RuleFor(t => t.City).MaximumLength(50);
-            RuleFor(t => t.City).AlphaOnly();
+            RuleFor(t => t.Company)
+                .MaximumLength(50)
+                .SpecialCharacters()
+                .When(t => t.Company?.Length > 0);
 
-            RuleFor(t => t.Company).MaximumLength(50);
-            RuleFor(t => t.Company).SpecialCharacters();
-
-            RuleFor(t => t.First).MaximumLength(35);
-            RuleFor(t => t.First).AlphaOnly();
-
-            RuleFor(t => t.Last).MaximumLength(35);
-            RuleFor(t => t.Last).AlphaOnly();
+            //Require a first and last names to be set together
+            When(t => t.First?.Length > 0 || t.Last?.Length > 0, () =>
+            {
+                RuleFor(t => t.First)
+                    .Length(1, 35)
+                    .AlphaOnly();
+                RuleFor(t => t.Last)
+                    .Length(1, 35)
+                    .AlphaOnly();
+            });
 
             RuleFor(t => t.PhoneNumber)
-                .EmptyPhoneNumber()
+                .PhoneNumber()
+                .When(t => t.PhoneNumber?.Length > 0)
                 .OverridePropertyName("Phone");
 
             //State must be 2 characters for us states if set
-            RuleFor(t => t.State).Length(t => t.State?.Length != 0 ? 2 : 0);
+            RuleFor(t => t.State)
+                .Length(2)
+                .When(t => t.State?.Length > 0);
 
-            RuleFor(t => t.Street).MaximumLength(50);
-            RuleFor(t => t.Street).AlphaNumericOnly();
+            RuleFor(t => t.Street)
+                .AlphaNumericOnly()
+                .MaximumLength(50)
+                .When(t => t.Street?.Length > 0);
 
-            RuleFor(t => t.Zip).NumericOnly();
             //Allow empty zip codes, but if one is defined, is must be less than 7 characters
-            RuleFor(t => t.Zip).Length(ad => ad.Zip?.Length != 0 ? 7 : 0);
+            RuleFor(t => t.Zip)
+                .NumericOnly()
+                .MaximumLength(7)
+                .When(t => t.Zip?.Length > 0);
         }
     }
 }

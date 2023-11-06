@@ -56,10 +56,7 @@ namespace VNLib.Plugins.Essentials.SocialOauth.Endpoints
          * Creates a user-id from the users discord username, that is repeatable 
          * and matches the Auth0 social user-id format
          */
-        private static string GetUserIdFromPlatform(string userName)
-        {
-            return ManagedHash.ComputeHash($"discord|{userName}", HashAlg.SHA1, HashEncodingMode.Hexadecimal);
-        }
+        private static string GetUserIdFromPlatform(string userName) => $"discord|{userName}";
 
 
         ///<inheritdoc/>

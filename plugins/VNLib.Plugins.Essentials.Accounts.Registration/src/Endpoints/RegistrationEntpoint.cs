@@ -25,6 +25,7 @@
 using System;
 using System.Net;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 using FluentValidation;
 
@@ -49,7 +50,6 @@ using VNLib.Plugins.Extensions.Validation;
 using VNLib.Plugins.Essentials.Accounts.Registration.TokenRevocation;
 using static VNLib.Plugins.Essentials.Accounts.AccountUtil;
 
-
 namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
 {
 
@@ -63,10 +63,10 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
 
         const string FAILED_AUTH_ERR = "Your registration does not exist, you should try to regisiter again.";
         const string REG_ERR_MESSAGE = "Please check your email inbox.";
-       
+
+        private static readonly IValidator<RegCompletionRequest> RegCompletionValidator = RegCompletionRequest.GetValidator();
+
         private readonly IUserManager Users;
-        private readonly IValidator<string> RegJwtValdidator;
-        private readonly IPasswordHashingProvider Passwords;
         private readonly RevokedTokenStore RevokedTokens;
         private readonly TransactionalEmailConfig Emails;
         private readonly IAsyncLazy<ReadOnlyJsonWebKey> RegSignatureKey;
@@ -84,11 +84,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
             InitPathAndLog(path, plugin.Log);
 
             RegExpiresSec = config["reg_expires_sec"].GetTimeSpan(TimeParseType.Seconds);
-
-            //Init reg jwt validator
-            RegJwtValdidator = GetJwtValidator();
-
-            Passwords = plugin.GetOrCreateSingleton<ManagedPasswordHashing>();
+           
             Users = plugin.GetOrCreateSingleton<UserManager>();           
             Emails = plugin.GetOrCreateSingleton<TEmailConfig>();
             RevokedTokens = new(plugin.GetContextOptions());
@@ -96,21 +92,6 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
             //Begin the async op to get the signature key from the vault
             RegSignatureKey = plugin.GetSecretAsync("reg_sig_key")
                                 .ToLazy(static sr => sr.GetJsonWebKey());
-        }
-
-
-        private static IValidator<string> GetJwtValidator()
-        {
-            InlineValidator<string> val = new();
-
-            val.RuleFor(static s => s)
-                .NotEmpty()
-                //Must contain 2 periods for jwt limitation
-                .Must(static s => s.Count(s => s == '.') == 2)
-                //Guard length
-                .Length(20, 500)
-                .IllegalCharacters();
-            return val;
         }
 
         //Schedule cleanup interval
@@ -125,66 +106,39 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
         protected override async ValueTask<VfReturnType> PostAsync(HttpEntity entity)
         {
             ValErrWebMessage webm = new();
+
             //Get the json request data from client
-            using JsonDocument? request = await entity.GetJsonFromFileAsync();
+            using RegCompletionRequest? request = await entity.GetJsonFromFileAsync<RegCompletionRequest>();
 
             if(webm.Assert(request != null, "No request data present"))
             {
-                entity.CloseResponseJson(HttpStatusCode.BadRequest, webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualClose(entity, webm, HttpStatusCode.BadRequest);
             }
 
-            //Get the jwt string from client
-            string? regJwt = request.RootElement.GetPropString("token");
-            using PrivateString? password = (PrivateString?)request.RootElement.GetPropString("password");
-
-            //validate inputs
+            if(!RegCompletionValidator.Validate(request, webm))
             {
-                if (webm.Assert(regJwt != null, FAILED_AUTH_ERR))
-                {
-                    entity.CloseResponse(webm);
-                    return VfReturnType.VirtualSkip;
-                }
-                
-                if (webm.Assert(password != null, "You must specify a password."))
-                {
-                    entity.CloseResponse(webm);
-                    return VfReturnType.VirtualSkip;
-                }
-                //validate new password
-                if(!AccountValidations.PasswordValidator.Validate((string)password, webm))
-                {
-                    entity.CloseResponse(webm);
-                    return VfReturnType.VirtualSkip;
-                }
-                //Validate jwt
-                if (webm.Assert(RegJwtValdidator.Validate(regJwt).IsValid, FAILED_AUTH_ERR))
-                {
-                    entity.CloseResponse(webm);
-                    return VfReturnType.VirtualSkip;
-                }
+                return VirtualClose(entity, webm, HttpStatusCode.UnprocessableEntity);
             }
 
-            //Verify jwt has not been revoked            
-            if(await RevokedTokens.IsRevokedAsync(regJwt, entity.EventCancellation))
+            //Verify jwt has not been revoked      
+            bool isRevoked = await RevokedTokens.IsRevokedAsync(request.Token!, entity.EventCancellation);
+            if (webm.Assert(!isRevoked, FAILED_AUTH_ERR))
             {
-                webm.Result = FAILED_AUTH_ERR;
-                entity.CloseResponse(webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualOk(entity, webm);
             }
 
             string emailAddress;
             try
             {
                 //get jwt
-                using JsonWebToken jwt = JsonWebToken.Parse(regJwt);
+                using JsonWebToken jwt = JsonWebToken.Parse(request.Token);
+
                 //verify signature
                 bool verified = jwt.VerifyFromJwk(RegSignatureKey.Value);
 
                 if (webm.Assert(verified, FAILED_AUTH_ERR))
                 {
-                    entity.CloseResponse(webm);
-                    return VfReturnType.VirtualSkip;
+                    return VirtualOk(entity, webm);
                 }
 
                 //recover iat and email address
@@ -195,32 +149,28 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
                 //Verify IAT against expiration at second resolution
                 if (webm.Assert(iat.Add(RegExpiresSec) > entity.RequestedTimeUtc, FAILED_AUTH_ERR))
                 {
-                    entity.CloseResponse(webm);
-                    return VfReturnType.VirtualSkip;
+                    return VirtualOk(entity, webm);
                 }
             }
             catch (FormatException fe)
             {
                 Log.Debug(fe);
                 webm.Result = FAILED_AUTH_ERR;
-                entity.CloseResponse(webm);
-                return VfReturnType.VirtualSkip;
+                return VirtualOk(entity, webm);
             }
-           
-
-            //Always hash the new password, even if failed
-            using PrivateString passHash = Passwords.Hash(password);
 
             try
             {
-                //Generate userid from email
-                string uid = GetRandomUserId();
+                UserCreationRequest creation = new()
+                {
+                    EmailAddress = emailAddress,
+                    InitialStatus = UserStatus.Active,
+                    Password = request.GetPassPrivString(),
+                };
 
-                //Create the new user
-                using IUser user = await Users.CreateUserAsync(uid, emailAddress, MINIMUM_LEVEL, passHash, entity.EventCancellation);
-
-                //Set active status
-                user.Status = UserStatus.Active;
+                //Create the new user with random user-id
+                using IUser user = await Users.CreateUserAsync(creation, null, entity.EventCancellation);
+                
                 //set local account origin
                 user.SetAccountOrigin(LOCAL_ACCOUNT_ORIGIN);
                 
@@ -228,12 +178,12 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
                 await user.ReleaseAsync();
 
                 //Revoke token now complete
-                _ = RevokedTokens.RevokeAsync(regJwt, CancellationToken.None).ConfigureAwait(false);
+                _ = RevokedTokens.RevokeAsync(request.Token, CancellationToken.None).ConfigureAwait(false);
 
                 webm.Result = "Successfully created your new account. You may now log in";
                 webm.Success = true;
-                entity.CloseResponse(webm);
-                return VfReturnType.VirtualSkip;
+
+                return VirtualOk(entity, webm);
             }
             //Capture creation failed, this may be a replay
             catch (UserExistsException)
@@ -244,8 +194,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
             }
 
             webm.Result = FAILED_AUTH_ERR;
-            entity.CloseResponse(webm);
-            return VfReturnType.VirtualSkip;
+            return VirtualOk(entity, webm);
         } 
 
         protected override async ValueTask<VfReturnType> PutAsync(HttpEntity entity)
@@ -366,6 +315,43 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
                 Log.Error(ex);
             }
         }
-       
+
+
+        private sealed class RegCompletionRequest : PrivateStringManager
+        {
+            public RegCompletionRequest() : base(1)
+            { }
+
+            [JsonPropertyName("password")]
+            public string? Password
+            {
+                get => this[0];
+                set => this[0] = value;
+            }
+
+            [JsonPropertyName("token")]
+            public string? Token { get; set; }
+
+            public PrivateString? GetPassPrivString() => PrivateString.ToPrivateString(this[0], false);
+
+            public static IValidator<RegCompletionRequest> GetValidator()
+            {
+                InlineValidator<RegCompletionRequest> validator = new();
+
+                validator.RuleFor(x => x.Password)
+                    .NotEmpty()
+                    .SetValidator(AccountValidations.PasswordValidator);
+
+                validator.RuleFor(x => x.Token)
+                    .NotEmpty()
+                    //Must contain 2 periods for jwt limitation
+                    .Must(static s => s!.Count(static s => s == '.') == 2)
+                    //Guard length
+                    .Length(20, 500)
+                    .IllegalCharacters();
+
+                return validator;
+            }
+        }
     }
 }

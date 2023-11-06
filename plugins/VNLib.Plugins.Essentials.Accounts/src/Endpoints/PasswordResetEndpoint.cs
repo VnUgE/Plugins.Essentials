@@ -29,16 +29,15 @@ using System.Text.Json.Serialization;
 
 using FluentValidation;
 
+using VNLib.Utils;
 using VNLib.Utils.Memory;
-using VNLib.Utils.Extensions;
 using VNLib.Plugins.Essentials.Users;
 using VNLib.Plugins.Essentials.Extensions;
+using VNLib.Plugins.Essentials.Endpoints;
+using VNLib.Plugins.Essentials.Accounts.MFA;
 using VNLib.Plugins.Extensions.Validation;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Users;
-using VNLib.Plugins.Essentials.Endpoints;
-using VNLib.Plugins.Essentials.Accounts.MFA;
-
 
 namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 {
@@ -61,7 +60,6 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
     internal sealed class PasswordChangeEndpoint : ProtectedWebEndpoint
     {
         private readonly IUserManager Users;
-        private readonly IPasswordHashingProvider Passwords;
         private readonly MFAConfig? mFAConfig;
         private readonly IValidator<PasswordResetMesage> ResetMessValidator;
 
@@ -71,7 +69,6 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             InitPathAndLog(path, pbase.Log);
 
             Users = pbase.GetOrCreateSingleton<UserManager>();
-            Passwords = pbase.GetOrCreateSingleton<ManagedPasswordHashing>();
             ResetMessValidator = GetMessageValidator();
             mFAConfig = pbase.GetConfigElement<MFAConfig>();
         }
@@ -95,10 +92,6 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             return rules;
         }
 
-        /*
-         * If mfa config
-         */
-
         protected override async ValueTask<VfReturnType> PostAsync(HttpEntity entity)
         {
             ValErrWebMessage webm = new();
@@ -118,7 +111,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             }
 
             //get the user's entry in the table
-            using IUser? user = await Users.GetUserAndPassFromIDAsync(entity.Session.UserID);
+            using IUser? user = await Users.GetUserFromIDAsync(entity.Session.UserID, entity.EventCancellation);
 
             if(webm.Assert(user != null, "An error has occured, please log-out and try again"))
             {
@@ -131,10 +124,12 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 return VirtualOk(entity, webm);
             }
 
+            //Validate the user's current password
+            ERRNO isPassValid = await Users.ValidatePasswordAsync(user, pwReset.Current!, PassValidateFlags.None, entity.EventCancellation);
+
             //Verify the user's old password
-            if (!Passwords.Verify(user.PassHash, pwReset.Current.AsSpan()))
+            if (webm.Assert(isPassValid > 0, "Please check your current password"))
             {
-                webm.Result = "Please check your current password";
                 return VirtualOk(entity, webm);
             }
 
@@ -160,11 +155,8 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 //continue
             }
 
-            //Hash the user's new password
-            using PrivateString newPassHash = Passwords.Hash(pwReset.NewPassword.AsSpan());
-
             //Update the user's password
-            if (!await Users.UpdatePassAsync(user, newPassHash))
+            if (!await Users.UpdatePasswordAsync(user, pwReset.NewPassword!, entity.EventCancellation))
             {
                 //error
                 webm.Result = "Your password could not be updated";

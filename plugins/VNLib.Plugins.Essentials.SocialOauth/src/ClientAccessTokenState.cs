@@ -27,7 +27,7 @@ using System.Text.Json.Serialization;
 
 namespace VNLib.Plugins.Essentials.SocialOauth
 {
-    public sealed class OAuthAccessState : IOAuthAccessState
+    public class OAuthAccessState : IOAuthAccessState
     {
         ///<inheritdoc/>
         [JsonPropertyName("access_token")]

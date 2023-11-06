@@ -757,7 +757,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                     Domain = Config.CookieDomain,
                     Path = Config.CookiePath,
                     ValidFor = TimeSpan.Zero,
-                    SameSite = CookieSameSite.SameSite,
+                    SameSite = CookieSameSite.Strict,
                     HttpOnly = true,
                     Secure = entity.IsSecure
                 };
@@ -779,7 +779,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                     Domain = Config.CookieDomain,
                     Path = Config.CookiePath,
                     ValidFor = Config.AuthorizationValidFor,
-                    SameSite = CookieSameSite.SameSite,
+                    SameSite = CookieSameSite.Strict,
                     HttpOnly = httpOnly,
                     Secure = entity.IsSecure
                 };

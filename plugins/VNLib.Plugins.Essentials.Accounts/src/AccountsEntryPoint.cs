@@ -29,7 +29,6 @@ using System.ComponentModel.Design;
 using FluentValidation.Results;
 
 using VNLib.Utils;
-using VNLib.Utils.Memory;
 using VNLib.Utils.Logging;
 using VNLib.Plugins.Attributes;
 using VNLib.Plugins.Essentials.Users;
@@ -40,9 +39,11 @@ using VNLib.Plugins.Essentials.Accounts.SecurityProvider;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Users;
 using VNLib.Plugins.Extensions.Loading.Routing;
+using VNLib.Utils.Memory;
 
 namespace VNLib.Plugins.Essentials.Accounts
 {
+
     public sealed class AccountsEntryPoint : PluginBase
     {
 
@@ -139,7 +140,6 @@ namespace VNLib.Plugins.Essentials.Accounts
                 ArgumentList args = new(cmd.Split(' '));
 
                 IUserManager Users = this.GetOrCreateSingleton<UserManager>();
-                IPasswordHashingProvider Passwords = this.GetOrCreateSingleton<ManagedPasswordHashing>();
 
                 string? username = args.GetArgument("-u");
                 string? password = args.GetArgument("-p");
@@ -187,13 +187,18 @@ Commands:
                                 privLevel = AccountUtil.MINIMUM_LEVEL;
                             }
 
-                            //Hash the password
-                            using PrivateString passHash = Passwords.Hash(password);
+                            //Create the user creation request
+                            UserCreationRequest creation = new()
+                            {
+                                EmailAddress = username,
+                                InitialStatus = UserStatus.Active,
+                                Privileges = privLevel,
+                                Password = PrivateString.ToPrivateString(password, false)
+                            };
+
                             //Create the user
-                            using IUser user = await Users.CreateUserAsync(username, passHash, privLevel); 
-                            
-                            //Set active flag
-                            user.Status = UserStatus.Active;
+                            using IUser user = await Users.CreateUserAsync(creation, null); 
+                           
                             //Set local account
                             user.SetAccountOrigin(AccountUtil.LOCAL_ACCOUNT_ORIGIN);
 
@@ -210,9 +215,6 @@ Commands:
                                 break;
                             }
 
-                            //Hash the password
-                            using PrivateString passHash = Passwords.Hash(password);
-
                             //Get the user
                             using IUser? user = await Users.GetUserFromEmailAsync(username);
 
@@ -223,7 +225,7 @@ Commands:
                             }
                                 
                             //Set the password
-                            await Users.UpdatePassAsync(user, passHash);
+                            await Users.UpdatePasswordAsync(user, password);
                             
                             Log.Information("Successfully reset password for {id}", username);
                         }
