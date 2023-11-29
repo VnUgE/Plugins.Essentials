@@ -25,21 +25,22 @@
 using Microsoft.EntityFrameworkCore;
 
 using VNLib.Utils;
+using VNLib.Plugins.Extensions.Loading;
 
 namespace VNLib.Plugins.Essentials.Accounts.Registration.TokenRevocation
 {
     internal class RevokedTokenStore
     {
-        private readonly DbContextOptions Options;
+        private readonly IAsyncLazy<DbContextOptions> Options;
 
-        public RevokedTokenStore(DbContextOptions options)
+        public RevokedTokenStore(IAsyncLazy<DbContextOptions> options)
         {
             Options = options;
         }
 
         public async Task<bool> IsRevokedAsync(string token, CancellationToken cancellation)
         {
-            await using RegistrationContext context = new (Options);
+            await using RegistrationContext context = new (Options.Value);
             await context.OpenTransactionAsync(cancellation);
 
             //Select any that match tokens
@@ -53,7 +54,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.TokenRevocation
 
         public async Task RevokeAsync(string token, CancellationToken cancellation)
         {
-            await using RegistrationContext context = new (Options);
+            await using RegistrationContext context = new (Options.Value);
             await context.OpenTransactionAsync(cancellation);
 
             //Add to table
@@ -78,7 +79,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.TokenRevocation
         {
             DateTime expiredBefore = DateTime.UtcNow.Subtract(validFor);
 
-            await using RegistrationContext context = new (Options);
+            await using RegistrationContext context = new (Options.Value);
             await context.OpenTransactionAsync(cancellation);
 
             //Select any that match tokens

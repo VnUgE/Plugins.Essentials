@@ -31,6 +31,7 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 
 using VNLib.Plugins.Extensions.Data;
+using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Sql;
 using VNLib.Plugins.Extensions.Data.Abstractions;
 using VNLib.Plugins.Extensions.Data.Extensions;
@@ -39,14 +40,14 @@ namespace VNLib.Plugins.Essentials.Content.Routing.Model
 {
     internal sealed class DbRouteStore : DbStore<Route>, IRouteStore
     {
-        private readonly DbContextOptions Options;
+        private readonly IAsyncLazy<DbContextOptions> Options;
 
         public override IDbQueryLookup<Route> QueryTable { get; } = new DbQueries();
 
         public DbRouteStore(PluginBase plugin)
         {
             //Load the db context options
-            Options = plugin.GetContextOptions();
+            Options = plugin.GetContextOptionsAsync();
         }
 
         ///<inheritdoc/>
@@ -60,7 +61,7 @@ namespace VNLib.Plugins.Essentials.Content.Routing.Model
         public override string GetNewRecordId() => Guid.NewGuid().ToString("N");
 
         ///<inheritdoc/>
-        public override IDbContextHandle GetNewContext() => new RoutingContext(Options);
+        public override IDbContextHandle GetNewContext() => new RoutingContext(Options.Value);
 
         ///<inheritdoc/>
         public override void OnRecordUpdate(Route newRecord, Route currentRecord)

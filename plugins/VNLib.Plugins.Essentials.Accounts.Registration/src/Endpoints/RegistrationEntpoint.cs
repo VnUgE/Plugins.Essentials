@@ -87,7 +87,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
            
             Users = plugin.GetOrCreateSingleton<UserManager>();           
             Emails = plugin.GetOrCreateSingleton<TEmailConfig>();
-            RevokedTokens = new(plugin.GetContextOptions());
+            RevokedTokens = new(plugin.GetContextOptionsAsync());
 
             //Begin the async op to get the signature key from the vault
             RegSignatureKey = plugin.GetSecretAsync("reg_sig_key")
