@@ -31,6 +31,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Security.Cryptography;
 using System.Text.Json.Serialization;
+using System.Diagnostics.CodeAnalysis;
 
 using FluentValidation;
 
@@ -136,12 +137,11 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 
             try
             {
-                AuthenticationInfo authInfo = default;
 
                 //Get auth info from jwt
-                bool isValidAuth = GetAuthInfo(jwt, entity.RequestedTimeUtc, ref authInfo);
+                bool isValidAuth = GetAuthInfo(jwt, entity.RequestedTimeUtc, out AuthenticationInfo? authInfo);
 
-                if(webm.Assert(isValidAuth, INVALID_MESSAGE))
+                if (webm.Assert(isValidAuth, INVALID_MESSAGE))
                 {
                     return VirtualOk(entity, webm);
                 }
@@ -150,6 +150,15 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 if (!AuthValidator.Validate(authInfo, webm))
                 {
                     return VirtualOk(entity, webm);
+                }
+
+                /*
+                 * If a pubic key was signed by the client, assign the signed key to the 
+                 * login key field for further authorization
+                 */
+                if (!string.IsNullOrWhiteSpace(authInfo.SignedPubkey))
+                {
+                    login.PublicKey = authInfo.SignedPubkey;
                 }
 
                 //Get the user from the email address
@@ -375,8 +384,10 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             return VirtualOk(entity, webm);
         }
 
-        private bool GetAuthInfo(JsonWebToken jwt, DateTimeOffset now, ref AuthenticationInfo authInfo)
+        private bool GetAuthInfo(JsonWebToken jwt, DateTimeOffset now, [NotNullWhen(true)] out AuthenticationInfo? authInfo)
         {
+            authInfo = null;
+
             //Get the signed payload message
             using JsonDocument payload = jwt.GetPayload();
 
@@ -400,6 +411,12 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 EmailAddress = payload.RootElement.GetPropString("sub"),
                 KeyId = payload.RootElement.GetPropString("keyid"),
                 SerialNumber = payload.RootElement.GetPropString("serial"),
+
+                /*
+                * Access the optional data JWT field for signed client data. For logins,
+                * this will be the client (browser) public key used for browser authenticationA
+                */
+                SignedPubkey = payload.RootElement.GetPropString("data")
             };
 
             return true;
@@ -479,13 +496,15 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 
         }
 
-        readonly record struct AuthenticationInfo
+        record class AuthenticationInfo
         {
-            public readonly string? EmailAddress { get; init; }
+            public string? EmailAddress { get; init; }
 
-            public readonly string? KeyId { get; init; }
+            public string? KeyId { get; init; }
 
-            public readonly string? SerialNumber { get; init; }
+            public string? SerialNumber { get; init; }
+
+            public string? SignedPubkey { get; init; }
 
             public static IValidator<AuthenticationInfo> GetValidator()
             {
@@ -505,6 +524,12 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                     .NotEmpty()
                     .Length(2, 50)
                     .AlphaNumericOnly();
+
+                //Optional signed public key
+                val.RuleFor(l => l.SignedPubkey)
+                    .Length(64, 500)
+                    .IllegalCharacters()
+                    .When(l => l.SignedPubkey is not null);
 
                 return val;
             }
