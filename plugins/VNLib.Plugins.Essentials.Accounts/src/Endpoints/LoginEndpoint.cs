@@ -334,7 +334,12 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
         private void LoginMfa(HttpEntity entity, IUser user, JsonDocument request, MFAUpgrade upgrade, MfaUpgradeWebm webm)
         {         
             //Recover the user's local time
-            DateTimeOffset localTime = request.RootElement.GetProperty("localtime").GetDateTimeOffset();
+            if(!request.RootElement.TryGetProperty("localtime", out JsonElement ltEl) 
+                && ltEl.TryGetDateTimeOffset(out DateTimeOffset localTime))
+            {
+                webm.Result = MFA_ERROR_MESSAGE;
+                return;
+            }
 
             //Check mode
             switch (upgrade.Type)
@@ -345,7 +350,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                         uint code = request.RootElement.GetProperty("code").GetUInt32();
 
                         //Verify totp code
-                        if (!MultiFactor!.VerifyTOTP(user, code))
+                        if (!MultiFactor.VerifyTOTP(user, code))
                         {
                             webm.Result = "Please check your code.";
 
