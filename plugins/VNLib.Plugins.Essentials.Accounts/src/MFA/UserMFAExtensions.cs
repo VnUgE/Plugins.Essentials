@@ -26,6 +26,7 @@ using System;
 using System.Linq;
 using System.Buffers;
 using System.Text.Json;
+using System.Diagnostics;
 using System.Collections.Generic;
 
 using VNLib.Hashing;
@@ -138,7 +139,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
                 //Verify the TOTP using the decrypted secret
                 isValid = count && VerifyTOTP(code, buffer.AsSpan(0, count), config.TOTPConfig);
                 //Zero out the buffer
-                MemoryUtil.InitializeBlock(buffer.Span);
+                MemoryUtil.InitializeBlock(ref buffer.GetReference(), buffer.IntLength);
             }
             else
             {
@@ -173,8 +174,9 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
                 DateTimeOffset window = currentUtc.Add(config.TOTPPeriod.Multiply(currenStep));
                 //calculate the time step
                 long timeStep = (long)Math.Floor(window.ToUnixTimeSeconds() / config.TOTPPeriod.TotalSeconds);
-                //try to compute the hash
-                _ = BitConverter.TryWriteBytes(stepBuffer, timeStep) ? 0 : throw new InternalBufferTooSmallException("Failed to format TOTP time step");
+                //try to compute the hash, must always be storable in the buffer
+                bool writeResult = BitConverter.TryWriteBytes(stepBuffer, timeStep);
+                Debug.Assert(writeResult, "Failed to format the time step buffer because the buffer size was not large enough");
                 //If platform is little endian, reverse the byte order
                 if (BitConverter.IsLittleEndian)
                 {
