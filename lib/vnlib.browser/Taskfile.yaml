@@ -1,0 +1,36 @@
+# https://taskfile.dev
+
+#Called by the vnbuild system to produce builds for my website
+#https://www.vaughnnugent.com/resources/software
+
+
+#this file must be in the same directory as the solution file
+
+version: '3'
+
+tasks:
+
+#called by build pipeline to build module
+  build:
+    cmds:
+     - echo "building module {{.MODULE_NAME}}" 
+
+    #install dependencies and build
+     - npm install
+     - npm run build
+
+  postbuild_success:
+    cmds:
+    - powershell -Command "mkdir bin -Force"
+    #tgz the dist folder
+    - tar --exclude="./node_modules" --exclude="./src" --exclude="./.git" --exclude="./bin" --exclude=".gitignore" --exclude="*.yaml" --exclude="*.yml" -czf bin/release.tgz .
+
+
+#called by build pipeline to clean module
+  clean:
+    ignore_error: true
+    cmds:
+     #delete dist folder
+    - cmd: powershell -Command "Remove-Item -Recurse node_modules"
+    - cmd: powershell -Command "Remove-Item -Recurse dist"
+    - cmd: powershell -Command "Remove-Item -Recurse -Force bin"
