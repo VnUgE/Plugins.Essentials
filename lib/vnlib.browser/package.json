@@ -1,0 +1,59 @@
+{
+  "name": "@vnuge/vnlib.browser",
+  "version": "0.1.13",
+  "author": "Vaughn Nugent",
+  "description": "Client JavaScript helper library for vuejs3 web-apps for connecting with Essentials.Accounts plugin and vuejs helpers.",
+  "repository":"https://github.com/VnUgE/vnlib.browser",
+  "copyright":"Copyright \u00A9 2023 Vaughn Nugent",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "typings": "./dist/index.d.ts",
+  "output":"bin",
+  "scripts": {
+    "lint": "eslint --ext .js,.ts --ignore-path .gitignore src",
+    "build": "tsc",
+    "clean": "if exist dist ( rd /S /Q lib)"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@babel/types": "^7.x",
+    "@types/lodash-es": "^4.14.x",
+    "@types/node": "^20.5.1",
+    "@typescript-eslint/eslint-plugin": "^6.x.x"
+  },
+
+  "peerDependencies": {
+    "@vueuse/core": "^10.x",
+    "lodash-es": "^4.x",
+    "vue": "^3.x",
+    "vue-router": "^4.x",
+    "axios": "^1.x",
+    "eslint": "^8.39.0",
+    "jose": "^5.x",
+    "universal-cookie": "^6.1.x"
+  },
+
+  "eslintConfig": {
+    "root": true,
+    "extends": [
+      "eslint:recommended",
+      "plugin:@typescript-eslint/recommended"
+    ],
+    "parser": "@typescript-eslint/parser",
+    "parserOptions": {
+      "project": []
+    },
+    "plugins": [
+      "@typescript-eslint"
+    ],
+    "rules": {},
+    "ignorePatterns": [
+      "src/**/*.test.ts",
+      "src/frontend/generated/*"
+    ],
+    "env": {
+      "browser": true
+    }
+  }
+}
