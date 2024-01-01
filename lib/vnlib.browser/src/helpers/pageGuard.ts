@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vaughn Nugent
+// Copyright (c) 2024 Vaughn Nugent
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -20,8 +20,12 @@
 import { watch } from 'vue'
 import { useSession } from "../session";
 import { useLastPage } from './lastPage';
-import type { ILastPageStorage } from "./lastPage";
+import type { ILastPageStorage, RouterLike } from "./lastPage";
 
+export interface PageGuardOptions {
+    readonly stack: ILastPageStorage;
+    readonly router: RouterLike;
+}
 
 /** 
  * When called, configures the component to 
@@ -30,12 +34,12 @@ import type { ILastPageStorage } from "./lastPage";
  * @remarks Once called, if the user is logged-in changes will be
  * watch to redirect if the user becomes logged out.
 */
-export const usePageGuard = (loginRoute = { name: 'Login' }, lpStorage?: ILastPageStorage): void => {
+export const usePageGuard = (loginRoute = { name: 'Login' }, options?: Partial<PageGuardOptions>): void => {
     //Get the session state
     const session = useSession();
 
     //Get last page controller, fall back to default session storage stack
-    const { pushAndNavigate } = useLastPage(lpStorage)
+    const { pushAndNavigate } = useLastPage(options?.stack, options?.router)
 
     // Initial check for logged in to guard the page
     if (!session.loggedIn.value) {

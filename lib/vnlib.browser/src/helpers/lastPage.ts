@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vaughn Nugent
+// Copyright (c) 2024 Vaughn Nugent
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -50,6 +50,19 @@ export interface ILastPageStorage {
     pop(): string | null;
 }
 
+/**
+ * Represents a router-like object that can be used 
+ * to navigate to a desired route 
+ */
+export interface RouterLike{
+    currentRoute: {
+        value: {
+            fullPath: string;
+        }
+    }
+    push(route: object | string): void;
+}
+
 const storageKey = "lastPage";
 
 //Storage impl
@@ -79,29 +92,29 @@ const defaultStack = (): ILastPageStorage => {
  * last page after login.
  * @returns { gotoLastPage: Function }
  */
-export const useLastPage = (storage?: ILastPageStorage): ILastPage => {
+export const useLastPage = (storage?: ILastPageStorage, router?: RouterLike): ILastPage => {
     
     //fallback to default storage
     const _storage = defaultTo(storage, defaultStack());
 
     //Get the current router instance
-    const router = useRouter();
+    const _router = defaultTo(router, useRouter());
 
     //Store the current page to the last page stack
-    const push = () => _storage.push(router.currentRoute.value.fullPath);
+    const push = () => _storage.push(_router.currentRoute.value.fullPath);
 
     const pushAndNavigate = (route: object) => {
         //Store the current page to the last page stack
         push();
         //Navigate to the desired route
-        router.push(route);
+        _router.push(route);
     };
 
     const gotoLastPage = () => {
         //Get the last stored page and navigate to it
         const lp = _storage.pop();
         if (lp) {
-            router.push(lp);
+            _router.push(lp);
         }
     };
 

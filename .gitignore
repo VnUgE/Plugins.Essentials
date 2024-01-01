@@ -475,3 +475,4 @@ FodyWeavers.xsd
 
 *.licenseheader
 /plugins/**/*.json
+/lib/vnlib.browser/dist

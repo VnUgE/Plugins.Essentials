@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vaughn Nugent
+// Copyright (c) 2024 Vaughn Nugent
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -49,7 +49,6 @@ export * from './toast'
 //Export helpers
 export * from './helpers/apiCall'
 export * from './helpers/autoHeartbeat'
-export * from './helpers/autoScroll'
 export * from './helpers/confirm'
 export * from './helpers/envSize'
 export * from './helpers/lastPage'
