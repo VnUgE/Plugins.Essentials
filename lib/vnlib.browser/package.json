@@ -3,7 +3,7 @@
   "version": "0.1.13",
   "author": "Vaughn Nugent",
   "description": "Client JavaScript helper library for vuejs3 web-apps for connecting with Essentials.Accounts plugin and vuejs helpers.",
-  "repository":"https://github.com/VnUgE/vnlib.browser",
+  "repository":"https://github.com/VnUgE/Plugins.Essentials/tree/master/lib/vnlib.browser",
   "copyright":"Copyright \u00A9 2023 Vaughn Nugent",
   "type": "module",
   "main": "./dist/index.js",

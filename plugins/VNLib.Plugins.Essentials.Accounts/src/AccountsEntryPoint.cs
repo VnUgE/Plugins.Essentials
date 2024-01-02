@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2023 Vaughn Nugent
+* Copyright (c) 2024 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
@@ -24,14 +24,12 @@
 
 using System;
 using System.Text.Json;
-using System.ComponentModel.Design;
 
 using FluentValidation.Results;
 
 using VNLib.Utils;
 using VNLib.Utils.Memory;
 using VNLib.Utils.Logging;
-using VNLib.Plugins.Attributes;
 using VNLib.Plugins.Essentials.Users;
 using VNLib.Plugins.Essentials.Middleware;
 using VNLib.Plugins.Essentials.Accounts.MFA;
@@ -50,21 +48,6 @@ namespace VNLib.Plugins.Essentials.Accounts
         public override string PluginName => "Essentials.Accounts";
 
         private bool SetupMode => HostArgs.HasArgument("--account-setup");
-
-        private AccountSecProvider? _securityProvider;
-
-        [ServiceConfigurator]
-        public void ConfigureServices(IServiceContainer services)
-        {
-            //Export the built in security provider and add it as a middleware item as well
-            if (_securityProvider != null)
-            {
-                services.AddService(typeof(IAccountSecurityProvider), _securityProvider);
-                
-                //Export as middleware
-                services.AddService(typeof(IHttpMiddleware[]), new IHttpMiddleware[] { _securityProvider });
-            }
-        }
 
         protected override void OnLoad()
         {
@@ -104,8 +87,12 @@ namespace VNLib.Plugins.Essentials.Accounts
             //Only export the account security service if the configuration element is defined
             if (this.HasConfigForType<AccountSecProvider>())
             {
-                //Inint the security provider
-                _securityProvider = this.GetOrCreateSingleton<AccountSecProvider>();
+                //Inint the security provider and export it
+                AccountSecProvider securityProvider = this.GetOrCreateSingleton<AccountSecProvider>();
+                this.ExportService<IAccountSecurityProvider>(securityProvider);
+
+                //Also add the middleware array
+                this.ExportService(new IHttpMiddleware[] { securityProvider });
 
                 Log.Information("Configuring the account security provider service");
             }

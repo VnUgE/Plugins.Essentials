@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2023 Vaughn Nugent
+* Copyright (c) 2024 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Content.Routing
@@ -23,10 +23,8 @@
 */
 
 using System;
-using System.ComponentModel.Design;
 
 using VNLib.Utils.Logging;
-using VNLib.Plugins.Attributes;
 using VNLib.Plugins.Extensions.Loading;
 
 namespace VNLib.Plugins.Essentials.Content.Routing
@@ -35,19 +33,13 @@ namespace VNLib.Plugins.Essentials.Content.Routing
     {
         public override string PluginName => "Essentials.Router";
 
-        private Router PageRouter;
-
-        [ServiceConfigurator]
-        public void ConfigureServices(IServiceContainer services)
-        {
-            //Deploy the page router to the host
-            services.AddService<IPageRouter>(PageRouter);
-        }
+        private Router Router;
 
         protected override void OnLoad()
         {
-            //Init router
-            PageRouter = this.GetOrCreateSingleton<Router>();
+            //Init router and export it as a service
+            Router = this.GetOrCreateSingleton<Router>();
+            this.ExportService<IPageRouter>(Router);
 
             Log.Information("Plugin loaded");
         }
@@ -61,7 +53,7 @@ namespace VNLib.Plugins.Essentials.Content.Routing
         {
             if(cmd.Contains("reset", StringComparison.OrdinalIgnoreCase))
             {
-                PageRouter?.ResetRoutes();
+                Router?.ResetRoutes();
                 Log.Information("Routing table reset");
             }
         }       

@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2023 Vaughn Nugent
+* Copyright (c) 2024 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
@@ -316,7 +316,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             finally
             {
                 //Zero buffer when complete
-                MemoryUtil.InitializeBlock(buffer.Span);
+                MemoryUtil.InitializeBlock(ref buffer.GetReference(), buffer.GetIntLength());
             }
         }
 
@@ -572,6 +572,9 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                 {
                     return false;
                 }
+
+                //Erase the signing key bytes
+                MemoryUtil.InitializeBlock(signingKey);
 
                 //Verify expiration
                 using JsonDocument payload = jwt.GetPayload();
