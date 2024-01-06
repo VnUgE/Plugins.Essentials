@@ -56,9 +56,9 @@
     <ProjectReference Include="..\..\..\..\Extensions\lib\VNLib.Plugins.Extensions.Loading.Sql\src\VNLib.Plugins.Extensions.Loading.Sql.csproj" />
     <ProjectReference Include="..\..\..\..\Extensions\lib\VNLib.Plugins.Extensions.Loading\src\VNLib.Plugins.Extensions.Loading.csproj" />
   </ItemGroup>
-
+  
   <Target Condition="'$(BuildingInsideVisualStudio)' == true" Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="start xcopy &quot;$(TargetDir)&quot; &quot;..\..\..\..\..\devplugins\$(TargetName)&quot; /E /Y /R" />
+    <Exec Command="start xcopy &quot;$(TargetDir)&quot; &quot;$(SolutionDir)devplugins\$(TargetName)&quot; /E /Y /R" />
   </Target>
 
 </Project>

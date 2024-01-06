@@ -1,4 +1,4 @@
-import { find, isEqual } from "lodash-es";
+import { find, isEqual, map } from "lodash-es";
 import { get } from "@vueuse/core";
 import { MaybeRef } from "vue";
 import Cookies from "universal-cookie";
@@ -63,6 +63,16 @@ export interface SocialLoginApi<T>{
      * in the methods collection
      */
     getActiveMethod(): T | undefined;
+}
+
+/**
+ * A social OAuth portal that defines a usable server 
+ * enabled authentication method
+ */
+export interface SocialOAuthPortal {
+    readonly id: string;
+    readonly login: string;
+    readonly logout: string;
 }
 
 /**
@@ -229,4 +239,15 @@ export const createSocialMethod = (id: string, path: MaybeRef<string>): OAuthMet
         Id: id,
         loginUrl: () => get(path),
     }
+}
+
+/**
+ * Creates social OAuth methods from the given portals (usually captured from the server)
+ */
+export const fromPortals = (portals: SocialOAuthPortal[]): OAuthMethod[] => {
+    return map(portals, p => ({
+        Id: p.id,
+        loginUrl: () => p.login,
+        getLogoutData: () => ({ url: p.logout, args: {} })
+    }))
 }

@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>VNLib.Plugins.Essentials.Auth.Auth0</RootNamespace>
+    <AssemblyName>VNLib.Plugins.Essentials.Auth.Auth0</AssemblyName>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
+    <AnalysisLevel>latest-all</AnalysisLevel>
+    <NeutralLanguage>en-US</NeutralLanguage>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Authors>Vaughn Nugent</Authors>
+    <Company>Vaughn Nugent</Company>
+    <Product>VNLib.Plugins.Essentials.Auth.Auth0</Product>
+    <PackageId>VNLib.Plugins.Essentials.Auth.Auth0</PackageId>
+    <Description>A runtime asset library that adds Auth0 social OAuth autentication integration with Auth.Social plugin library</Description>
+    <Copyright>Copyright © 2024 Vaughn Nugent</Copyright>
+    <PackageProjectUrl>https://www.vaughnnugent.com/resources/software/modules/Plugins.Essentials</PackageProjectUrl>
+    <RepositoryUrl>https://Auth0.com/VnUgE/Plugins.Essentials/tree/master/plugins/providers/VNLib.Plugins.Essentials.Auth.Auth0</RepositoryUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\..\..\LICENSE">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="..\README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\plugins\VNLib.Plugins.Essentials.Auth.Social\src\VNLib.Plugins.Essentials.Auth.Social.csproj" />
+  </ItemGroup>
+
+  <Target Condition="'$(BuildingInsideVisualStudio)' == true" Name="PostBuild" AfterTargets="PostBuildEvent">
+    <Exec Command="start xcopy &quot;$(TargetDir)&quot; &quot;$(SolutionDir)devplugins\RuntimeAssets\$(TargetName)&quot; /E /Y /R" />
+  </Target>
+
+</Project>

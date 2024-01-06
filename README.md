@@ -12,7 +12,8 @@ Debug build w/ symbols & xml docs, release builds, NuGet packages, and individua
 Documentation, specifications, and setup guides are available on my website.  
 
 [Docs and Articles](https://www.vaughnnugent.com/resources/software/articles?tags=docs,_plugins.essentials)  
-[Builds and Source](https://www.vaughnnugent.com/resources/software/modules/VNLib.Core)  
+[Builds and Source](https://www.vaughnnugent.com/resources/software/modules/Plugins.Essentials)  
+[Nuget Feeds](https://www.vaughnnugent.com/resources/software/modules)  
 
 ## License
 The vnlib.browser project is licensed under the MIT license. See the LICENSE file for more information.
