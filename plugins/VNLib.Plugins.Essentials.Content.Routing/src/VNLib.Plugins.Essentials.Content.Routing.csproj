@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <Nullable>enable</Nullable>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <RootNamespace>VNLib.Plugins.Essentials.Content.Routing</RootNamespace>
     <AssemblyName>PageRouter</AssemblyName>
     <NeutralLanguage>en-US</NeutralLanguage>
@@ -19,7 +19,7 @@
     <Description>
       An essetials framework IPageRouter dynamic page routing implementation
     </Description>
-    <Copyright>Copyright © 2023 Vaughn Nugent</Copyright>
+    <Copyright>Copyright © 2024 Vaughn Nugent</Copyright>
     <PackageProjectUrl>https://www.vaughnnugent.com/resources/software/modules/Plugins.Essentials</PackageProjectUrl>
     <RepositoryUrl>https://github.com/VnUgE/Plugins.Essentials/tree/master/plugins/VNLib.Plugins.Essentials.Content.Routing</RepositoryUrl>
   </PropertyGroup>

@@ -294,7 +294,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             {
                 //dispose the output buffer
                 outputBuffer.Dispose();
-                MemoryUtil.InitializeBlock(secretBuffer.AsSpan());
+                MemoryUtil.InitializeBlock(secretBuffer);
             }
         }
 
