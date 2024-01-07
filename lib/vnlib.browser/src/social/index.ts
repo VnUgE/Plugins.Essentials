@@ -72,7 +72,7 @@ export interface SocialLoginApi<T>{
 export interface SocialOAuthPortal {
     readonly id: string;
     readonly login: string;
-    readonly logout: string;
+    readonly logout?: string;
 }
 
 /**
@@ -87,7 +87,7 @@ export const useSocialOauthLogin = <T extends OAuthMethod>(methods: T[], axiosCo
     const axios = useAxios(axiosConfig);
 
     //A cookie will hold the status of the current login method
-    const c = new Cookies(null, { path: '/', sameSite: 'strict', httpOnly:false });
+    const c = new Cookies(null, { sameSite: 'strict', httpOnly:false });
 
     const getNonceQuery = () => new URLSearchParams(window.location.search).get('nonce');
     const getResultQuery = () => new URLSearchParams(window.location.search).get('result');
@@ -155,11 +155,13 @@ export const useSocialOauthLogin = <T extends OAuthMethod>(methods: T[], axiosCo
             throw new Error('The current session has not been initialized for social login');
         }
 
+        const loginUrl = method.loginUrl();
+
         //Prepare the session for a new login
         const login = await prepareLogin();
 
         //Send a post request to the endpoint to complete the login and pass the nonce argument
-        const { data } = await axios.post<ITokenResponse>(method.loginUrl(), { ...login, nonce })
+        const { data } = await axios.post<ITokenResponse>(loginUrl, { ...login, nonce })
 
         //Verify result
         data.getResultOrThrow()
@@ -173,7 +175,7 @@ export const useSocialOauthLogin = <T extends OAuthMethod>(methods: T[], axiosCo
         }
 
         //Set the cookie to the method id
-        c.set(cookieName, method.Id);
+        c.set(cookieName, method.Id, { path: loginUrl });
     }
 
     const logout = async (): Promise<boolean> => {
@@ -245,9 +247,13 @@ export const createSocialMethod = (id: string, path: MaybeRef<string>): OAuthMet
  * Creates social OAuth methods from the given portals (usually captured from the server)
  */
 export const fromPortals = (portals: SocialOAuthPortal[]): OAuthMethod[] => {
-    return map(portals, p => ({
-        Id: p.id,
-        loginUrl: () => p.login,
-        getLogoutData: () => ({ url: p.logout, args: {} })
-    }))
+    return map(portals, p => {
+        const method = createSocialMethod(p.id, p.login);
+
+        //If a logout url is defined, then add it to the method
+        if(p.logout){
+            method.getLogoutData = () => ({ url: p.logout!, args: {} })
+        }
+        return method;
+    })
 }
