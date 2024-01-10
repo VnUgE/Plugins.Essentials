@@ -51,6 +51,9 @@ namespace VNLib.Plugins.Essentials.Auth.Social
         [JsonPropertyName("clientid")]
         public string? ClientId { get; set; }
 
+        [JsonPropertyName("path")]
+        public string? Path { get; set; }
+
 
         public void ComputeNonce(int nonceSize)
         {

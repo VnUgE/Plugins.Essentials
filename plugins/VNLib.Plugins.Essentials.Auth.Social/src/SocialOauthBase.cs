@@ -112,7 +112,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social
                 Path = Path
             };
 
-            _claims = new(cookies);
+            _claims = new(cookies, Config.EndpointPath);
 
             //Define the site adapter
             SiteAdapter = new();

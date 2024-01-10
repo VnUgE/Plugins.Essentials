@@ -29,13 +29,12 @@ using VNLib.Hashing;
 using VNLib.Hashing.IdentityUtility;
 using VNLib.Utils;
 using VNLib.Utils.Memory;
-using VNLib.Utils.Extensions;
 using VNLib.Plugins.Essentials.Accounts;
 using VNLib.Plugins.Essentials.Extensions;
 
 namespace VNLib.Plugins.Essentials.Auth.Social
 {
-    internal sealed record class ClientClaimManager(ICookieController Cookies)
+    internal sealed record class ClientClaimManager(ICookieController Cookies, string Path)
     {
         const string SESSION_SIG_KEY_NAME = "soa.sig";
         const int SIGNING_KEY_SIZE = 32;
@@ -75,10 +74,11 @@ namespace VNLib.Plugins.Essentials.Auth.Social
                 }
 
                 //Recover the clam from the jwt
-                claim = jwt.GetPayload<LoginClaim>();
+                claim = jwt.GetPayload<LoginClaim>(Statics.SR_OPTIONS)!;
 
-                //Verify the expiration time
-                return claim.ExpirationSeconds > entity.RequestedTimeUtc.ToUnixTimeSeconds();
+                //Verify the expiration time and path incase the wrong endpoint was called
+                return string.Equals(claim.Path, Path, StringComparison.OrdinalIgnoreCase) 
+                    && claim.ExpirationSeconds > entity.RequestedTimeUtc.ToUnixTimeSeconds();
             }
             catch (FormatException)
             {
@@ -105,6 +105,9 @@ namespace VNLib.Plugins.Essentials.Auth.Social
             //Setup Jwt
             using JsonWebToken jwt = new();
 
+            //Set the claim's path to verify later
+            claim.Path = Path;
+
             //Write claim body, we dont need a header
             jwt.WritePayload(claim, Statics.SR_OPTIONS);
 
@@ -120,7 +123,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social
             entity.Session[SESSION_SIG_KEY_NAME] = VnEncoding.ToBase64UrlSafeString(sigKey, false);
 
             //Clear the signing key
-            MemoryUtil.InitializeBlock(sigKey.AsSpan());
+            MemoryUtil.InitializeBlock(sigKey);
         }
     }
 }
