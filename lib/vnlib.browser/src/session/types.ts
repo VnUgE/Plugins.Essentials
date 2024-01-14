@@ -77,7 +77,7 @@ export interface ISession {
      * Computes a one time key for a fetch request security header
      * It is a signed jwt token that is valid for a short period of time
      */
-    generateOneTimeToken(): Promise<string | null>;
+    generateOneTimeToken(path: string): Promise<string | null>;
 
     /**
      * Clears the session login status and removes all client side

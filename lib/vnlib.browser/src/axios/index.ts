@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vaughn Nugent
+// Copyright (c) 2024 Vaughn Nugent
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -37,7 +37,7 @@ const configureAxiosInternal = (instance: Axios, session: ISession, tokenHeader:
         // See if the current session is logged in
         if (tokenHeaderValue && loggedIn.value) {
             // Get an otp for the request
-            config.headers[tokenHeaderValue] = await generateOneTimeToken()
+            config.headers[tokenHeaderValue] = await generateOneTimeToken(config.url!);
         }
         // Return the config
         return config

@@ -74,22 +74,46 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
         public static readonly RSAEncryptionPadding ClientEncryptonPadding = RSAEncryptionPadding.OaepSHA256;
 
         private readonly AccountSecConfig _config;
-        private readonly CookieHandler _cookieHandler;
+        private readonly SingleCookieController _statusCookie;
+        private readonly SingleCookieController _pubkeyCookie;
         private readonly ILogProvider _logger;
 
         public AccountSecProvider(PluginBase plugin)
-        {
-            //Setup default config
-            _config = new();
-            _cookieHandler = new(_config);
-            _logger = plugin.Log.CreateScope("Acnt-Sec");
-        }
+            :this(plugin, new AccountSecConfig())
+        { }
 
         public AccountSecProvider(PluginBase plugin, IConfigScope config)
+            :this(
+                 plugin,
+                 config.DeserialzeAndValidate<AccountSecConfig>()
+            )
+        { }
+
+        private AccountSecProvider(PluginBase plugin, AccountSecConfig config)
         {
             //Parse config if defined
-            _config = config.DeserialzeAndValidate<AccountSecConfig>();
-            _cookieHandler = new(_config);
+            _config = config;
+
+            //Status cookie handler
+            _statusCookie = new(_config.ClientStatusCookieName, _config.AuthorizationValidFor)
+            {
+                Domain = _config.CookieDomain,
+                Path = _config.CookiePath,
+                SameSite = CookieSameSite.Strict,
+                HttpOnly = false,   //allow javascript to read this cookie
+                Secure = true
+            };
+
+            //Public key cookie handler
+            _pubkeyCookie = new(_config.PubKeyCookieName, _config.AuthorizationValidFor)
+            {
+                Domain = _config.CookieDomain,
+                Path = _config.CookiePath,
+                SameSite = CookieSameSite.Strict,
+                HttpOnly = true,
+                Secure = true
+            };
+
             _logger = plugin.Log.CreateScope("Acnt-Sec");
         }
 
@@ -110,7 +134,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                 if (OnMwCheckSessionExpired(entity, in session))
                 {
                     //Expired
-                    ExpireCookies(entity);
+                    ExpireCookies(entity, true);
                     
                     //Verbose because this is a normal occurance
                     if (_logger.IsEnabled(LogLevel.Verbose))
@@ -134,7 +158,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                     //If the session is new, or not supposed to be logged in, clear the login cookies if they were set
                     if (session.IsNew || string.IsNullOrEmpty(session.Token))
                     {
-                        ExpireCookies(entity);
+                        ExpireCookies(entity, false);
                     }
                 }
             }
@@ -174,12 +198,10 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
         IClientAuthorization IAccountSecurityProvider.AuthorizeClient(HttpEntity entity, IClientSecInfo clientInfo, IUser user)
         {
             //Validate client info
-            _ = clientInfo ?? throw new ArgumentNullException(nameof(clientInfo));
-            _ = clientInfo.PublicKey ?? throw new ArgumentException(nameof(clientInfo.PublicKey));
-            _ = clientInfo.ClientId ?? throw new ArgumentException(nameof(clientInfo.ClientId));
-
-            //Validate user
-            _ = user ?? throw new ArgumentNullException(nameof(user));
+            ArgumentNullException.ThrowIfNull(user);
+            ArgumentNullException.ThrowIfNull(clientInfo);
+            ArgumentNullException.ThrowIfNull(clientInfo.PublicKey, nameof(clientInfo.PublicKey));
+            ArgumentNullException.ThrowIfNull(clientInfo.ClientId, nameof(clientInfo.ClientId));
 
             if (!entity.Session.IsSet || entity.Session.IsNew || entity.Session.SessionType != SessionType.Web)
             {
@@ -211,7 +233,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
         void IAccountSecurityProvider.InvalidateLogin(HttpEntity entity)
         {
             //Client should also destroy the session
-            ExpireCookies(entity);
+            ExpireCookies(entity, true);
 
             //Clear known security keys
             entity.Session.Token = null!;
@@ -266,7 +288,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             entity.Session.Token = serverToken;
 
             //set client status cookie via handler
-            _cookieHandler.SetCookie(entity, _config.ClientStatusCookieName, localAccount ? "1" : "2", false);
+            _statusCookie.SetCookie(entity, localAccount ? "1" : "2");
 
             //Return the new authorzation
             return new EncryptedTokenAuthorization(clientToken);
@@ -343,10 +365,10 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
              * Clients may send bad data, so we should swallow exceptions and return false
              */
 
-            bool isValid = true;
-
             try
             {
+                bool isValid = true;
+
                 //Parse the client jwt signed message
                 using JsonWebToken jwt = JsonWebToken.Parse(signedMessage);
                
@@ -387,34 +409,83 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                     //No time element provided
                     isValid = false;
                 }
+
+                //Check the audience matches the request uri
+                if(data.RootElement.TryGetProperty("aud", out JsonElement tokenOriginEl))
+                {                  
+                    string? tokenOrigin = tokenOriginEl.GetString();
+                    string? requestOrigin = null;
+
+                    //If strict origin is enabled, we need to check against the request uri
+                    Uri? origin = _config.EnforceSameOriginToken ?
+                        entity.Server.RequestUri :
+                        entity.Session.SpecifiedOrigin;
+                  
+
+                    //Check origin matches stored origin
+                    if (origin != null)
+                    {
+                        requestOrigin = $"{origin.Scheme}://{origin.Authority}";
+
+                        //Make sure the token href matches the request uri
+                        isValid &= string.Equals(tokenOrigin, requestOrigin, StringComparison.OrdinalIgnoreCase);
+                    }
+
+                    if (!isValid)
+                    {
+                        _logger.Debug("Client security OTP JWT origin mismatch from {ip} : {current} != {token}",
+                            entity.TrustedRemoteIp,
+                            requestOrigin,
+                            tokenOrigin
+                        );
+                    }
+                }
+                else
+                {
+                    isValid = false;
+                }
+
+                //Check the subject (path) matches the request uri
+                if (data.RootElement.TryGetProperty("path", out JsonElement tokenPathEl))
+                {
+                    string? path = tokenPathEl.GetString();
+
+                    //Make sure the token href matches the request uri
+                    isValid &= string.Equals(path, entity.Server.RequestUri.PathAndQuery, StringComparison.OrdinalIgnoreCase);
+
+                    if (!isValid)
+                    {
+                        _logger.Debug("Client security OTP JWT path mismatch from {ip} : {current} != {token}",
+                          entity.TrustedRemoteIp,
+                          entity.Server.RequestUri.PathAndQuery,
+                          path
+                        );
+                    }
+                }
+                else
+                {
+                    isValid = false;
+                }
+
+                return isValid;
             }
             catch (FormatException)
             {
                 //we may catch the format exception for a malformatted jwt
-                isValid = false;
                 _logger.Debug("Client security OTP JWT not valid from {ip}", entity.TrustedRemoteIp);
+                return false;
             }
-            
-            return isValid;
         }
         
         #endregion
 
         #region Cookies
 
-        private void ExpireCookies(HttpEntity entity)
+        private void ExpireCookies(HttpEntity entity, bool force)
         {
-            //Expire the LI cookie if set
-            if (entity.Server.RequestCookies.ContainsKey(_config.ClientStatusCookieName))
-            {
-                _cookieHandler.ExpireCookie(entity, _config.ClientStatusCookieName);
-            }
-
-            //Expire pupkey cookie
-            if (entity.Server.RequestCookies.ContainsKey(_config.PubKeyCookieName))
-            {
-                _cookieHandler.ExpireCookie(entity, _config.PubKeyCookieName);
-            }
+            //Do not force clear cookies (saves bandwidth)
+            _statusCookie.ExpireCookie(entity, force);
+            _pubkeyCookie.ExpireCookie(entity, force);
         }
 
         #endregion
@@ -526,7 +597,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             //Compile the jwt for the cookie value
             string jwtValue = jwt.Compile();
 
-            _cookieHandler.SetCookie(entity, _config.PubKeyCookieName, jwtValue, true);
+            _pubkeyCookie.SetCookie(entity, jwtValue);
 
             //Return the signing key
             return base32SigningKey;
@@ -543,7 +614,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             }
 
             //Get the jwt cookie
-            string? pubKeyJwt = _cookieHandler.GetCookie(entity, _config.PubKeyCookieName);
+            string? pubKeyJwt = _pubkeyCookie.GetCookie(entity);
            
             if (string.IsNullOrWhiteSpace(pubKeyJwt))
             {
@@ -729,6 +800,13 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                 set => SignedTokenTimeDiff = TimeSpan.FromSeconds(value);
             }
 
+            /// <summary>
+            /// Enforce that the client's token is only valid for the origin 
+            /// it was read from. Will break sites hosted from multiple origins
+            /// </summary>
+            [JsonPropertyName("strict_origin")]
+            public bool EnforceSameOriginToken { get; set; } = true;
+
             void IOnConfigValidation.Validate()
             {
                 //Validate the current instance
@@ -744,62 +822,6 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             ///<inheritdoc/>
             public string GetClientAuthDataString() => ClientAuthToken;            
         }
-
-        record class CookieHandler(AccountSecConfig Config)
-        {
-
-            /// <summary>
-            /// Expires a cookie with the given name
-            /// </summary>
-            /// <param name="entity">The entity to expire the cookie on</param>
-            /// <param name="cookieName">The name of the cookie to expire</param>
-            public void ExpireCookie(HttpEntity entity, string cookieName)
-            {
-                HttpCookie cookie = new(cookieName, string.Empty)
-                {
-                    Domain = Config.CookieDomain,
-                    Path = Config.CookiePath,
-                    ValidFor = TimeSpan.Zero,
-                    SameSite = CookieSameSite.Strict,
-                    HttpOnly = true,
-                    Secure = entity.IsSecure
-                };
-
-                entity.Server.SetCookie(in cookie);
-            }
-
-            /// <summary>
-            /// Sets a cookie with the given name and value
-            /// </summary>
-            /// <param name="entity">The entity to set the cookie on</param>
-            /// <param name="name">The name of the cookie to set</param>
-            /// <param name="value">The value of the cookie to set</param>
-            /// <param name="httpOnly">A value that indicates of the httponly flag should be set on the cookie</param>
-            public void SetCookie(HttpEntity entity, string name, string value, bool httpOnly)
-            {
-                HttpCookie cookie = new(name, value)
-                {
-                    Domain = Config.CookieDomain,
-                    Path = Config.CookiePath,
-                    ValidFor = Config.AuthorizationValidFor,
-                    SameSite = CookieSameSite.Strict,
-                    HttpOnly = httpOnly,
-                    Secure = entity.IsSecure
-                };
-                entity.Server.SetCookie(in cookie);
-            }
-
-            /// <summary>
-            /// Gets the value of a cookie with the given name
-            /// </summary>
-            /// <param name="entity">The entity to get the cookie from</param>
-            /// <param name="name">The name of the cooke to retrieve</param>
-            /// <returns>The cookie value if found, null otherwise</returns>
-            public string? GetCookie(HttpEntity entity, string name)
-            {
-                _ = entity.Server.GetCookie(name, out string? value);
-                return value;
-            }
-        }
+        
     }
 }

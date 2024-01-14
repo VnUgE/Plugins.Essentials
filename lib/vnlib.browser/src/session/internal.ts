@@ -162,7 +162,7 @@ const createUtil = (utilState: Ref<SessionConfig>, sessionStorage: Ref<IStateSto
         token.value = ArrayBuffToBase64(decrypted)
     }
 
-    const generateOneTimeToken = async (): Promise<string | null> => {
+    const generateOneTimeToken = async (path: string): Promise<string | null> => {
         //we need to get the shared key from storage and decode it, it may be null if not set
         const sharedKey = token.value ? Base64ToUint8Array(token.value) : null
 
@@ -176,7 +176,7 @@ const createUtil = (utilState: Ref<SessionConfig>, sessionStorage: Ref<IStateSto
         //Get the alg from the config
         const alg = get(sigAlg);
 
-        const jwt = new SignJWT({ 'nonce': nonce })
+        const jwt = new SignJWT({ 'nonce': nonce, path })
         //Set alg
         jwt.setProtectedHeader({ alg })
             //Iat is the only required claim at the current time utc
