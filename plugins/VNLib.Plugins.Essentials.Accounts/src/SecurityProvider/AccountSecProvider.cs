@@ -390,12 +390,13 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                 using JsonDocument data = jwt.GetPayload();
 
                 //Get iat time
-                if (data.RootElement.TryGetProperty("iat", out JsonElement iatEl))
+                if (data.RootElement.TryGetProperty("iat", out JsonElement iatEl) 
+                    && iatEl.ValueKind == JsonValueKind.Number)
                 {
-                    //Try to get iat in uning seconds 
+                    //Try to get iat in unint seconds 
                     isValid &= iatEl.TryGetInt64(out long iatSec);
                     
-                    //Recover dto from seconds
+                    //Recover dto from unix seconds regardless of int success
                     DateTimeOffset iat = DateTimeOffset.FromUnixTimeSeconds(iatSec);
 
                     //Verify iat against current time with allowed disparity
@@ -411,32 +412,29 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                 }
 
                 //Check the audience matches the request uri
-                if(data.RootElement.TryGetProperty("aud", out JsonElement tokenOriginEl))
+                if(data.RootElement.TryGetProperty("aud", out JsonElement tokenOriginEl) 
+                    && tokenOriginEl.ValueKind == JsonValueKind.String)
                 {                  
-                    string? tokenOrigin = tokenOriginEl.GetString();
+                    string? unsafeUserOrigin = tokenOriginEl.GetString();
                     string? requestOrigin = null;
 
                     //If strict origin is enabled, we need to check against the request uri
-                    Uri? origin = _config.EnforceSameOriginToken ?
-                        entity.Server.RequestUri :
-                        entity.Session.SpecifiedOrigin;
-                  
+                    Uri origin = entity.Session.CrossOrigin && _config.EnforceSameOriginToken ?
+                        entity.Session.SpecifiedOrigin! :
+                        (entity.Server.Origin ?? entity.Server.RequestUri); //Finally fall back to the request uri if no origin is specified
+                
 
-                    //Check origin matches stored origin
-                    if (origin != null)
-                    {
-                        requestOrigin = $"{origin.Scheme}://{origin.Authority}";
+                    requestOrigin = origin.GetLeftPart(UriPartial.Authority);
 
-                        //Make sure the token href matches the request uri
-                        isValid &= string.Equals(tokenOrigin, requestOrigin, StringComparison.OrdinalIgnoreCase);
-                    }
+                    //Make sure the token href matches the request uri
+                    isValid &= string.Equals(unsafeUserOrigin, requestOrigin, StringComparison.OrdinalIgnoreCase);
 
                     if (!isValid)
                     {
                         _logger.Debug("Client security OTP JWT origin mismatch from {ip} : {current} != {token}",
                             entity.TrustedRemoteIp,
                             requestOrigin,
-                            tokenOrigin
+                            unsafeUserOrigin
                         );
                     }
                 }
@@ -446,20 +444,48 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                 }
 
                 //Check the subject (path) matches the request uri
-                if (data.RootElement.TryGetProperty("path", out JsonElement tokenPathEl))
+                if (data.RootElement.TryGetProperty("path", out JsonElement tokenPathEl) 
+                    && tokenPathEl.ValueKind == JsonValueKind.String)
                 {
-                    string? path = tokenPathEl.GetString();
-
-                    //Make sure the token href matches the request uri
-                    isValid &= string.Equals(path, entity.Server.RequestUri.PathAndQuery, StringComparison.OrdinalIgnoreCase);
-
-                    if (!isValid)
+                  
+                    ReadOnlySpan<char> unsafeUserPath = tokenPathEl.GetString();
+                    /*
+                     * Query parameters are optional, so we need to check if the path contains a 
+                     * query, if so we can compare the entire path and query, otherwise we need to
+                     * compare the path only
+                     */
+                    if (unsafeUserPath.Contains("?", StringComparison.OrdinalIgnoreCase))
                     {
-                        _logger.Debug("Client security OTP JWT path mismatch from {ip} : {current} != {token}",
-                          entity.TrustedRemoteIp,
-                          entity.Server.RequestUri.PathAndQuery,
-                          path
-                        );
+                        //Compare path and query when possible
+                        string requestPath = entity.Server.RequestUri.PathAndQuery;
+
+                        isValid &= unsafeUserPath.Equals(requestPath, StringComparison.OrdinalIgnoreCase);
+
+                        if (!isValid && _logger.IsEnabled(LogLevel.Debug))
+                        {
+                            _logger.Debug("Client security OTP JWT path mismatch from {ip} : {current} != {token}",
+                              entity.TrustedRemoteIp,
+                              requestPath,
+                              unsafeUserPath.ToString()
+                            );
+                        }
+                    }
+                    else
+                    {
+                        //Use path only
+                        string requestPath = entity.Server.RequestUri.LocalPath;
+
+                        //Compare path only
+                        isValid &= unsafeUserPath.Equals(requestPath, StringComparison.OrdinalIgnoreCase);
+
+                        if (!isValid && _logger.IsEnabled(LogLevel.Debug))
+                        {
+                            _logger.Debug("Client security OTP JWT path mismatch from {ip} : {current} != {token}",
+                                entity.TrustedRemoteIp,
+                                requestPath,
+                                unsafeUserPath.ToString()
+                            );
+                        }
                     }
                 }
                 else
