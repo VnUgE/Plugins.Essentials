@@ -1,0 +1,61 @@
+# https://taskfile.dev
+
+#Called by the vnbuild system to produce builds for my website
+#https://www.vaughnnugent.com/resources/software
+
+#This taskfile is designed to create a bundle of essentials plugins ready to use
+
+#The Module.Taskfile will build the plugins, we just need to copy the ones we want to use
+
+version: '3'
+
+vars:
+  PROJ_BUILD_OUT_DIR: 'src/bin/Release/net8.0/Publish/'
+  OUT_FILE_NAME: 'essentials-release'
+
+tasks:
+  postbuild_success:
+    dir: '{{.USER_WORKING_DIR}}'
+    cmds:
+      #clean temp dir
+     - defer: powershell -Command "rm -r temp -Force"
+  
+     #make output directories
+     - cmd: powershell -Command "mkdir temp -Force" && powershell -Command "mkdir temp/plugins -Force"
+       ignore_error: true
+     - cmd: powershell -Command "mkdir bin -Force"
+       ignore_error: true
+
+     #copy account's plugin to output directory
+     - task: copy-plugin
+       vars: 
+         NAME: 'VNLib.Plugins.Essentials.Accounts' 
+         OUT_NAME: 'Essentials.Accounts'
+
+     #copy auth.social plugin to output directory
+     - task: copy-plugin
+       vars: 
+         NAME: 'VNLib.Plugins.Essentials.Auth.Social' 
+         OUT_NAME: 'Auth.Social'
+
+     #copy content.routing plugin to output directory
+     - task: copy-plugin
+       vars:
+         NAME: 'VNLib.Plugins.Essentials.Content.Routing' 
+         OUT_NAME: 'PageRouter'
+
+    #tar temp dir and put in output
+     - cmd: cd temp && tar -czf "../bin/{{.OUT_FILE_NAME}}-{{.BUILD_VERSION}}.tgz" .
+
+  copy-plugin:
+    desc: "copy a single plugin project to its output directory"
+    cmds:
+     - cd '{{.MODULE_DIR}}/plugins' && powershell -Command "cp -Path {{.NAME}}/{{.PROJ_BUILD_OUT_DIR}} -Destination {{.PROJECT_DIR}}/temp/plugins/{{.OUT_NAME}} -Force -Recurse"
+
+  clean:
+    desc: "Cleans all build artifacts"
+    cmds:
+     - cmd: powershell -Command "rm -Recurse temp -Force"
+       ignore_error: true
+     - cmd: powershell -Command "rm -Recurse bin -Force"
+       ignore_error: true

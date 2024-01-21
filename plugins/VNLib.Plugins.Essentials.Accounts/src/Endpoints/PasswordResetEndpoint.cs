@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2023 Vaughn Nugent
+* Copyright (c) 2024 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
@@ -60,7 +60,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
     internal sealed class PasswordChangeEndpoint : ProtectedWebEndpoint
     {
         private readonly IUserManager Users;
-        private readonly MFAConfig? mFAConfig;
+        private readonly MFAConfig mFAConfig;
         private readonly IValidator<PasswordResetMesage> ResetMessValidator;
 
         public PasswordChangeEndpoint(PluginBase pbase, IConfigScope config)
@@ -87,7 +87,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 .NotEmpty()
                 .NotEqual(static pm => pm.Current)
                 .WithMessage("Your new password may not equal your new current password")
-                .SetValidator(AccountValidations.PasswordValidator!);
+                .SetValidator(AccountValidations.PasswordValidator);
 
             return rules;
         }
@@ -134,29 +134,27 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             }
 
             //Check if totp is enabled
-            if (user.MFATotpEnabled())
+            if (mFAConfig.TOTPEnabled && user.MFATotpEnabled())
             {
-                if(mFAConfig != null)
+                //TOTP code is required
+                if (webm.Assert(pwReset.TotpCode.HasValue, "TOTP is enabled on this user account, you must enter your TOTP code."))
                 {
-                    //TOTP code is required
-                    if(webm.Assert(pwReset.TotpCode.HasValue, "TOTP is enabled on this user account, you must enter your TOTP code."))
-                    {
-                        return VirtualOk(entity, webm);
-                    }
-
-                    //Veriy totp code
-                    bool verified = mFAConfig.VerifyTOTP(user, pwReset.TotpCode.Value);
-
-                    if (webm.Assert(verified, "Please check your TOTP code and try again"))
-                    {
-                        return VirtualOk(entity, webm);
-                    }
+                    return VirtualOk(entity, webm);
                 }
+
+                //Veriy totp code
+                bool verified = mFAConfig.VerifyTOTP(user, pwReset.TotpCode.Value);
+
+                if (webm.Assert(verified, "Please check your TOTP code and try again"))
+                {
+                    return VirtualOk(entity, webm);
+                }
+
                 //continue
             }
 
             //Update the user's password
-            if (!await Users.UpdatePasswordAsync(user, pwReset.NewPassword!, entity.EventCancellation))
+            if (await Users.UpdatePasswordAsync(user, pwReset.NewPassword!, entity.EventCancellation) == 1)
             {
                 //error
                 webm.Result = "Your password could not be updated";
@@ -164,7 +162,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             }
 
             //Publish to user database
-            await user.ReleaseAsync();
+            await user.ReleaseAsync(entity.EventCancellation);
 
             //delete the user's MFA entry so they can re-enable it
             webm.Result = "Your password has been updated";

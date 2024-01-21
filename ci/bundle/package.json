@@ -1,0 +1,10 @@
+{
+  "name": "Essentials-Bundle",
+  "version": "0.1.0",
+  "type": "module",
+  "copyright": "Copyright \u00A9 2024 Vaughn Nugent",
+  "author": "Vaughn Nugent",
+  "description": "This package is a bundle of essential website plugins ready to be used for projects most web application projects",
+  "repository": "https://github.com/VnUgE/Simple-Bookmark/tree/master/ci/bundle",
+  "output_dir": "bin"
+}

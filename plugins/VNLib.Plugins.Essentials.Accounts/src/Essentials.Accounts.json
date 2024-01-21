@@ -1,0 +1,94 @@
+{
+  "debug": false,
+
+  //endpoints (any or all can be commented out if not needed)
+
+  "login_endpoint": {
+    "path": "/account/login",
+    "max_login_attempts": 10, //10 failed attempts in 10 minutes
+    "failed_attempt_timeout_sec": 600 //10 minutes
+  },
+
+  "keepalive_endpoint": {
+    "path": "/account/keepalive",
+    //Regen token every 15 mins along with cookies
+    "token_refresh_sec": 600 //15 minutes
+  },
+
+  "profile_endpoint": {
+    "path": "/account/profile"
+  },
+
+  "password_endpoint": {
+    "path": "/account/reset"
+  },
+
+  "mfa_endpoint": {
+    "path": "/account/mfa"
+  },
+
+  "logout_endpoint": {
+    "path": "/account/logout"
+  },
+
+  "pki_auth_endpoint": {
+    "path": "/account/pki",
+    "jwt_time_dif_sec": 30,
+
+    "max_login_attempts": 10,
+    "failed_attempt_timeout_sec": 600,
+
+    //Configures the PATCH and DELETE methods to update the user's stored key when logged in
+    "enable_key_update": true
+  },
+
+  //If mfa is defined, configures mfa enpoints and enables mfa logins
+  "mfa": {
+    "upgrade_expires_secs": 180,
+    "nonce_size": 64,
+
+    //Defines totp specific arguments
+    "totp": {
+      "digits": 6,
+      "issuer": "vaughnnugent.com",
+      "period_secs": 30,
+      "algorithm": "sha1",
+      "secret_size": 32,
+      "window_size": 2
+    },
+
+    "fido": {
+      "challenge_size": 64,
+      "attestation": "none",
+      "timeout": 60000,
+      "site_name": "vaughnnugent.com",
+
+      "authenticatorSelection": {
+        "authenticatorAttachment": "cross-platform",
+        "requireResidentKey": false,
+        "userVerification": "required"
+      }
+    }
+  },
+
+  //Defines the included account provider
+  "account_security": {
+    //Time in seconds before a session is considered expired
+    "session_valid_for_sec": 3600,
+
+    //Path/domain for all security cookies
+    "cookie_domain": "",
+    "cookie_path": "/",
+
+    "status_cookie_name": "li",
+
+    "otp_header_name": "X-Web-Token",
+    "otp_time_diff_sec": 30,
+    "otp_key_size": 64,
+
+    "pubkey_cookie_name": "client-id",
+    "pubkey_signing_key_size": 32,
+
+    "strict_origin": false
+  }
+}

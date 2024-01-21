@@ -32,6 +32,7 @@
  */
 
 using System;
+using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Security.Cryptography;
@@ -411,36 +412,51 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                     isValid = false;
                 }
 
-                //Check the audience matches the request uri
-                if(data.RootElement.TryGetProperty("aud", out JsonElement tokenOriginEl) 
-                    && tokenOriginEl.ValueKind == JsonValueKind.String)
-                {                  
-                    string? unsafeUserOrigin = tokenOriginEl.GetString();
-                    string? requestOrigin = null;
-
-                    //If strict origin is enabled, we need to check against the request uri
-                    Uri origin = entity.Session.CrossOrigin && _config.EnforceSameOriginToken ?
-                        entity.Session.SpecifiedOrigin! :
-                        (entity.Server.Origin ?? entity.Server.RequestUri); //Finally fall back to the request uri if no origin is specified
-                
-
-                    requestOrigin = origin.GetLeftPart(UriPartial.Authority);
-
-                    //Make sure the token href matches the request uri
-                    isValid &= string.Equals(unsafeUserOrigin, requestOrigin, StringComparison.OrdinalIgnoreCase);
-
-                    if (!isValid)
-                    {
-                        _logger.Debug("Client security OTP JWT origin mismatch from {ip} : {current} != {token}",
-                            entity.TrustedRemoteIp,
-                            requestOrigin,
-                            unsafeUserOrigin
-                        );
-                    }
-                }
-                else
+                if (_config.VerifyOrigin)
                 {
-                    isValid = false;
+                    //Check the audience matches the request uri
+                    if (data.RootElement.TryGetProperty("aud", out JsonElement tokenOriginEl)
+                        && tokenOriginEl.ValueKind == JsonValueKind.String)
+                    {
+                        string? unsafeUserOrigin = tokenOriginEl.GetString();
+
+                        if(string.IsNullOrWhiteSpace(unsafeUserOrigin))
+                        {
+                            isValid = false;
+                        }
+                        else if (_config.EnforceSameOriginToken)
+                        {
+                            //enforce strict origin checking
+                            string strictOrigin = entity.Server.RequestUri.GetLeftPart(UriPartial.Authority);
+                            isValid &= string.Equals(unsafeUserOrigin, strictOrigin, StringComparison.OrdinalIgnoreCase);
+
+                            if (!isValid)
+                            {
+                                _logger.Debug("Client security OTP JWT origin mismatch from {ip} : strict origin {current} != {token}",
+                                    entity.TrustedRemoteIp,
+                                    strictOrigin,
+                                    unsafeUserOrigin
+                                );
+                            }
+                        }
+                        else
+                        {
+                            //Verify against allow list
+                            isValid &= _config.AllowedOrigins!.Contains(unsafeUserOrigin, StringComparer.OrdinalIgnoreCase);
+
+                            if (!isValid)
+                            {
+                                _logger.Debug("CST origin not allowed {ip} : {token}",
+                                    entity.TrustedRemoteIp,
+                                    unsafeUserOrigin
+                                );
+                            }
+                        }
+                    }
+                    else
+                    {
+                        isValid = false;
+                    }
                 }
 
                 //Check the subject (path) matches the request uri
@@ -751,6 +767,10 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                     .InclusiveBetween((uint)1, uint.MaxValue)
                     .WithMessage("You must specify a valid value for a web session timeout in seconds");
 
+                val.RuleForEach(c => c.AllowedOrigins)
+                    .Matches(@"^https?://[a-z0-9\-\.]+$")
+                    .WithMessage("The allowed origins must be valid http(s) urls");
+
                 return val;
             }
 
@@ -832,6 +852,18 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             /// </summary>
             [JsonPropertyName("strict_origin")]
             public bool EnforceSameOriginToken { get; set; } = true;
+
+            /// <summary>
+            /// Enable/disable origin verification for the client's token
+            /// </summary>
+            [JsonIgnore]
+            public bool VerifyOrigin => AllowedOrigins != null && AllowedOrigins.Length > 0;
+
+            /// <summary>
+            /// The list of origins that are allowed to send requests to the server
+            /// </summary>
+            [JsonPropertyName("allowed_origins")]
+            public string[]? AllowedOrigins { get; set; }
 
             void IOnConfigValidation.Validate()
             {
