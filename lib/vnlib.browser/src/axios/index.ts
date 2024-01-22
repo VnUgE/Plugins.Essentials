@@ -36,8 +36,23 @@ const configureAxiosInternal = (instance: Axios, session: ISession, tokenHeader:
 
         // See if the current session is logged in
         if (tokenHeaderValue && loggedIn.value) {
-            // Get an otp for the request
-            config.headers[tokenHeaderValue] = await generateOneTimeToken(config.url!);
+            
+            const path = `${config.baseURL}${config.url}`
+
+            //see if absolute url or relative
+            if(path.match(/https?:\/\//)){
+                //Is absolute
+                const { pathname } = new URL(path);
+                
+                // Get an otp for the request
+                config.headers[tokenHeaderValue] = await generateOneTimeToken(pathname);
+            }
+            else{
+                //Is relative
+
+                // Get an otp for the request
+                config.headers[tokenHeaderValue] = await generateOneTimeToken(path);
+            }
         }
         // Return the config
         return config

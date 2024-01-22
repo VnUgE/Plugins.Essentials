@@ -89,6 +89,9 @@
     "pubkey_cookie_name": "client-id",
     "pubkey_signing_key_size": 32,
 
-    "strict_origin": false
+    "strict_origin": false,
+    "strict_path": false,
+
+    //"allowed_origins": [ ]
   }
 }

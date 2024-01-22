@@ -45,7 +45,7 @@ tasks:
          OUT_NAME: 'PageRouter'
 
     #tar temp dir and put in output
-     - cmd: cd temp && tar -czf "../bin/{{.OUT_FILE_NAME}}-{{.BUILD_VERSION}}.tgz" .
+     - cmd: cd temp && tar -czf "../bin/release-bundle.tgz" .
 
   copy-plugin:
     desc: "copy a single plugin project to its output directory"

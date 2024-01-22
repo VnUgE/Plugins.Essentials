@@ -459,54 +459,57 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                     }
                 }
 
-                //Check the subject (path) matches the request uri
-                if (data.RootElement.TryGetProperty("path", out JsonElement tokenPathEl) 
-                    && tokenPathEl.ValueKind == JsonValueKind.String)
+                if (_config.VerifyPath)
                 {
-                  
-                    ReadOnlySpan<char> unsafeUserPath = tokenPathEl.GetString();
-                    /*
-                     * Query parameters are optional, so we need to check if the path contains a 
-                     * query, if so we can compare the entire path and query, otherwise we need to
-                     * compare the path only
-                     */
-                    if (unsafeUserPath.Contains("?", StringComparison.OrdinalIgnoreCase))
+                    //Check the subject (path) matches the request uri
+                    if (data.RootElement.TryGetProperty("path", out JsonElement tokenPathEl)
+                        && tokenPathEl.ValueKind == JsonValueKind.String)
                     {
-                        //Compare path and query when possible
-                        string requestPath = entity.Server.RequestUri.PathAndQuery;
 
-                        isValid &= unsafeUserPath.Equals(requestPath, StringComparison.OrdinalIgnoreCase);
-
-                        if (!isValid && _logger.IsEnabled(LogLevel.Debug))
+                        ReadOnlySpan<char> unsafeUserPath = tokenPathEl.GetString();
+                        /*
+                         * Query parameters are optional, so we need to check if the path contains a 
+                         * query, if so we can compare the entire path and query, otherwise we need to
+                         * compare the path only
+                         */
+                        if (unsafeUserPath.Contains("?", StringComparison.OrdinalIgnoreCase))
                         {
-                            _logger.Debug("Client security OTP JWT path mismatch from {ip} : {current} != {token}",
-                              entity.TrustedRemoteIp,
-                              requestPath,
-                              unsafeUserPath.ToString()
-                            );
+                            //Compare path and query when possible
+                            string requestPath = entity.Server.RequestUri.PathAndQuery;
+
+                            isValid &= unsafeUserPath.Equals(requestPath, StringComparison.OrdinalIgnoreCase);
+
+                            if (!isValid && _logger.IsEnabled(LogLevel.Debug))
+                            {
+                                _logger.Debug("Client security OTP JWT path mismatch from {ip} : {current} != {token}",
+                                  entity.TrustedRemoteIp,
+                                  requestPath,
+                                  unsafeUserPath.ToString()
+                                );
+                            }
+                        }
+                        else
+                        {
+                            //Use path only
+                            string requestPath = entity.Server.RequestUri.LocalPath;
+
+                            //Compare path only
+                            isValid &= unsafeUserPath.Equals(requestPath, StringComparison.OrdinalIgnoreCase);
+
+                            if (!isValid && _logger.IsEnabled(LogLevel.Debug))
+                            {
+                                _logger.Debug("Client security OTP JWT path mismatch from {ip} : {current} != {token}",
+                                    entity.TrustedRemoteIp,
+                                    requestPath,
+                                    unsafeUserPath.ToString()
+                                );
+                            }
                         }
                     }
                     else
                     {
-                        //Use path only
-                        string requestPath = entity.Server.RequestUri.LocalPath;
-
-                        //Compare path only
-                        isValid &= unsafeUserPath.Equals(requestPath, StringComparison.OrdinalIgnoreCase);
-
-                        if (!isValid && _logger.IsEnabled(LogLevel.Debug))
-                        {
-                            _logger.Debug("Client security OTP JWT path mismatch from {ip} : {current} != {token}",
-                                entity.TrustedRemoteIp,
-                                requestPath,
-                                unsafeUserPath.ToString()
-                            );
-                        }
+                        isValid = false;
                     }
-                }
-                else
-                {
-                    isValid = false;
                 }
 
                 return isValid;
@@ -864,6 +867,12 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             /// </summary>
             [JsonPropertyName("allowed_origins")]
             public string[]? AllowedOrigins { get; set; }
+
+            /// <summary>
+            /// Enforce strict path checking for the client's token
+            /// </summary>
+            [JsonPropertyName("strict_path")]
+            public bool VerifyPath { get; set; } = true;
 
             void IOnConfigValidation.Validate()
             {
