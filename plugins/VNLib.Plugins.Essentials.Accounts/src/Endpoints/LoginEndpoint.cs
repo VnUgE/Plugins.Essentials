@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2023 Vaughn Nugent
+* Copyright (c) 2024 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
@@ -136,7 +136,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                     return VirtualClose(entity, webm, HttpStatusCode.UnprocessableEntity);
                 }
                
-                using IUser? user = await Users.GetUserFromEmailAsync(loginMessage.UserName);
+                using IUser? user = await Users.GetUserFromUsernameAsync(loginMessage.UserName);
 
                 //Make sure account exists
                 if (webm.Assert(user != null, INVALID_MESSAGE))
@@ -303,7 +303,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             }
             
             //recover user account 
-            using IUser? user = await Users.GetUserFromEmailAsync(upgrade.UserName!);
+            using IUser? user = await Users.GetUserFromUsernameAsync(upgrade.UserName!);
 
             if (webm.Assert(user != null, MFA_ERROR_MESSAGE))
             {

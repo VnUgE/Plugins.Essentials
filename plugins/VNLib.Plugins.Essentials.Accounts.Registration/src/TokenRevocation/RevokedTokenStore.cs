@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2023 Vaughn Nugent
+* Copyright (c) 2024 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts.Registration
@@ -41,32 +41,30 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.TokenRevocation
         public async Task<bool> IsRevokedAsync(string token, CancellationToken cancellation)
         {
             await using RegistrationContext context = new (Options.Value);
-            await context.OpenTransactionAsync(cancellation);
 
             //Select any that match tokens
             bool any = await (from t in context.RevokedRegistrationTokens
                               where t.Token == token
-                              select t).AnyAsync(cancellation);
+                              select t)
+                              .AnyAsync(cancellation);
 
-            await context.CommitTransactionAsync(cancellation);
+            await context.SaveAndCloseAsync(true, cancellation);
             return any;
         }
 
         public async Task RevokeAsync(string token, CancellationToken cancellation)
         {
             await using RegistrationContext context = new (Options.Value);
-            await context.OpenTransactionAsync(cancellation);
 
             //Add to table
-            context.RevokedRegistrationTokens.Add(new RevokedToken()
+            context.RevokedRegistrationTokens.Add(new RevokedToken
             {
                 Created = DateTime.UtcNow,
                 Token = token
             });
 
             //Save changes and commit transaction
-            await context.SaveChangesAsync(cancellation);
-            await context.CommitTransactionAsync(cancellation);
+            await context.SaveAndCloseAsync(true, cancellation);
         }
 
         /// <summary>
@@ -80,21 +78,15 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.TokenRevocation
             DateTime expiredBefore = DateTime.UtcNow.Subtract(validFor);
 
             await using RegistrationContext context = new (Options.Value);
-            await context.OpenTransactionAsync(cancellation);
 
             //Select any that match tokens
             RevokedToken[] expired = await context.RevokedRegistrationTokens.Where(t => t.Created < expiredBefore)
                 .Select(static t => t)
                 .ToArrayAsync(cancellation);
 
-
             context.RevokedRegistrationTokens.RemoveRange(expired);
 
-            ERRNO count =await context.SaveChangesAsync(cancellation);
-            
-            await context.CommitTransactionAsync(cancellation);
-
-            return count;
+            return await context.SaveAndCloseAsync(true, cancellation);
         }
     }
 }

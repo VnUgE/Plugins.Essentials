@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2023 Vaughn Nugent
+* Copyright (c) 2024 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Content.Routing
@@ -22,8 +22,6 @@
 * along with this program.  If not, see https://www.gnu.org/licenses/.
 */
 
-using System;
-
 using Microsoft.EntityFrameworkCore;
 
 using VNLib.Plugins.Extensions.Data;
@@ -31,7 +29,7 @@ using VNLib.Plugins.Extensions.Loading.Sql;
 
 namespace VNLib.Plugins.Essentials.Content.Routing.Model
 {
-    internal sealed class RoutingContext : TransactionalDbContext, IDbTableDefinition
+    internal sealed class RoutingContext : DBContextBase, IDbTableDefinition
     {
         public DbSet<Route> Routes { get; set; }
 

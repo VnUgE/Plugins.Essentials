@@ -203,7 +203,7 @@ Commands:
                             }
 
                             //Get the user
-                            using IUser? user = await Users.GetUserFromEmailAsync(username);
+                            using IUser? user = await Users.GetUserFromUsernameAsync(username);
 
                             if(user == null)
                             {
@@ -226,7 +226,7 @@ Commands:
                             }
 
                             //Get user
-                            using IUser? user = await Users.GetUserFromEmailAsync(username);
+                            using IUser? user = await Users.GetUserFromUsernameAsync(username);
                             
                             if (user == null)
                             {
@@ -251,7 +251,7 @@ Commands:
                             }
 
                             //Get user
-                            using IUser? user = await Users.GetUserFromEmailAsync(username);
+                            using IUser? user = await Users.GetUserFromUsernameAsync(username);
 
                             if (user == null)
                             {
@@ -276,7 +276,7 @@ Commands:
                             }
 
                             //Get user
-                            using IUser? user = await Users.GetUserFromEmailAsync(username);
+                            using IUser? user = await Users.GetUserFromUsernameAsync(username);
 
                             if (user == null)
                             {
@@ -322,7 +322,7 @@ Commands:
                             }
 
                             //Get user
-                            using IUser? user = await Users.GetUserFromEmailAsync(username);
+                            using IUser? user = await Users.GetUserFromUsernameAsync(username);
 
                             if (user == null)
                             {
@@ -369,7 +369,7 @@ Commands:
                             }
 
                             //Get user
-                            using IUser? user = await Users.GetUserFromEmailAsync(username);
+                            using IUser? user = await Users.GetUserFromUsernameAsync(username);
                             if (user == null)
                             {
                                 Log.Warn("The specified user does not exist");

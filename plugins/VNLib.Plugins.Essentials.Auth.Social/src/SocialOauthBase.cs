@@ -450,7 +450,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social
                 }
 
                 //See if user by email address exists
-                user = await Users.GetUserFromEmailAsync(userAccount.EmailAddress!, entity.EventCancellation);
+                user = await Users.GetUserFromUsernameAsync(userAccount.EmailAddress!, entity.EventCancellation);
 
                 if (user == null)
                 {

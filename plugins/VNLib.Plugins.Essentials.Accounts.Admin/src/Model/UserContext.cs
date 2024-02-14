@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2022 Vaughn Nugent
+* Copyright (c) 2024 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts.Admin
@@ -28,7 +28,7 @@ using VNLib.Plugins.Extensions.Data;
 
 namespace VNLib.Plugins.Essentials.Accounts.Admin.Model
 {
-    internal class UserContext : TransactionalDbContext
+    internal class UserContext : DBContextBase
     {
         public DbSet<User> Users { get; set; }
 #nullable disable

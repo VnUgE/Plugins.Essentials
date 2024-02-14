@@ -173,7 +173,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
          * and need to be regnerated or invalidated. If they are expired
          * we need to cleanup any internal security flags/keys
          */
-        private bool OnMwCheckSessionExpired(HttpEntity entity, in SessionInfo session)
+        private bool OnMwCheckSessionExpired(HttpEntity entity, ref readonly SessionInfo session)
         {
             if (session.Created.AddSeconds(_config.WebSessionValidForSeconds) < entity.RequestedTimeUtc)
             {
@@ -881,7 +881,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             }
         }
 
-        private sealed record class EncryptedTokenAuthorization(string ClientAuthToken) : IClientAuthorization
+        private sealed class EncryptedTokenAuthorization(string ClientAuthToken) : IClientAuthorization
         {
             ///<inheritdoc/>
             public object GetClientAuthData() => ClientAuthToken;

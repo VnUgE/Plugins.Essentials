@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2023 Vaughn Nugent
+* Copyright (c) 2024 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
@@ -162,7 +162,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 }
 
                 //Get the user from the email address
-                user = await _users.GetUserFromEmailAsync(authInfo.EmailAddress!, entity.EventCancellation);
+                user = await _users.GetUserFromUsernameAsync(authInfo.EmailAddress!, entity.EventCancellation);
 
                 if (webm.Assert(user != null, INVALID_MESSAGE))
                 {

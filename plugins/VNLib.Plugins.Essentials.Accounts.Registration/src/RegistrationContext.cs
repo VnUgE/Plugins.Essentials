@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2023 Vaughn Nugent
+* Copyright (c) 2024 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts.Registration
@@ -30,7 +30,7 @@ using VNLib.Plugins.Essentials.Accounts.Registration.TokenRevocation;
 
 namespace VNLib.Plugins.Essentials.Accounts.Registration
 {
-    internal class RegistrationContext : TransactionalDbContext, IDbTableDefinition
+    internal class RegistrationContext : DBContextBase, IDbTableDefinition
     {
         public DbSet<RevokedToken> RevokedRegistrationTokens { get; set; }
         

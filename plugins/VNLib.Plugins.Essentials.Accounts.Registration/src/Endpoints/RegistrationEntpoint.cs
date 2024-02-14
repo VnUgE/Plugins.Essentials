@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2023 Vaughn Nugent
+* Copyright (c) 2024 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts.Registration
@@ -220,7 +220,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
             Task delay = Task.Delay(200);
 
             //See if a user account already exists
-            using (IUser? user = await Users.GetUserFromEmailAsync(request.UserName!, entity.EventCancellation))
+            using (IUser? user = await Users.GetUserFromUsernameAsync(request.UserName!, entity.EventCancellation))
             {
                 if (user != null)
                 {
