@@ -131,20 +131,18 @@ namespace VNLib.Plugins.Essentials.Accounts
                 string? username = args.GetArgument("-u");
                 string? password = args.GetArgument("-p");
 
-                if (args.Count < 3)
+                if (args.Count < 1)
                 {
                     Log.Warn("Not enough arguments, use the help command to view available commands");
                     return;
                 }
 
-                switch (args[2].ToLower(null))
+                switch (args[0].ToLower(null))
                 {
                     case "help":
                         const string help = @"
     
 Command help for {name}
-
-Usage: p {name} <command> [options]
 
 Commands:
     create -u <username> -p <password>                              Create a new user
@@ -390,9 +388,9 @@ Commands:
             {
                 Log.Error("User already exists");
             }
-            catch(UserCreationFailedException)
+            catch(UserCreationFailedException ucfe)
             {
-                Log.Error("Failed to create the new user");
+                Log.Error(ucfe, "Failed to create the new user");
             }
             catch (ArgumentOutOfRangeException)
             {

@@ -60,7 +60,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
 
     [ConfigurationName("account_security", Required = false)]
     [MiddlewareImpl(MiddlewareImplOptions.SecurityCritical)]
-    internal class AccountSecProvider : IAccountSecurityProvider, IHttpMiddleware
+    internal sealed class AccountSecProvider : IAccountSecurityProvider, IHttpMiddleware
     {
         private const int PUB_KEY_JWT_NONCE_SIZE = 16;
 

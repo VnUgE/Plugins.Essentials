@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2023 Vaughn Nugent
+* Copyright (c) 2024 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Content.Routing
@@ -41,21 +41,14 @@ using VNLib.Plugins.Essentials.Content.Routing.Model;
 namespace VNLib.Plugins.Essentials.Content.Routing
 {
 
-    internal sealed class Router : IPageRouter
+    internal sealed class Router(PluginBase plugin) : IPageRouter
     {
         private static readonly RouteComparer Comparer = new();
 
-        private readonly IRouteStore Store;
-        private readonly ILogProvider Logger;
+        private readonly IRouteStore Store = plugin.GetOrCreateSingleton<ManagedRouteStore>();
+        private readonly ILogProvider Logger = plugin.Log;
 
-        private readonly ConcurrentDictionary<IWebProcessor, Task<ReadOnlyCollection<Route>>> RouteTable;
-
-        public Router(PluginBase plugin)
-        {
-            Store = plugin.GetOrCreateSingleton<ManagedRouteStore>();
-            Logger = plugin.Log;
-            RouteTable = new();
-        }
+        private readonly ConcurrentDictionary<IWebProcessor, Task<ReadOnlyCollection<Route>>> RouteTable = new();
 
         public Router(PluginBase plugin, IConfigScope config):this(plugin)
         { }
