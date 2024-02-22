@@ -193,7 +193,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             ERRNO valResult = await Users.ValidatePasswordAsync(user, login.Password!, PassValidateFlags.None, cancellation);
 
             //Valid results are greater than 0;
-            return valResult > 0;
+            return valResult == UserPassValResult.Success;
         }
 
         private bool LoginUser(HttpEntity entity, LoginMessage loginMessage, IUser user, MfaUpgradeWebm webm)

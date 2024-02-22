@@ -457,8 +457,9 @@ namespace VNLib.Plugins.Essentials.Auth.Social
                     //Create the new user account
                     UserCreationRequest creation = new()
                     {
-                        EmailAddress = userAccount.EmailAddress!,
+                        Username = userAccount.EmailAddress!,
                         InitialStatus = UserStatus.Active,
+                        Privileges = AccountUtil.MINIMUM_LEVEL
                     };
 
                     try

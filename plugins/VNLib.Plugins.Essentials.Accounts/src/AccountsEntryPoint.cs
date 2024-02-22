@@ -175,7 +175,7 @@ Commands:
                             //Create the user creation request
                             UserCreationRequest creation = new()
                             {
-                                EmailAddress = username,
+                                Username = username,
                                 InitialStatus = UserStatus.Active,
                                 Privileges = privLevel,
                                 Password = PrivateString.ToPrivateString(password, false)

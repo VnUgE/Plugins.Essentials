@@ -163,7 +163,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
             {
                 UserCreationRequest creation = new()
                 {
-                    EmailAddress = emailAddress,
+                    Username = emailAddress,
                     InitialStatus = UserStatus.Active,
                     Password = request.GetPassPrivString(),
                 };

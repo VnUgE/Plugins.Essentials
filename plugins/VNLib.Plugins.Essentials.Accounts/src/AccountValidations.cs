@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2022 Vaughn Nugent
+* Copyright (c) 2024 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
@@ -25,8 +25,6 @@
 using FluentValidation;
 
 using VNLib.Plugins.Extensions.Validation;
-
-#nullable enable
 
 namespace VNLib.Plugins.Essentials.Accounts
 {
