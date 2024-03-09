@@ -22,8 +22,6 @@
 * along with this program.  If not, see https://www.gnu.org/licenses/.
 */
 
-using System;
-
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Routing;
 using VNLib.Plugins.Essentials.Auth.Social;
@@ -35,22 +33,15 @@ namespace VNLib.Plugins.Essentials.Auth.Github
 
     [ServiceExport]
     [ConfigurationName(ConfigKey)]
-    public sealed class GithubPortal : IOAuthProvider
+    public sealed class GithubPortal(PluginBase plugin) : IOAuthProvider
     {
         internal const string ConfigKey = "github";
 
-        private readonly GitHubOauth _loginEndpoint;
-
-        public GithubPortal(PluginBase plugin, IConfigScope config)
-        {
-            //Init the login endpoint
-            _loginEndpoint = plugin.Route<GitHubOauth>();
-        }
+        private readonly GitHubOauth _loginEndpoint = plugin.Route<GitHubOauth>();
 
         ///<inheritdoc/>
         public SocialOAuthPortal[] GetPortals()
         {
-
             //Return the github portal
             return [
                 new SocialOAuthPortal(

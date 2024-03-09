@@ -35,22 +35,15 @@ namespace VNLib.Plugins.Essentials.Auth.Discord
 
     [ServiceExport]
     [ConfigurationName(ConfigKey)]
-    public sealed class DiscordPortal : IOAuthProvider
+    public sealed class DiscordPortal(PluginBase plugin) : IOAuthProvider
     {
         internal const string ConfigKey = "discord";
 
-        private readonly DiscordOauth _loginEndpoint;
-
-        public DiscordPortal(PluginBase plugin, IConfigScope config)
-        {
-            //Init the login endpoint
-            _loginEndpoint = plugin.Route<DiscordOauth>();
-        }
+        private readonly DiscordOauth _loginEndpoint = plugin.Route<DiscordOauth>();
 
         ///<inheritdoc/>
         public SocialOAuthPortal[] GetPortals()
         {
-
             //Return the Discord portal
             return [
                 new SocialOAuthPortal(

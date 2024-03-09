@@ -22,8 +22,6 @@
 * along with this program.  If not, see https://www.gnu.org/licenses/.
 */
 
-using System;
-
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Routing;
 using VNLib.Plugins.Essentials.Auth.Social;
@@ -35,24 +33,16 @@ namespace VNLib.Plugins.Essentials.Auth.Auth0
 
     [ServiceExport]
     [ConfigurationName(ConfigKey)]
-    public sealed class Auth0Portal : IOAuthProvider
+    public sealed class Auth0Portal(PluginBase plugin) : IOAuthProvider
     {
         internal const string ConfigKey = "auth0";
 
-        private readonly LoginEndpoint _loginEndpoint;
-        private readonly LogoutEndpoint _logoutEndpoint;
-
-        public Auth0Portal(PluginBase plugin, IConfigScope config)
-        {
-            //Init the login endpoint
-            _loginEndpoint = plugin.Route<LoginEndpoint>();
-            _logoutEndpoint = plugin.Route<LogoutEndpoint>();
-        }
+        private readonly LoginEndpoint _loginEndpoint = plugin.Route<LoginEndpoint>();
+        private readonly LogoutEndpoint _logoutEndpoint = plugin.Route<LogoutEndpoint>();
 
         ///<inheritdoc/>
         public SocialOAuthPortal[] GetPortals()
         {
-
             //Return the Auth0 portal
             return [
                 new SocialOAuthPortal(

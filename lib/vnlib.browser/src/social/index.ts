@@ -1,6 +1,5 @@
-import { find, isEqual, map } from "lodash-es";
-import { get } from "@vueuse/core";
-import { MaybeRef } from "vue";
+import { find, first, isArray, isEqual, map } from "lodash-es";
+import { Mutable, get } from "@vueuse/core";
 import Cookies from "universal-cookie";
 import { useUser } from "../user";
 import { useAxios } from "../axios";
@@ -10,29 +9,12 @@ import { type AxiosRequestConfig } from "axios";
 
 export type SocialServerSetQuery = 'invalid' | 'expired' | 'authorized';
 
-export interface OAuthMethod{
-    /**
-     * Gets the url to the login endpoint for this method
-     */
-    readonly Id: string
-    /**
-     * The endpoint to submit the authentication request to
-     */
-    loginUrl(): string
-    /**
-     * Called when the login to this method was successful
-     */
-    onSuccessfulLogin?:() => void
-    /**
-     * Called when the logout to this method was successful
-     */
-    onSuccessfulLogout?:(responseData: unknown) => void
-    /**
-    * Gets the data to send to the logout endpoint, if this method
-    * is undefined, then the logout will be handled by the normal user logout
-    */
-    getLogoutData?: () => { readonly url: string; readonly args: unknown }
-}
+/**
+ * A continuation function that is called after a successful logout
+ */
+export type SocialLogoutContinuation = () => Promise<void>
+
+
 
 export interface SocialLoginApi<T>{
     /**
@@ -76,152 +58,121 @@ export interface SocialOAuthPortal {
 }
 
 /**
+ * An social OAuth2 authentication method that can be used to
+ * authenticate against a server for external connections 
+ */
+export interface OAuthMethod {
+    /**
+     * The unique id of the method
+     */
+    readonly id: string;
+    /**
+     * Determines if the current flow is active for this method
+     */
+    isActiveLogin(): boolean
+    /**
+     * Begins the login flow for this method
+     */
+    beginLoginFlow(): Promise<void>
+    /**
+     * Completes the login flow for this method
+     */
+    completeLogin(): Promise<void>
+    /**
+     * Logs out of the current session
+     */
+    logout(): Promise<SocialLogoutContinuation | void>
+}
+
+export interface SocialOauthMethod {
+    /**
+     * Gets the url to the login endpoint for this method
+     */
+    readonly id: string
+    /**
+     * The endpoint to submit the authentication request to
+     */
+    loginUrl(): string
+    /**
+     * Called when the login to this method was successful
+     */
+    onSuccessfulLogin?: () => void
+    /**
+     * Called when the logout to this method was successful
+     */
+    onSuccessfulLogout?: (responseData: unknown) => SocialLogoutContinuation | void
+    /**
+    * Gets the data to send to the logout endpoint, if this method
+    * is undefined, then the logout will be handled by the normal user logout
+    */
+    getLogoutData?: () => { readonly url: string; readonly args: unknown }
+}
+
+
+interface SocialLogoutResult{
+    readonly url: string | undefined;
+}
+
+/**
  * Creates a new social login api for the given methods
  */
-export const useSocialOauthLogin = <T extends OAuthMethod>(methods: T[], axiosConfig?: Partial<AxiosRequestConfig>): SocialLoginApi<T> =>{
+export const useOauthLogin = <T extends OAuthMethod>(methods: T[]): SocialLoginApi<T> => {
 
     const cookieName = 'active-social-login';
 
-    const { loggedIn, KeyStore } = useSession();
-    const { prepareLogin, logout:userLogout } = useUser();
-    const axios = useAxios(axiosConfig);
+    const { loggedIn } = useSession();
 
     //A cookie will hold the status of the current login method
-    const c = new Cookies(null, { sameSite: 'strict', httpOnly:false });
-
-    const getNonceQuery = () => new URLSearchParams(window.location.search).get('nonce');
-    const getResultQuery = () => new URLSearchParams(window.location.search).get('result');
-    const selectMethodForCurrentUrl = () => find(methods, method => {
-        const loginUrl = method.loginUrl();
-        //Check for absolute url, then check if the path is the same
-        if(loginUrl.startsWith('http')){
-            const asUrl = new URL(loginUrl);
-            return isEqual(asUrl.pathname, window.location.pathname);
-        }
-        //Relative url
-        return isEqual(loginUrl, window.location.pathname);
-    })
+    const c = new Cookies(null, { sameSite: 'strict', httpOnly: false });
 
     const getActiveMethod = (): T | undefined => {
-       const methodName = c.get(cookieName)
-       return find(methods, method => isEqual(method.Id, methodName))
+        const methodName = c.get(cookieName)
+        return find(methods, method => isEqual(method.id, methodName))
     }
 
-    const beginLoginFlow = async (method: T): Promise<void> => {
-        //Prepare the login claim`
-        const claim = await prepareLogin()
-        const { data } = await axios.put<WebMessage<string>>(method.loginUrl(), claim)
-
-        const encDat = data.getResultOrThrow()
-        // Decrypt the result which should be a redirect url
-        const result = await KeyStore.decryptDataAsync(encDat)
-        // get utf8 text
-        const text = new TextDecoder('utf-8').decode(result)
-        // Recover url
-        const redirect = new URL(text)
-        // Force https
-        redirect.protocol = 'https:'
-        // redirect to the url
-        window.location.href = redirect.href
+    const beginLoginFlow =  (method: T): Promise<void> => {
+        return method.beginLoginFlow()
     }
 
     const completeLogin = async () => {
 
-        //Get auth result from query params
-        const result = getResultQuery();
-        switch(result){
-            case 'invalid':
-                throw new Error('The request was invalid, and you could not be logged in. Please try again.');
-            case 'expired':
-                throw new Error('The request has expired. Please try again.');
-            
-            //Continue with login
-            case 'authorized':
-                break;
+        const method = find(methods, method => method.isActiveLogin());
 
-            default:
-                throw new Error('There was an error processing the login request. Please try again.')
-        }
-
-        const method = selectMethodForCurrentUrl();
-
-        if(!method){
+        if (!method) {
             throw new Error('The current url is not a valid social login url');
         }
 
-        //Recover the nonce from query params
-        const nonce = getNonceQuery();
-        if(!nonce){
-            throw new Error('The current session has not been initialized for social login');
-        }
-
-        const loginUrl = method.loginUrl();
-
-        //Prepare the session for a new login
-        const login = await prepareLogin();
-
-        //Send a post request to the endpoint to complete the login and pass the nonce argument
-        const { data } = await axios.post<ITokenResponse>(loginUrl, { ...login, nonce })
-
-        //Verify result
-        data.getResultOrThrow()
-        
-        //Complete login authorization
-        await login.finalize(data);
-
-        //Signal the method that the login was successful
-        if(method.onSuccessfulLogin){
-            method.onSuccessfulLogin();
-        }
+        await method.completeLogin();
 
         //Set the cookie to the method id
-        c.set(cookieName, method.Id, { path: loginUrl });
+        c.set(cookieName, method.id);
     }
 
     const logout = async (): Promise<boolean> => {
-        if(!get(loggedIn)){
+        if (!get(loggedIn)) {
             return false;
         }
 
-        //see if any methods are active
+        //see if any methods are active, then call logout on the active method
         const method = getActiveMethod();
 
         if(!method){
-            return false;
+           return false;
         }
 
-        /**
-         * If no logout data method is defined, then the logout 
-         * is handled by a normal account logout
-         */
-        if(!method.getLogoutData){
-            //Normal user logout
-            const result = await userLogout();
-
-            if(method.onSuccessfulLogout){
-                method.onSuccessfulLogout(result);
-            }
-            
-            return true;
-        }
-
-        const { url, args } = method.getLogoutData();
-
-        //Exec logout post request against the url
-        const { data } = await axios.post(url, args);
+        const result = await method.logout();
 
         //clear cookie on success
         c.remove(cookieName);
 
-        //Signal the method that the logout was successful
-        if (method.onSuccessfulLogout) {
-            method.onSuccessfulLogout(data);
+        if (result) {
+            await result();
         }
 
         return true;
     }
 
-    return{
+    return {
         beginLoginFlow,
         completeLogin,
         getActiveMethod,
@@ -231,29 +182,176 @@ export const useSocialOauthLogin = <T extends OAuthMethod>(methods: T[], axiosCo
 }
 
 /**
- * Creates a new simple social OAuth method used for login
- * @example
- * const google = createSocialMethod('google', 'https://accounts.google.com/o/oauth2/v2/auth')
- * const facebook = createSocialMethod('facebook', 'https://www.facebook.com/v2.10/dialog/oauth')
+ * Creates a new oauth2 login api for the given methods
  */
-export const createSocialMethod = (id: string, path: MaybeRef<string>): OAuthMethod => {
-    return{
-        Id: id,
-        loginUrl: () => get(path),
+export const fromSocialConnections = <T extends SocialOauthMethod>(methods: T[], axiosConfig?: Partial<AxiosRequestConfig>): OAuthMethod[] =>{
+
+    const { KeyStore } = useSession();
+    const { prepareLogin, logout:userLogout } = useUser();
+    const axios = useAxios(axiosConfig);
+
+    const getNonceQuery = () => new URLSearchParams(window.location.search).get('nonce');
+    const getResultQuery = () => new URLSearchParams(window.location.search).get('result');
+
+    const checkForValidResult = () => {
+        //Get auth result from query params
+        const result = getResultQuery();
+        switch (result) {
+            case 'invalid':
+                throw new Error('The request was invalid, and you could not be logged in. Please try again.');
+            case 'expired':
+                throw new Error('The request has expired. Please try again.');
+
+            //Continue with login
+            case 'authorized':
+                break;
+
+            default:
+                throw new Error('There was an error processing the login request. Please try again.')
+        }
     }
+
+    return map(methods, method => {
+        return{
+            id: method.id,
+           
+            async beginLoginFlow() {
+                //Prepare the login claim`
+                const claim = await prepareLogin()
+                const { data } = await axios.put<WebMessage<string>>(method.loginUrl(), claim)
+                const encDat = data.getResultOrThrow()
+                // Decrypt the result which should be a redirect url
+                const result = await KeyStore.decryptDataAsync(encDat)
+                // get utf8 text
+                const text = new TextDecoder('utf-8').decode(result)
+                // Recover url
+                const redirect = new URL(text)
+                // Force https
+                redirect.protocol = 'https:'
+                // redirect to the url
+                window.location.href = redirect.href
+            },
+            async completeLogin() {
+                checkForValidResult();
+
+                //Recover the nonce from query params
+                const nonce = getNonceQuery();
+                if (!nonce) {
+                    throw new Error('The current session has not been initialized for social login');
+                }
+
+                //Prepare the session for a new login
+                const login = await prepareLogin();
+
+                //Send a post request to the endpoint to complete the login and pass the nonce argument
+                const { data } = await axios.post<ITokenResponse>(method.loginUrl(), { ...login, nonce })
+
+                //Verify result
+                data.getResultOrThrow()
+
+                //Complete login authorization
+                await login.finalize(data);
+            },
+            isActiveLogin() {
+                const loginUrl = method.loginUrl();
+                //Check for absolute url, then check if the path is the same
+                if (loginUrl.startsWith('http')) {
+                    const asUrl = new URL(loginUrl);
+                    return isEqual(asUrl.pathname, window.location.pathname);
+                }
+                //Relative url
+                return isEqual(loginUrl, window.location.pathname);
+            },
+            async logout() {
+                /**
+                 * If no logout data method is defined, then the logout 
+                 * is handled by a normal account logout
+                 */
+                if (!method.getLogoutData) {
+                    //Normal user logout
+                    const result = await userLogout();
+
+                    if (method.onSuccessfulLogout) {
+                        method.onSuccessfulLogout(result);
+                    }
+
+                    return;
+                }
+
+                const { url, args } = method.getLogoutData();
+
+                //Exec logout post request against the url
+                const { data } = await axios.post(url, args);
+
+                //Signal the method that the logout was successful
+                return method.onSuccessfulLogout ? method.onSuccessfulLogout(data) : undefined; 
+            },
+        } as OAuthMethod
+    });
 }
 
 /**
- * Creates social OAuth methods from the given portals (usually captured from the server)
+ * Adds a default logout function to the social login api that will
+ * call the user supplied logout function if the social logout does not
+ * have a registered logout method
  */
-export const fromPortals = (portals: SocialOAuthPortal[]): OAuthMethod[] => {
-    return map(portals, p => {
-        const method = createSocialMethod(p.id, p.login);
+export const useSocialDefaultLogout = <T>(socialOauth: SocialLoginApi<T>, logout: () => Promise<unknown>): SocialLoginApi<T> => {
+    //Store old logout function for later use
+    const logoutFunc = socialOauth.logout;
 
-        //If a logout url is defined, then add it to the method
-        if(p.logout){
-            method.getLogoutData = () => ({ url: p.logout!, args: {} })
+    (socialOauth as Mutable<SocialLoginApi<T>>).logout = async (): Promise<boolean> => {
+        //If no logout was handled by social, fall back to user supplied logout
+        if (await logoutFunc() === false) {
+            await logout()
         }
-        return method;
+        return true;
+    }
+
+    return socialOauth;
+}
+
+export const fromSocialPortals = (portals: SocialOAuthPortal[]): SocialOauthMethod[] => {
+    return map(portals, p => {
+        return {
+            id: p.id,
+            loginUrl : () => p.login,
+            //Get the logout data from the server
+            getLogoutData: () => ({ url: p.logout!, args: {}}),
+            //Redirect to the logout url returned by the server
+            onSuccessfulLogout: (data: SocialLogoutResult) => {
+                if (data.url) {
+                    return () => {
+                        window.location.assign(data.url!);
+                        return Promise.resolve();
+                    }
+                }
+            },
+            onSuccessfulLogin: () => {}
+        } as SocialOauthMethod
     })
+}
+
+export const fetchSocialPortals = async (portalEndpoint: string, axiosConfig?: Partial<AxiosRequestConfig>): Promise<SocialOAuthPortal[]> => {
+    //Get axios instance
+    const axios = useAxios(axiosConfig)
+
+    //Get all enabled portals
+    const { data } = await axios.get<SocialOAuthPortal[]>(portalEndpoint);
+
+    /**
+     * See if the response was a json array.
+     * 
+     * Sometimes axios will parse HTML as json and still
+     * return an object array, so if its an array, then
+     * verify that at least one element is a valid portal
+     */
+    if (isArray(data)) {
+        if(data.length === 0){
+            return [];
+        }
+       
+        return first(data)?.id ? data : [];
+    }
+
+    throw new Error('The response from the server was not a valid json array');
 }

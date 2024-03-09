@@ -11,7 +11,7 @@
   "typings": "./dist/index.d.ts",
   "output":"bin",
   "scripts": {
-    "lint": "eslint --ext .js,.ts --ignore-path .gitignore src",
+    "lint": "eslint --ext .js,.ts src",
     "build": "tsc",
     "clean": "if exist dist ( rd /S /Q lib)"
   },
@@ -27,7 +27,6 @@
     "@vueuse/core": "^10.x",
     "lodash-es": "^4.x",
     "vue": "^3.x",
-    "vue-router": "^4.x",
     "axios": "^1.x",
     "eslint": "^8.39.0",
     "jose": "^5.x",

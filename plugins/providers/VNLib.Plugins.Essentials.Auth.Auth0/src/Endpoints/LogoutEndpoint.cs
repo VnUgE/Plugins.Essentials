@@ -22,12 +22,14 @@
 * along with this program.  If not, see https://www.gnu.org/licenses/.
 */
 
-using VNLib.Utils;
+using System.Net;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
+using VNLib.Utils.IO;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Essentials.Accounts;
 using VNLib.Plugins.Essentials.Endpoints;
-using VNLib.Plugins.Essentials.Extensions;
 
 
 namespace VNLib.Plugins.Essentials.Auth.Auth0.Endpoints
@@ -35,7 +37,7 @@ namespace VNLib.Plugins.Essentials.Auth.Auth0.Endpoints
     [ConfigurationName(Auth0Portal.ConfigKey)]
     internal sealed class LogoutEndpoint : ProtectedWebEndpoint
     {
-        private readonly IAsyncLazy<string> ReturnUrl;
+        private readonly IAsyncLazy<VnMemoryStream> ReturnUrl;
 
         public LogoutEndpoint(PluginBase plugin, IConfigScope config)
         {
@@ -48,23 +50,35 @@ namespace VNLib.Plugins.Essentials.Auth.Auth0.Endpoints
             //Build the return url once the client id is available
             ReturnUrl = plugin.GetSecretAsync("auth0_client_id").ToLazy(sr =>
             {
-                return $"{logoutUrl}?client_id={sr.Result.ToString()}&returnTo={returnToUrl}";
-            });
-        }
+                //The result we will send to users on logout so then can properly redirect their clients
+                LogoutResult json = new()
+                {
+                    Url = $"{logoutUrl}?client_id={sr.Result.ToString()}&returnTo={returnToUrl}"
+                };
 
-        protected override ERRNO PreProccess(HttpEntity entity)
-        {
-            //Client required to be fully authorized
-            return base.PreProccess(entity)
-                && entity.IsClientAuthorized(AuthorzationCheckLevel.Critical);
+                VnMemoryStream vms = new();
+                JsonSerializer.Serialize(vms, json);
+                return VnMemoryStream.CreateReadonly(vms);
+            });
         }
 
         protected override VfReturnType Post(HttpEntity entity)
         {
             //Invalidate the login before redirecting the client
             entity.InvalidateLogin();
-            entity.Redirect(RedirectType.Temporary, ReturnUrl.Value);
-            return VfReturnType.VirtualSkip;
+
+            return VirtualClose(
+                entity, 
+                HttpStatusCode.OK, 
+                Net.Http.ContentType.Json,  
+                ReturnUrl.Value.GetReadonlyShallowCopy()    //Return stream shallow copy to avoid alloc and copy
+            );
+        }
+
+        sealed class LogoutResult
+        {
+            [JsonPropertyName("url")]
+            public string? Url { get; set; }
         }
     }
 }
