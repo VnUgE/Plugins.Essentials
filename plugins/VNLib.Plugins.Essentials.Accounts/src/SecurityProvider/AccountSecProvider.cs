@@ -637,7 +637,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             string base32SigningKey = VnEncoding.ToBase32String(signingKey, false);
 
             //Zero signing key now were done using it
-            MemoryUtil.InitializeBlock(signingKey.AsSpan());
+            MemoryUtil.InitializeBlock(signingKey);
 
             //Compile the jwt for the cookie value
             string jwtValue = jwt.Compile();

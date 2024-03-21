@@ -33,7 +33,7 @@ namespace VNLib.Plugins.Essentials.Auth.Github
 
     [ServiceExport]
     [ConfigurationName(ConfigKey)]
-    public sealed class GithubPortal(PluginBase plugin) : IOAuthProvider
+    public sealed class GithubPortal(PluginBase plugin, IConfigScope config) : IOAuthProvider
     {
         internal const string ConfigKey = "github";
 
@@ -42,12 +42,15 @@ namespace VNLib.Plugins.Essentials.Auth.Github
         ///<inheritdoc/>
         public SocialOAuthPortal[] GetPortals()
         {
+            string? base64IconData = config.GetValueOrDefault("icon", p => p.GetString()!, null);
+
             //Return the github portal
             return [
                 new SocialOAuthPortal(
                     ConfigKey,
                     _loginEndpoint,
-                    null
+                    null,
+                    base64IconData
                 )
             ];
             

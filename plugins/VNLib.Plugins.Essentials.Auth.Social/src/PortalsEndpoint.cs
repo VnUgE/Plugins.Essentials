@@ -23,44 +23,63 @@
 */
 
 using System;
+using System.Net;
 using System.Linq;
+using System.Text.Json;
 using System.Collections.Generic;
 
+using VNLib.Utils.IO;
+using VNLib.Net.Http;
 using VNLib.Plugins.Essentials.Endpoints;
 using VNLib.Plugins.Extensions.Loading;
-
 
 namespace VNLib.Plugins.Essentials.Auth.Social
 {
     [ConfigurationName("portals")]
-    internal sealed class PortalsEndpoint : UnprotectedWebEndpoint
+    internal sealed class PortalsEndpoint : UnprotectedWebEndpoint, IDisposable
     {
-        private PortalDefJson[] _portals;
+        private readonly VnMemoryStream _portals;
 
         public PortalsEndpoint(PluginBase plugin, IConfigScope config)
         {
             string path = config.GetRequiredProperty("path", p => p.GetString()!);
             InitPathAndLog(path, plugin.Log);
 
-            //Empty array by default
-            _portals = [];
+            _portals = new VnMemoryStream();
         }
 
         public void SetPortals(IEnumerable<SocialOAuthPortal> portals)
         {
             //Convert to json
-            _portals = portals.Select(p => new PortalDefJson
+            PortalDefJson[] jsn = portals.Select(p => new PortalDefJson
             {
                 id = p.PortalId,
                 login = p.LoginEndpoint.Path,
                 logout = p.LogoutEndpoint?.Path,
+                icon = p.Base64Icon
             }).ToArray();
+
+            //Serialize portals array to memory stream
+            JsonSerializer.Serialize(_portals, jsn);
+
+            //Set memory stream to readonly so shallow copy can be returned
+            _ = VnMemoryStream.CreateReadonly(_portals);
         }
 
         protected override VfReturnType Get(HttpEntity entity)
         {
-            //return portals array as json
-            return VirtualOkJson(entity, _portals);
+            //return portals array, pre-serialized
+            return VirtualClose(
+                entity,
+                HttpStatusCode.OK,
+                ContentType.Json,
+                _portals!.GetReadonlyShallowCopy()
+            );
+        }
+
+        void IDisposable.Dispose()
+        {
+            _portals?.Dispose();
         }
 
         private sealed class PortalDefJson
@@ -70,6 +89,8 @@ namespace VNLib.Plugins.Essentials.Auth.Social
             public string? login { get; set; }
 
             public string? logout { get; set; }
+
+            public string? icon { get; set; }
         }
     }
 }

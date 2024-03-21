@@ -30,5 +30,6 @@ namespace VNLib.Plugins.Essentials.Auth.Social
     /// <param name="PortalId"> The unique identifier for the portal </param>
     /// <param name="LoginEndpoint"> Required login endpoint to advertise to the client </param>
     /// <param name="LogoutEndpoint"> Optional logout endpoint to advertise to the client </param>
-    public record SocialOAuthPortal(string PortalId, IEndpoint LoginEndpoint, IEndpoint? LogoutEndpoint);
+    /// <param name="Base64Icon">Optional base64 image icon src for the client to load and display</param>
+    public record SocialOAuthPortal(string PortalId, IEndpoint LoginEndpoint, IEndpoint? LogoutEndpoint, string? Base64Icon);
 }
