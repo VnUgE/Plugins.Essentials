@@ -55,6 +55,7 @@ export interface SocialOAuthPortal {
     readonly id: string;
     readonly login: string;
     readonly logout?: string;
+    readonly icon?: string;
 }
 
 /**
@@ -66,6 +67,10 @@ export interface OAuthMethod {
      * The unique id of the method
      */
     readonly id: string;
+    /**
+     * Optional bas64encoded icon image url for the method
+     */
+    readonly icon?: string;
     /**
      * Determines if the current flow is active for this method
      */
@@ -89,6 +94,10 @@ export interface SocialOauthMethod {
      * Gets the url to the login endpoint for this method
      */
     readonly id: string
+    /**
+     * Optional bas64encoded icon image url for the method
+     */
+    readonly icon?: string
     /**
      * The endpoint to submit the authentication request to
      */
@@ -214,7 +223,8 @@ export const fromSocialConnections = <T extends SocialOauthMethod>(methods: T[],
     return map(methods, method => {
         return{
             id: method.id,
-           
+            icon: method.icon,
+
             async beginLoginFlow() {
                 //Prepare the login claim`
                 const claim = await prepareLogin()
@@ -314,6 +324,7 @@ export const fromSocialPortals = (portals: SocialOAuthPortal[]): SocialOauthMeth
     return map(portals, p => {
         return {
             id: p.id,
+            icon: p.icon,
             loginUrl : () => p.login,
             //Get the logout data from the server
             getLogoutData: () => ({ url: p.logout!, args: {}}),

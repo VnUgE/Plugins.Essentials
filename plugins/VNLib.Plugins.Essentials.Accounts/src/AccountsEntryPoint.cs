@@ -92,7 +92,7 @@ namespace VNLib.Plugins.Essentials.Accounts
                 this.ExportService<IAccountSecurityProvider>(securityProvider);
 
                 //Also add the middleware array
-                this.ExportService(new IHttpMiddleware[] { securityProvider });
+                this.ExportService<IHttpMiddleware[]>([ securityProvider ]);
 
                 Log.Information("Configuring the account security provider service");
             }

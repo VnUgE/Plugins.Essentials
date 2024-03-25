@@ -35,7 +35,7 @@ namespace VNLib.Plugins.Essentials.Auth.Discord
 
     [ServiceExport]
     [ConfigurationName(ConfigKey)]
-    public sealed class DiscordPortal(PluginBase plugin) : IOAuthProvider
+    public sealed class DiscordPortal(PluginBase plugin, IConfigScope config) : IOAuthProvider
     {
         internal const string ConfigKey = "discord";
 
@@ -44,12 +44,15 @@ namespace VNLib.Plugins.Essentials.Auth.Discord
         ///<inheritdoc/>
         public SocialOAuthPortal[] GetPortals()
         {
+            string? base64IconData = config.GetValueOrDefault("icon", p => p.GetString()!, null);
+
             //Return the Discord portal
             return [
                 new SocialOAuthPortal(
                     ConfigKey,
                     _loginEndpoint,
-                    null
+                    null,
+                    base64IconData
                 )
             ];
             

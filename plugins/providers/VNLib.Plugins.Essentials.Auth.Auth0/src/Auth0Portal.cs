@@ -33,7 +33,7 @@ namespace VNLib.Plugins.Essentials.Auth.Auth0
 
     [ServiceExport]
     [ConfigurationName(ConfigKey)]
-    public sealed class Auth0Portal(PluginBase plugin) : IOAuthProvider
+    public sealed class Auth0Portal(PluginBase plugin, IConfigScope config) : IOAuthProvider
     {
         internal const string ConfigKey = "auth0";
 
@@ -43,12 +43,15 @@ namespace VNLib.Plugins.Essentials.Auth.Auth0
         ///<inheritdoc/>
         public SocialOAuthPortal[] GetPortals()
         {
+            string? base64IconData = config.GetValueOrDefault("icon", p => p.GetString()!, null);
+
             //Return the Auth0 portal
             return [
                 new SocialOAuthPortal(
                     ConfigKey,
                     _loginEndpoint,
-                    _logoutEndpoint
+                    _logoutEndpoint,
+                    base64IconData
                 )
             ];
             
