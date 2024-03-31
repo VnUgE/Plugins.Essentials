@@ -147,7 +147,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             if (session.Created.AddSeconds(_config.WebSessionValidForSeconds) < entity.RequestedTimeUtc)
             {
                 //Invalidate the session, so its technically valid for this request, but will be cleared on this handle close cycle
-                entity.Session.Invalidate();
+                session.Invalidate();
 
                 //Clear auth specifc cookies
                 _authManager.DestroyAuthorization(entity);
