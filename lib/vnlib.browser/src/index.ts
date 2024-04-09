@@ -37,6 +37,9 @@ export * from './social'
 //Forward session public exports
 export * from './session'
 
+//App-data
+export * from './app-data'
+
 //Axios exports
 export { useAxios } from './axios'
 

@@ -1,6 +1,9 @@
 # VNLib.Plugins.Essentials.Accounts.AppData  
 *An Essentials plugin that provides endpoints for web-application synchronized storage such as user preferences.*
 
+> [!WARNING]
+> This plugin is still in early development and is not yet ready for production use.
+
 ## Builds  
 Debug build w/ symbols & xml docs, release builds, NuGet packages, and individually packaged source code are available on my website (link below).  
 

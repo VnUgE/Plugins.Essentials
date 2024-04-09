@@ -34,6 +34,7 @@
 using System;
 using System.Linq;
 using System.Text.Json;
+using System.Diagnostics;
 
 using VNLib.Hashing;
 using VNLib.Hashing.IdentityUtility;
@@ -286,7 +287,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             }
 
             //Get the client signature
-            string? base32Sig =  GetSigningKey(in entity.Session);
+            string? base32Sig = GetSigningKey(in entity.Session);
 
             if (string.IsNullOrWhiteSpace(base32Sig))
             {
@@ -352,11 +353,12 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
 
         private bool VerifyConnectionOTPInternal(HttpEntity entity)
         {
-            //Get the token from the client header, the client should always sent this
-            string? signedMessage = entity.Server.Headers[_config.TokenHeaderName];
+            Debug.Assert(IsSessionValid(in entity.Session), "Session was assumed to be valid for this call");
 
-            //Make sure a session is loaded
-            if (!entity.Session.IsSet || entity.Session.IsNew || string.IsNullOrWhiteSpace(signedMessage))
+            //Get the token from the client header, the client should always sent this
+            string? signedMessage = GetOTPHeaderValue(entity);
+          
+            if (string.IsNullOrWhiteSpace(signedMessage))
             {
                 return false;
             }
@@ -540,6 +542,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             => string.IsNullOrWhiteSpace(GetLoginToken(in session)) == false;
 
         private void SetPubkeyCookie(HttpEntity entity, string value) => _pubkeyCookie.SetCookie(entity, value);
+        private string? GetOTPHeaderValue(HttpEntity entity) => entity.Server.Headers[_config.TokenHeaderName];
 
         private static void SetSigningKey(ref readonly SessionInfo session, string? value) => session[PUBLIC_KEY_SIG_KEY_ENTRY] = value!;
         private static void SetLoginToken(ref readonly SessionInfo session, string? value) => session[LOGIN_TOKEN_ENTRY] = value!;

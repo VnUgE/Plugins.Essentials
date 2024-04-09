@@ -16,7 +16,7 @@
     <PackageId>VNLib.Plugins.Essentials.Accounts.AppData</PackageId>
     <Authors>Vaughn Nugent</Authors>
     <Company>Vaughn Nugent</Company>
-    <Product>Essentials user accounts an web authentication plugin</Product>
+    <Product>Essentials Account-Based client data storage</Product>
     <Copyright>Copyright © 2024 Vaughn Nugent</Copyright>
     <PackageProjectUrl>https://www.vaughnnugent.com/resources/software/modules/Plugins.Essentials</PackageProjectUrl>
     <RepositoryUrl>https://github.com/VnUgE/Plugins.Essentials/tree/master/plugins/VNLib.Plugins.Essentials.Accounts.AppData</RepositoryUrl>
