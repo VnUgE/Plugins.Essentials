@@ -104,33 +104,40 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                 {
                     //Expired
                     ExpireCookies(entity, true);
-                    
+
                     //Verbose because this is a normal occurance
                     if (_logger.IsEnabled(LogLevel.Verbose))
                     {
                         _logger.Verbose("Session {id} expired", session.SessionID[..8]);
                     }
                 }
-                else
+                else if (session.IsNew)
                 {
-                    //See if the session might be elevated
-                    if (!ClientWebAuthManager.IsSessionElevated(in session))
+                    //explicitly expire cookies on new sessions
+                    ExpireCookies(entity, false);
+                }
+                //See if the session might be elevated
+                else if (ClientWebAuthManager.IsSessionElevated(in session))
+                {
+                    //If the session stored a user-agent, make sure it matches the connection
+                    if (session.UserAgent != null && !session.UserAgent.Equals(entity.Server.UserAgent, StringComparison.Ordinal))
                     {
-                        //If the session stored a user-agent, make sure it matches the connection
-                        if (session.UserAgent != null && !session.UserAgent.Equals(entity.Server.UserAgent, StringComparison.Ordinal))
-                        {
-                            _logger.Debug("Denied authorized connection from {ip} because user-agent changed", entity.TrustedRemoteIp);
-                            return ValueTask.FromResult(FileProcessArgs.Deny);
-                        }
-                    }
-
-                    //If the session is new, or not supposed to be logged in, clear the login cookies if they were set
-                    if (session.IsNew || string.IsNullOrEmpty(session.Token))
-                    {
-                        //Do not force clear cookies (saves bandwidth)
-                        ExpireCookies(entity, false);
+                        _logger.Debug("Denied authorized connection from {ip} because user-agent changed", entity.TrustedRemoteIp);
+                        return ValueTask.FromResult(FileProcessArgs.Deny);
                     }
                 }
+                else
+                {
+                    /*
+                     * Attempts to clear client cookies if the session is not elevated
+                     * and the client may still have cookies set from a previous session
+                     * 
+                     * Cookies are only sent if the client also sent login cookies to avoid 
+                     * sending cookies on every request
+                     */
+                    ExpireCookies(entity, false);
+                }
+
             }
 
             //Always continue otherwise
@@ -147,7 +154,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             if (session.Created.AddSeconds(_config.WebSessionValidForSeconds) < entity.RequestedTimeUtc)
             {
                 //Invalidate the session, so its technically valid for this request, but will be cleared on this handle close cycle
-                entity.Session.Invalidate();
+                session.Invalidate();
 
                 //Clear auth specifc cookies
                 _authManager.DestroyAuthorization(entity);
@@ -169,7 +176,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             ArgumentNullException.ThrowIfNull(clientInfo.PublicKey, nameof(clientInfo.PublicKey));
             ArgumentNullException.ThrowIfNull(clientInfo.ClientId, nameof(clientInfo.ClientId));
 
-            if (!entity.Session.IsSet || entity.Session.IsNew || entity.Session.SessionType != SessionType.Web)
+            if (!IsSessionStateValid(in entity.Session))
             {
                 throw new ArgumentException("The session is no configured for authorization");
             }
@@ -189,7 +196,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
         IClientAuthorization IAccountSecurityProvider.ReAuthorizeClient(HttpEntity entity)
         {
             //Confirm session is configured
-            if (!entity.Session.IsSet || entity.Session.IsNew || entity.Session.SessionType != SessionType.Web)
+            if (!IsSessionStateValid(in entity.Session))
             {
                 throw new InvalidOperationException("The session is not configured for authorization");
             }
@@ -219,7 +226,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
         bool IAccountSecurityProvider.IsClientAuthorized(HttpEntity entity, AuthorzationCheckLevel level)
         {
             //Session must be loaded and not-new for an authorization to exist
-            if(!entity.Session.IsSet || entity.Session.IsNew)
+            if(!IsSessionStateValid(in entity.Session))
             {
                 return false;
             }
@@ -249,7 +256,9 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
         {
             //Use the public key supplied by the csecinfo 
             return RsaClientDataEncryption.TryEncrypt(entity.PublicKey, data, outputBuffer);
-        }     
+        }
+
+        private static bool IsSessionStateValid(in SessionInfo session) => session.IsSet && !session.IsNew && session.SessionType == SessionType.Web;
 
         #endregion   
 
