@@ -141,7 +141,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 //Get auth info from jwt
                 bool isValidAuth = GetAuthInfo(jwt, entity.RequestedTimeUtc, out AuthenticationInfo? authInfo);
 
-                if (webm.Assert(isValidAuth, INVALID_MESSAGE))
+                if (webm.Assert(isValidAuth && authInfo != null, INVALID_MESSAGE))
                 {
                     return VirtualOk(entity, webm);
                 }
