@@ -49,7 +49,7 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="MemoryPack" Version="1.20.3" />
+    <PackageReference Include="MemoryPack" Version="1.21.1" />
   </ItemGroup>
 
   <ItemGroup>

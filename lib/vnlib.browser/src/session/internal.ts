@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vaughn Nugent
+// Copyright (c) 2024 Vaughn Nugent
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -17,7 +17,7 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import { defaults, isEmpty, isNil } from 'lodash-es';
+import { defaults, isEmpty, isNil, noop } from 'lodash-es';
 import { computed, watch, type Ref } from "vue";
 import { get, set, toRefs } from '@vueuse/core';
 import { SignJWT } from 'jose'
@@ -235,8 +235,8 @@ export const createSession = (
 
     const isLocalAccount = computed<boolean>(() => cookieValue.value === ServerLiTokenValues.LocalAccount);
 
-    //Watch the logged in value and if it changes from true to false, clear the token
-    watch(loggedIn, value => value ? null : token.value = null);
+    //Watch the logged in cookie value and if it changes from true to false, clear the token
+    watch(cookieValue, value => value ? noop() : set(token, null));
 
     return { 
         loggedIn,
