@@ -120,7 +120,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                 else if (ClientWebAuthManager.IsSessionElevated(in session))
                 {
                     //If the session stored a user-agent, make sure it matches the connection
-                    if (session.UserAgent != null && !session.UserAgent.Equals(entity.Server.UserAgent, StringComparison.Ordinal))
+                    if (string.Equals(session.UserAgent, entity.Server.UserAgent, StringComparison.Ordinal))
                     {
                         _logger.Debug("Denied authorized connection from {ip} because user-agent changed", entity.TrustedRemoteIp);
                         return ValueTask.FromResult(FileProcessArgs.Deny);
@@ -208,6 +208,9 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             {
                 throw new InvalidOperationException("The user does not have the required public key token stored");
             }
+
+            //re-set the client status cookie on successful re-auth
+            _statusCookie.SetCookie(entity, entity.Session.HasLocalAccount() ? "1" : "2");
 
             return new EncryptedTokenAuthorization(clientData);
         }
