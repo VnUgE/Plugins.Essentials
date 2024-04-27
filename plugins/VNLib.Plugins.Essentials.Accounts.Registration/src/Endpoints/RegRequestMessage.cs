@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2022 Vaughn Nugent
+* Copyright (c) 2024 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts.Registration
@@ -22,6 +22,7 @@
 * along with this program.  If not, see https://www.gnu.org/licenses/.
 */
 
+using System;
 using System.Text.Json.Serialization;
 
 namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
