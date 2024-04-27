@@ -22,6 +22,11 @@
 * along with this program.  If not, see https://www.gnu.org/licenses/.
 */
 
+using System;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+
 using Microsoft.EntityFrameworkCore;
 
 using VNLib.Utils;
@@ -29,18 +34,11 @@ using VNLib.Plugins.Extensions.Loading;
 
 namespace VNLib.Plugins.Essentials.Accounts.Registration.TokenRevocation
 {
-    internal class RevokedTokenStore
+    internal class RevokedTokenStore(IAsyncLazy<DbContextOptions> options)
     {
-        private readonly IAsyncLazy<DbContextOptions> Options;
-
-        public RevokedTokenStore(IAsyncLazy<DbContextOptions> options)
-        {
-            Options = options;
-        }
-
         public async Task<bool> IsRevokedAsync(string token, CancellationToken cancellation)
         {
-            await using RegistrationContext context = new (Options.Value);
+            await using RegistrationContext context = new (options.Value);
 
             //Select any that match tokens
             bool any = await (from t in context.RevokedRegistrationTokens
@@ -54,7 +52,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.TokenRevocation
 
         public async Task RevokeAsync(string token, CancellationToken cancellation)
         {
-            await using RegistrationContext context = new (Options.Value);
+            await using RegistrationContext context = new (options.Value);
 
             //Add to table
             context.RevokedRegistrationTokens.Add(new RevokedToken
@@ -77,7 +75,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.TokenRevocation
         {
             DateTime expiredBefore = DateTime.UtcNow.Subtract(validFor);
 
-            await using RegistrationContext context = new (Options.Value);
+            await using RegistrationContext context = new (options.Value);
 
             //Select any that match tokens
             RevokedToken[] expired = await context.RevokedRegistrationTokens.Where(t => t.Created < expiredBefore)
