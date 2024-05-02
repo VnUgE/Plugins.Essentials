@@ -184,6 +184,12 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
         [JsonPropertyName("strict_path")]
         public bool VerifyPath { get; set; } = true;
 
+        /// <summary>
+        /// Enforce strict user-agent strings for authorized users
+        /// </summary>
+        [JsonPropertyName("strict_user_agent")]
+        public bool StrictUserAgent { get; set; } = true;
+
         void IOnConfigValidation.Validate()
         {
             //Validate the current instance
