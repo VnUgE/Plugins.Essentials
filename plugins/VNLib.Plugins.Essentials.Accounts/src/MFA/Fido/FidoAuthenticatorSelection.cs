@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2022 Vaughn Nugent
+* Copyright (c) 2024 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
@@ -24,14 +24,16 @@
 
 using System.Text.Json.Serialization;
 
-namespace VNLib.Plugins.Essentials.Accounts.MFA
+namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
 {
-    class FidoAuthenticatorSelection
+    internal sealed class FidoAuthenticatorSelection
     {
         [JsonPropertyName("requireResidentKey")]
         public bool RequireResidentKey { get; set; } = false;
+
         [JsonPropertyName("authenticatorAttachment")]
         public string? AuthenticatorAttachment { get; set; } = "cross-platform";
+
         [JsonPropertyName("userVerification")]
         public string? UserVerification { get; set; } = "required";
     }

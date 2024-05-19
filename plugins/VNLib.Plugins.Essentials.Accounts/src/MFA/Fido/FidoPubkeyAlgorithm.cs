@@ -1,11 +1,11 @@
 ﻿/*
-* Copyright (c) 2022 Vaughn Nugent
+* Copyright (c) 2024 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
-* File: FidoRegClientData.cs 
+* File: FidoPubkeyAlgorithm.cs 
 *
-* FidoRegClientData.cs is part of VNLib.Plugins.Essentials.Accounts which is part of the larger 
+* FidoPubkeyAlgorithm.cs is part of VNLib.Plugins.Essentials.Accounts which is part of the larger 
 * VNLib collection of libraries and utilities.
 *
 * VNLib.Plugins.Essentials.Accounts is free software: you can redistribute it and/or modify 
@@ -24,17 +24,14 @@
 
 using System.Text.Json.Serialization;
 
-#nullable enable
-
-namespace VNLib.Plugins.Essentials.Accounts.MFA
+namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
 {
-    internal class FidoRegClientData
+    internal sealed class FidoPubkeyAlgorithm
     {
-        [JsonPropertyName("challenge")]
-        public string? Challenge { get; set; }
-        [JsonPropertyName("origin")]
-        public string? Origin { get; set; }
+        [JsonPropertyName("alg")]
+        public int AlgId { get; set; }
+
         [JsonPropertyName("type")]
-        public string? Type { get; set; }
+        public string Type { get; set; } = "public-key";
     }
 }

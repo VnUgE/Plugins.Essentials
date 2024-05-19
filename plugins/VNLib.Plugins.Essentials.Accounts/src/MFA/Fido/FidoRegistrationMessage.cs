@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2022 Vaughn Nugent
+* Copyright (c) 2024 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
@@ -24,29 +24,33 @@
 
 using System.Text.Json.Serialization;
 
-#nullable enable
-
-namespace VNLib.Plugins.Essentials.Accounts.MFA
+namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
 {
     /// <summary>
     /// Represents a fido device registration message to be sent
     /// to a currently signed in user
     /// </summary>
-    class FidoRegistrationMessage
+    sealed class FidoRegistrationMessage
     {
-        [JsonPropertyName("id")]
-        public string? GuidUserId { get; set; }
         [JsonPropertyName("challenge")]
         public string? Base64Challenge { get; set; } = null;
+
         [JsonPropertyName("timeout")]
         public int Timeout { get; set; } = 60000;
-        [JsonPropertyName("cose_alg")]
-        public int CoseAlgNumber { get; set; }
-        [JsonPropertyName("rp_name")]
-        public string? SiteName { get; set; }
+
+        [JsonPropertyName("rp")]
+        public FidoRelyingParty RelyingParty { get; set; } = new();
+
         [JsonPropertyName("attestation")]
-        public string? AttestationType { get; set; } = "none";
+        public string AttestationType { get; set; } = "none";
+
+        [JsonPropertyName("user")]
+        public FidoUserData User { get; set; } = new();
+
+        [JsonPropertyName("pubKeyCredParams")]
+        public FidoPubkeyAlgorithm[]? PubKeyCredParams { get; set; }
+
         [JsonPropertyName("authenticatorSelection")]
-        public FidoAuthenticatorSelection? AuthSelection { get; set; } = new();
+        public FidoAuthenticatorSelection AuthSelection { get; set; } = new();
     }
 }
