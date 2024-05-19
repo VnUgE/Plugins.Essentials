@@ -56,11 +56,11 @@ namespace VNLib.Plugins.Essentials.Auth.Social
             //buffer writer for easier syntax
             ForwardOnlyWriter<char> writer = new(buffer);
             //first build the redirect url to re-encode it
-            writer.Append(scheme);
-            writer.Append("://");
+            writer.AppendSmall(scheme);
+            writer.AppendSmall("://");
             //Create redirect url (current page, default action is to authorize the client)
-            writer.Append(authority);
-            writer.Append(path);
+            writer.AppendSmall(authority);
+            writer.AppendSmall(path);
             //url encode the redirect path and save it for later
             redirectUrl = Uri.EscapeDataString(writer.ToString());
 
@@ -98,13 +98,13 @@ namespace VNLib.Plugins.Essentials.Auth.Social
             //Append the config redirect path
             writer.Append(Config.AccessCodeUrl.OriginalString);
             //begin query arguments
-            writer.Append("&client_id=");
+            writer.AppendSmall("&client_id=");
             writer.Append(Config.ClientID.Value);
             //add the redirect url
-            writer.Append("&redirect_uri=");
+            writer.AppendSmall("&redirect_uri=");
             writer.Append(redirectUrl);
             //Append the state parameter
-            writer.Append("&state=");
+            writer.AppendSmall("&state=");
             writer.Append(nonce);
 
             //Collect the written character data

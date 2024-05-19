@@ -29,9 +29,10 @@ using FluentValidation;
 
 using VNLib.Hashing;
 using VNLib.Plugins.Extensions.Loading;
+using VNLib.Plugins.Essentials.Accounts.MFA.Fido;
 
 namespace VNLib.Plugins.Essentials.Accounts.MFA
-{   
+{
 
     [ConfigurationName("mfa")]
     internal class MFAConfig : IOnConfigValidation
