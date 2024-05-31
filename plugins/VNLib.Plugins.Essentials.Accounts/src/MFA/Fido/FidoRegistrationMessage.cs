@@ -42,7 +42,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
         public FidoRelyingParty RelyingParty { get; set; } = new();
 
         [JsonPropertyName("attestation")]
-        public string AttestationType { get; set; } = "none";
+        public string? AttestationType { get; set; } = "none";
 
         [JsonPropertyName("user")]
         public FidoUserData User { get; set; } = new();
@@ -51,6 +51,6 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
         public FidoPubkeyAlgorithm[]? PubKeyCredParams { get; set; }
 
         [JsonPropertyName("authenticatorSelection")]
-        public FidoAuthenticatorSelection AuthSelection { get; set; } = new();
+        public FidoAuthenticatorSelection? AuthSelection { get; set; } = new();
     }
 }

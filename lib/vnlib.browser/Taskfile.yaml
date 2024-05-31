@@ -31,6 +31,5 @@ tasks:
     ignore_error: true
     cmds:
      #delete dist folder
-    - cmd: powershell -Command "Remove-Item -Recurse node_modules"
-    - cmd: powershell -Command "Remove-Item -Recurse dist"
-    - cmd: powershell -Command "Remove-Item -Recurse -Force bin"
+    - for: ['bin/', 'dist/', 'node_modules/']
+      cmd: powershell -Command "Remove-Item -Recurse -Force {{.ITEM_NAME}}"

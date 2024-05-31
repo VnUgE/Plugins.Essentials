@@ -21,7 +21,7 @@ import { defaults, isEmpty, isNil, noop } from 'lodash-es';
 import { computed, watch, type Ref } from "vue";
 import { get, set, toRefs } from '@vueuse/core';
 import { SignJWT } from 'jose'
-import crypto, { decryptAsync, getRandomHex } from "../webcrypto";
+import { getCryptoOrThrow, decryptAsync, getRandomHex } from "../webcrypto";
 import { ArrayBuffToBase64, Base64ToUint8Array } from '../binhelpers'
 import { debugLog } from "../util";
 import type { CookieMonitor } from './cookies'
@@ -63,6 +63,8 @@ const createKeyStore = (storage: Ref<IKeyStorage>, keyAlg: Ref<AlgorithmIdentifi
     }
 
     const setCredentialAsync = async (keypair: CryptoKeyPair): Promise<void> => {
+        const crypto = getCryptoOrThrow();
+
         // Store the private key
         const newPrivRaw = await crypto.exportKey('pkcs8', keypair.privateKey);
         const newPubRaw = await crypto.exportKey('spki', keypair.publicKey);
@@ -83,10 +85,11 @@ const createKeyStore = (storage: Ref<IKeyStorage>, keyAlg: Ref<AlgorithmIdentifi
             return;
         }
 
+        const crypto = getCryptoOrThrow();
+
         // If not, generate a new key pair
         const keypair = await crypto.generateKey(keyAlg.value, true, ['encrypt', 'decrypt']) as CryptoKeyPair;
-
-        //Set credential
+       
         await setCredentialAsync(keypair);
 
         debugLog("Generated new client keypair, none were found")
@@ -102,16 +105,19 @@ const createKeyStore = (storage: Ref<IKeyStorage>, keyAlg: Ref<AlgorithmIdentifi
         // Convert the private key to a Uint8Array from its base64 string
         const keyData = Base64ToUint8Array(priv.value || "")
 
+        const crypto = getCryptoOrThrow();
+
         //import private key as pkcs8
         const privKey = await crypto.importKey('pkcs8', keyData, keyAlg.value, false, ['decrypt'])
-
-        // Decrypt the data and return it
+       
         return await decryptAsync(keyAlg.value, privKey, data, false) as ArrayBuffer
     }
 
     const decryptAndHashAsync = async (data: string | ArrayBuffer): Promise<string> => {
         // Decrypt the data
         const decrypted = await decryptDataAsync(data)
+
+        const crypto = getCryptoOrThrow();
 
         // Hash the decrypted data
         const hashed = await crypto.digest({ name: 'SHA-256' }, decrypted)

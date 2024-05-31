@@ -28,8 +28,8 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
 {
     internal sealed class FidoAuthenticatorSelection
     {
-        [JsonPropertyName("requireResidentKey")]
-        public bool RequireResidentKey { get; set; } = false;
+        [JsonPropertyName("residentKey")]
+        public string? RequireResidentKey { get; set; } = "discouraged";
 
         [JsonPropertyName("authenticatorAttachment")]
         public string? AuthenticatorAttachment { get; set; } = "cross-platform";

@@ -43,13 +43,14 @@ using VNLib.Plugins.Essentials.Users;
 using VNLib.Plugins.Essentials.Endpoints;
 using VNLib.Plugins.Essentials.Extensions;
 using VNLib.Plugins.Extensions.Validation;
-using VNLib.Plugins.Essentials.Accounts.MFA;
 using VNLib.Plugins.Essentials.Accounts.Validators;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Users;
+using VNLib.Plugins.Essentials.Accounts.MFA.Otp;
 
 namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 {
+
     [ConfigurationName("pki_auth_endpoint")]
     internal sealed class PkiLoginEndpoint : UnprotectedWebEndpoint
     {
@@ -66,9 +67,9 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
         private static IValidator<AuthenticationInfo> AuthValidator { get; } = AuthenticationInfo.GetValidator();
         
         /// <summary>
-        /// A validator used to validate <see cref="PkiAuthPublicKey"/> instances
+        /// A validator used to validate <see cref="OtpAuthPublicKey"/> instances
         /// </summary>
-        public static IValidator<PkiAuthPublicKey> UserJwkValidator { get; } = GetKeyValidator();
+        public static IValidator<OtpAuthPublicKey> UserJwkValidator { get; } = GetKeyValidator();
 
         private readonly JwtEndpointConfig _config;
         private readonly IUserManager _users;
@@ -176,7 +177,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 }
 
                 //Now we can verify the signed message against the stored key
-                if (webm.Assert(user.PKIVerifyUserJWT(jwt, authInfo.KeyId!) == true, INVALID_MESSAGE))
+                if (webm.Assert(user.OtpVerifyUserJWT(jwt, authInfo.KeyId!) == true, INVALID_MESSAGE))
                 {
                     //increment flc on invalid signature
                     _lockout.Increment(user, entity.RequestedTimeUtc);
@@ -254,7 +255,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             }
 
             //Get the uesr's stored keys
-            webm.Result = user.PkiGetAllPublicKeys();
+            webm.Result = user.OtpGetAllPublicKeys();
             webm.Success = true;
 
             return VirtualOk(entity, webm);
@@ -276,7 +277,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             ValErrWebMessage webm = new();
 
             //Get the request body
-            PkiAuthPublicKey? pubKey = await entity.GetJsonFromFileAsync<PkiAuthPublicKey>();
+            OtpAuthPublicKey? pubKey = await entity.GetJsonFromFileAsync<OtpAuthPublicKey>();
 
             if(webm.Assert(pubKey != null, "The request message is not valid"))
             {                
@@ -304,6 +305,12 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 return VirtualOk(entity, webm);
             }
 
+            //Make sure there is enough room to store another key
+            if(webm.Assert(user.OtpCanAddKey(), "Cannot add another public key to your account"))
+            {
+                return VirtualOk(entity, webm);
+            }
+
             try
             {
                 //Try to get the ECDA instance to confirm the key data could be recovered properly
@@ -323,7 +330,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             }            
 
             //Update user's key, or add it if it doesn't exist
-            user.PKIAddPublicKey(pubKey);
+            user.OtpAddPublicKey(pubKey);
 
             //publish changes
             await user.ReleaseAsync();
@@ -368,13 +375,13 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             if(entity.QueryArgs.TryGetValue("id", out string? keyId))
             {
                 //Remove only the specified key
-                user.PKIRemovePublicKey(keyId);
+                user.OtpRemovePublicKey(keyId);
                 webm.Result = "You have successfully removed the key from your account";
             }
             else
             {
                 //Delete all keys
-                user.PKISetPublicKeys(null);
+                user.OtpSetPublicKeys(null);
                 webm.Result = "You have successfully disabled PKI login";
             }
          
@@ -535,9 +542,9 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             }
         }
 
-        private static IValidator<PkiAuthPublicKey> GetKeyValidator()
+        private static IValidator<OtpAuthPublicKey> GetKeyValidator()
         {
-            InlineValidator<PkiAuthPublicKey> val = new();
+            InlineValidator<OtpAuthPublicKey> val = new();
 
             val.RuleFor(a => a.KeyType)
                 .NotEmpty()

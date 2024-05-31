@@ -3,10 +3,10 @@
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
-* File: FidoUserData.cs 
+* File: FidoConfig.cs 
 *
-* FidoUserData.cs is part of VNLib.Plugins.Essentials.Accounts which is part of the larger 
-* VNLib collection of libraries and utilities.
+* FidoConfig.cs is part of VNLib.Plugins.Essentials.Accounts which is part 
+* of the larger VNLib collection of libraries and utilities.
 *
 * VNLib.Plugins.Essentials.Accounts is free software: you can redistribute it and/or modify 
 * it under the terms of the GNU Affero General Public License as 
@@ -26,16 +26,18 @@ using System.Text.Json.Serialization;
 
 namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
 {
-
-    internal sealed class FidoUserData
+    internal sealed class FidoUserCredential
     {
         [JsonPropertyName("id")]
-        public string? UserId { get; set; }
+        public string Id { get; set; } = string.Empty;
 
-        [JsonPropertyName("name")]
-        public string? UserName { get; set; }
+        [JsonPropertyName("tp")]
+        public string Algorithm { get; set; } = string.Empty;
 
-        [JsonPropertyName("displayName")]
-        public string? DisplayName { get; set; }
+        [JsonPropertyName("pk")]
+        public string PublicKey { get; set; } = string.Empty;
+
+        [JsonPropertyName("alg")]
+        public int AlgorithmId { get; set; }
     }
 }

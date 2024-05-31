@@ -3,10 +3,10 @@
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
-* File: FidoUserData.cs 
+* File: IMfaProcessor.cs 
 *
-* FidoUserData.cs is part of VNLib.Plugins.Essentials.Accounts which is part of the larger 
-* VNLib collection of libraries and utilities.
+* IMfaProcessor.cs is part of VNLib.Plugins.Essentials.Accounts which is 
+* part of the larger VNLib collection of libraries and utilities.
 *
 * VNLib.Plugins.Essentials.Accounts is free software: you can redistribute it and/or modify 
 * it under the terms of the GNU Affero General Public License as 
@@ -22,20 +22,22 @@
 * along with this program.  If not, see https://www.gnu.org/licenses/.
 */
 
-using System.Text.Json.Serialization;
+using System.Text.Json;
 
-namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
+using VNLib.Hashing.IdentityUtility;
+using VNLib.Plugins.Essentials.Users;
+
+
+namespace VNLib.Plugins.Essentials.Accounts.MFA
 {
-
-    internal sealed class FidoUserData
+    internal interface IMfaProcessor
     {
-        [JsonPropertyName("id")]
-        public string? UserId { get; set; }
+        MFAType Type { get; }
 
-        [JsonPropertyName("name")]
-        public string? UserName { get; set; }
+        bool MethodEnabledForUser(IUser user);
 
-        [JsonPropertyName("displayName")]
-        public string? DisplayName { get; set; }
+        void ExtendUpgradePayload(in JwtPayload message, IUser user);
+
+        bool VerifyResponse(MfaChallenge upgrade, IUser user, JsonDocument result);
     }
 }

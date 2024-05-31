@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vaughn Nugent
+// Copyright (c) 2024 Vaughn Nugent
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -22,6 +22,7 @@ import { type MaybeRef } from "vue";
 import { useAxiosInternal } from "../axios"
 import type { MfaMethod } from "./login"
 import type { WebMessage } from '../types'
+import type { AxiosRequestConfig } from "axios";
 
 export type UserArg = object;
 
@@ -56,9 +57,9 @@ export interface MfaApi{
  * @param mfaEndpoint The server mfa endpoint relative to the base url
  * @returns An object containing the mfa api
  */
-export const useMfaConfig = (mfaEndpoint: MaybeRef<string>): MfaApi =>{
+export const useMfaConfig = (mfaEndpoint: MaybeRef<string>, axiosConfig?: MaybeRef<AxiosRequestConfig | undefined | null>): MfaApi =>{
 
-    const axios = useAxiosInternal(null)
+    const axios = useAxiosInternal(axiosConfig)
 
     const getMethods = async () => {
         //Get the mfa methods

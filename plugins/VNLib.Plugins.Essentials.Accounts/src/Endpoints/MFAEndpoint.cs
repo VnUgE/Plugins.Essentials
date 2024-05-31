@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2023 Vaughn Nugent
+* Copyright (c) 2024 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
@@ -40,9 +40,13 @@ using VNLib.Plugins.Extensions.Validation;
 using VNLib.Plugins.Essentials.Endpoints;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Users;
+using VNLib.Plugins.Essentials.Accounts.MFA.Otp;
+using VNLib.Plugins.Essentials.Accounts.MFA.Totp;
+using VNLib.Plugins.Essentials.Accounts.MFA.Fido;
 
 namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 {
+
     [ConfigurationName("mfa_endpoint")]
     internal sealed class MFAEndpoint : ProtectedWebEndpoint
     {
@@ -50,12 +54,14 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
         private const string CHECK_PASSWORD = "Please check your password";
 
         private readonly IUserManager Users;
-        private readonly MFAConfig? MultiFactor;
+        private readonly MFAConfig MultiFactor;
 
         public MFAEndpoint(PluginBase pbase, IConfigScope config)
-        {
-            string? path = config["path"].GetString();
-            InitPathAndLog(path, pbase.Log);
+        {           
+            InitPathAndLog(
+                path: config.GetRequiredProperty("path", p => p.GetString()!), 
+                log: pbase.Log.CreateScope("Mfa-Endpoint")
+            );
 
             Users = pbase.GetOrCreateSingleton<UserManager>();
             MultiFactor = pbase.GetConfigElement<MFAConfig>();
@@ -67,21 +73,18 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 
             //Load the MFA entry for the user
             using IUser? user = await Users.GetUserFromIDAsync(entity.Session.UserID);
-
-            //Set the TOTP flag if set
-            if (user?.MFATotpEnabled() == true)
+           
+            if (user?.TotpEnabled() == true)
             {
                 enabledModes[0] = "totp";
             }
-
-            //TODO Set fido flag if enabled
-            if (!string.IsNullOrWhiteSpace(""))
+          
+            if (user?.FidoEnabled() == true)
             {
                 enabledModes[1] = "fido";
             }
-
-            //PKI enabled
-            if (user?.PKIEnabled() == true)
+          
+            if (user?.OtpAuthEnabled() == true)
             {
                 enabledModes[2] = "pki";
             }
@@ -112,12 +115,6 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             
             //Make sure the user's account origin is a local account
             if (webm.Assert(entity.Session.HasLocalAccount(), "Your account uses external authentication and MFA cannot be enabled"))
-            {
-                return VirtualOk(entity, webm);
-            }
-
-            //Make sure mfa is loaded
-            if (webm.Assert(MultiFactor != null, "MFA is not enabled on this server"))
             {
                 return VirtualOk(entity, webm);
             }
@@ -183,18 +180,18 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 
                 //get the request
                 using JsonDocument? request = await entity.GetJsonFromFileAsync();
-                if (webm.Assert(request != null, "Invalid request."))
+                if (webm.Assert(request != null, "Invalid request"))
                 {
                     return VirtualClose(entity, webm, HttpStatusCode.BadRequest);
                 }
              
                 string? mfaType = request.RootElement.GetProperty("type").GetString();
-
-                //get the user
+              
                 using IUser? user = await Users.GetUserFromIDAsync(entity.Session.UserID);
-                if (user == null)
+
+                if (webm.Assert(user != null, "User does not exist"))
                 {
-                    return VfReturnType.NotFound;
+                    return VirtualClose(entity, webm, HttpStatusCode.NotFound);
                 }
 
                 /*
@@ -218,29 +215,34 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 }
 
                 //Check for totp disable
-                if ("totp".Equals(mfaType, StringComparison.OrdinalIgnoreCase))
+                if (string.Equals("totp", mfaType, StringComparison.OrdinalIgnoreCase))
                 {
-                    //Clear the TOTP secret to disable it
-                    user.MFASetTOTPSecret(null);
-
-                    //write changes
-                    await user.ReleaseAsync();
+                    user.TotpDisable();
+                  
                     webm.Result = "Successfully disabled your TOTP authentication";
                     webm.Success = true;
                 }
-                else if ("fido".Equals(mfaType, StringComparison.OrdinalIgnoreCase))
+                else if (string.Equals("fido", mfaType, StringComparison.OrdinalIgnoreCase))
                 {
-                    //Clear webauthn changes
-
-                    //write changes
-                    await user.ReleaseAsync();
+                    user.FidoDisable();
+                    
                     webm.Result = "Successfully disabled your FIDO authentication";
+                    webm.Success = true;
+                }
+                else if(string.Equals("pkotp", mfaType, StringComparison.OrdinalIgnoreCase))
+                {
+                    user.OtpDisable();
+                    
+                    webm.Result = "Successfully disabled your OTP authentication";
                     webm.Success = true;
                 }
                 else
                 {
                     webm.Result = "Invalid MFA type";
                 }
+
+                //write changes (will do nothing if no changes were made)
+                await user.ReleaseAsync();
 
                 //Must write response while password is in scope
                 return VirtualOk(entity, webm);

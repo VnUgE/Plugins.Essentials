@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2023 Vaughn Nugent
+* Copyright (c) 2024 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
@@ -26,7 +26,7 @@ using System.Text.Json.Serialization;
 
 namespace VNLib.Plugins.Essentials.Accounts.MFA
 {
-    internal class MFAUpgrade : IClientSecInfo
+    internal class MfaChallenge : IClientSecInfo
     {
         /// <summary>
         /// The login's client id specifier
@@ -41,8 +41,8 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
         /// <summary>
         /// The <see cref="MFAType"/> of the upgrade request
         /// </summary>
-        [JsonPropertyName("type")]
-        public MFAType Type { get; set; }
+        [JsonPropertyName("types")]
+        public MFAType[] Types { get; set; }
         /// <summary>
         /// The a base64 encoded string of the user's 
         /// public key

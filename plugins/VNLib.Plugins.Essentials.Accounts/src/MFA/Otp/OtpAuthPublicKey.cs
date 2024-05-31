@@ -1,11 +1,11 @@
 ﻿/*
-* Copyright (c) 2023 Vaughn Nugent
+* Copyright (c) 2024 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
-* File: PkiAuthPublicKey.cs 
+* File: OtpAuthPublicKey.cs 
 *
-* PkiAuthPublicKey.cs is part of VNLib.Plugins.Essentials.Accounts which is part of the larger 
+* OtpAuthPublicKey.cs is part of VNLib.Plugins.Essentials.Accounts which is part of the larger 
 * VNLib collection of libraries and utilities.
 *
 * VNLib.Plugins.Essentials.Accounts is free software: you can redistribute it and/or modify 
@@ -26,12 +26,12 @@ using System.Text.Json.Serialization;
 
 using VNLib.Hashing.IdentityUtility;
 
-namespace VNLib.Plugins.Essentials.Accounts.MFA
+namespace VNLib.Plugins.Essentials.Accounts.MFA.Otp
 {
     /// <summary>
     /// A json serializable JWK format public key for PKI authentication
     /// </summary>
-    public record class PkiAuthPublicKey : IJsonWebKey
+    public record class OtpAuthPublicKey : IJsonWebKey
     {
         [JsonPropertyName("kid")]
         public string? KeyId { get; set; }

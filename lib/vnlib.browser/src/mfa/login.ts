@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vaughn Nugent
+// Copyright (c) 2024 Vaughn Nugent
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -29,9 +29,7 @@ import type { Axios } from "axios";
 import type { ITokenResponse } from "../session";
 import type { WebMessage } from "../types";
 
-export enum MfaMethod {
-    TOTP = 'totp'
-}
+export type MfaMethod = 'totp' | 'fido' | 'pkotp';
 
 export interface IMfaSubmission {
     /**
@@ -100,7 +98,7 @@ export interface IMfaLoginManager {
 const getMfaProcessor = (user: IUserInternal, axios:Ref<Axios>) =>{
 
     //Store handlers by their mfa type
-    const handlerMap = new Map<string, IMfaTypeProcessor>();
+    const handlerMap = new Map<MfaMethod, IMfaTypeProcessor>();
 
     //Creates a submission handler for an mfa upgrade
     const createSubHandler = (upgrade : string, finalize: (res: ITokenResponse) => Promise<void>) :MfaSumissionHandler => {
@@ -177,7 +175,7 @@ export const totpMfaProcessor = (): IMfaTypeProcessor => {
     }
 
     return {
-        type: MfaMethod.TOTP,
+        type: 'totp',
         processMfa
     }
 }

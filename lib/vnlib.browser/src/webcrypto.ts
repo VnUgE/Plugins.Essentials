@@ -20,7 +20,16 @@
 import { isArrayBuffer, isPlainObject, isString } from 'lodash-es';
 import { ArrayBuffToBase64, Base64ToUint8Array, ArrayToHexString } from './binhelpers';
 
-const crypto = window?.crypto?.subtle || {};
+export const isCryptoSupported = () : boolean => {
+    return !!(window.isSecureContext && window.crypto && window.crypto.subtle);
+}
+
+export const getCryptoOrThrow = () => {
+    if (!isCryptoSupported()) {
+        throw new Error('Your browser does not support the Web Cryptography API');
+    }
+    return window.crypto.subtle;
+}
 
 /**
  * Signs the dataBuffer using the specified key and hmac algorithm by its name eg. 'SHA-256'
@@ -29,9 +38,13 @@ const crypto = window?.crypto?.subtle || {};
  * @param {String} alg The name of the hmac algorithm to use eg. 'SHA-256'
  * @param {String} [toBase64 = false] The output format, the array buffer data, or true for base64 string
  * @returns {Promise<ArrayBuffer | String>} The signature as an ArrayBuffer or a base64 string
+ * @throws An error if the browser does not support the Web Cryptography API
  */
 export const hmacSignAsync = async (keyBuffer: ArrayBuffer | string, dataBuffer: ArrayBuffer | string, alg : string, toBase64 = false) 
 : Promise<ArrayBuffer | string> => {
+
+    const crypto = getCryptoOrThrow()
+
      // Check key argument type
     const rawKeyBuffer = isString(keyBuffer) ? Base64ToUint8Array(keyBuffer as string) : keyBuffer as ArrayBuffer;
     
@@ -47,6 +60,7 @@ export const hmacSignAsync = async (keyBuffer: ArrayBuffer | string, dataBuffer:
     // Encode to base64 if needed
     return toBase64 ? ArrayBuffToBase64(digest) : digest;
 }
+
 /**
  * @function decryptAsync Decrypts syncrhonous or asyncrhonsous en encypted data
  * asynchronously.
@@ -55,13 +69,17 @@ export const hmacSignAsync = async (keyBuffer: ArrayBuffer | string, dataBuffer:
  * @param {Object} algorithm The algorithm object to use for decryption.
  * @param {Boolean} toBase64 If true, the decrypted data will be returned as a base64 string.
  * @returns {Promise} The decrypted data.
+ * @throws An error if the browser does not support the Web Cryptography API
  */
 export const decryptAsync = async (
     algorithm: AlgorithmIdentifier,
     privKey: BufferSource | CryptoKey | JsonWebKey,
     data: string | ArrayBuffer,
-    toBase64 = false): Promise<string | ArrayBuffer> =>
+    toBase64 = false
+): Promise<string | ArrayBuffer> =>
 {
+    const crypto = getCryptoOrThrow()
+
     // Check data argument type and decode if needed
     const dataBuffer = isString(data) ? Base64ToUint8Array(data as string) : data as ArrayBuffer;
 
@@ -84,14 +102,21 @@ export const decryptAsync = async (
     return toBase64 ? ArrayBuffToBase64(decrypted) : decrypted
 }
 
+/**
+ * Gets a random hex string of the specified size
+ * @param size The number of bytes to generate
+ * @returns A random hex string of the specified size
+ * @throws An error if the browser does not support the Web Cryptography API
+ */
 export const getRandomHex = (size: number) : string => {
-    // generate a new random secret and store it
+    if (!isCryptoSupported()) {
+        throw new Error('Your browser does not support the Web Cryptography API');
+    }
+
     const randBuffer = new Uint8Array(size)
-    // generate random id directly on the window.crypto object
+
     window.crypto.getRandomValues(randBuffer)
-    // Store the id in the session as hex
+
+    //Convert the random buffer to a hex string
     return ArrayToHexString(randBuffer)
 }
-
-//default export subtle crypto 
-export default crypto;

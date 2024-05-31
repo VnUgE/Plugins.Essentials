@@ -38,6 +38,9 @@ using VNLib.Plugins.Essentials.Accounts.SecurityProvider;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Users;
 using VNLib.Plugins.Extensions.Loading.Routing;
+using VNLib.Plugins.Essentials.Accounts.MFA.Otp;
+using VNLib.Plugins.Essentials.Accounts.MFA.Totp;
+using VNLib.Plugins.Essentials.Accounts.MFA.Fido;
 
 namespace VNLib.Plugins.Essentials.Accounts
 {
@@ -49,6 +52,7 @@ namespace VNLib.Plugins.Essentials.Accounts
 
         private bool SetupMode => HostArgs.HasArgument("--account-setup");
 
+        /// <inheritdoc/>
         protected override void OnLoad()
         {
             //Add optional endpoint routing
@@ -82,6 +86,11 @@ namespace VNLib.Plugins.Essentials.Accounts
             if (this.HasConfigForType<PkiLoginEndpoint>())
             {
                 this.Route<PkiLoginEndpoint>();
+            }
+
+            if (this.HasConfigForType<FidoEndpoint>())
+            {
+                this.Route<FidoEndpoint>();
             }
 
             //Only export the account security service if the configuration element is defined
@@ -257,7 +266,11 @@ Commands:
                                 break;
                             }
 
-                            user.MFADisable();
+                            //Disable all mfa methods
+                            user.TotpDisable();
+                            //user.OtpDisable();
+                            user.FidoDisable();
+
                             await user.ReleaseAsync();
 
                             Log.Information("Successfully disabled MFA for {id}", username);
@@ -293,7 +306,7 @@ Commands:
                             }
 
                             //Update the totp secret and flush changes
-                            user.MFASetTOTPSecret(secret);
+                            user.TotpSetSecret(secret);
                             await user.ReleaseAsync();
 
                             Log.Information("Successfully set TOTP secret for {id}", username);
@@ -328,7 +341,7 @@ Commands:
                                 break;
                             }
 
-                            PkiAuthPublicKey? pubkey = JsonSerializer.Deserialize<PkiAuthPublicKey>(pubkeyJwk);
+                            OtpAuthPublicKey? pubkey = JsonSerializer.Deserialize<OtpAuthPublicKey>(pubkeyJwk);
                             if (pubkey == null)
                             {
                                 Log.Error("You public key is not a JSON object");
@@ -345,7 +358,7 @@ Commands:
 
 
                             //Add/update the public key and flush changes
-                            user.PKIAddPublicKey(pubkey);
+                            user.OtpAddPublicKey(pubkey);
                             await user.ReleaseAsync();
 
                             Log.Information("Successfully set TOTP secret for {id}", username);

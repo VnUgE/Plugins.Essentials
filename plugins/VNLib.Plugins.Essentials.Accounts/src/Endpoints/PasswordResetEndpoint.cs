@@ -38,6 +38,7 @@ using VNLib.Plugins.Essentials.Accounts.MFA;
 using VNLib.Plugins.Extensions.Validation;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Users;
+using VNLib.Plugins.Essentials.Accounts.MFA.Totp;
 
 namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 {
@@ -134,7 +135,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             }
 
             //Check if totp is enabled
-            if (mFAConfig.TOTPEnabled && user.MFATotpEnabled())
+            if (mFAConfig.TOTPEnabled && user.TotpEnabled())
             {
                 //TOTP code is required
                 if (webm.Assert(pwReset.TotpCode.HasValue, "TOTP is enabled on this user account, you must enter your TOTP code."))

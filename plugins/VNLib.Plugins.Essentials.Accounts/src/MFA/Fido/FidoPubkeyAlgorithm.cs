@@ -26,10 +26,10 @@ using System.Text.Json.Serialization;
 
 namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
 {
-    internal sealed class FidoPubkeyAlgorithm
+    internal sealed class FidoPubkeyAlgorithm(int algId)
     {
         [JsonPropertyName("alg")]
-        public int AlgId { get; set; }
+        public int AlgId { get; set; } = algId;
 
         [JsonPropertyName("type")]
         public string Type { get; set; } = "public-key";

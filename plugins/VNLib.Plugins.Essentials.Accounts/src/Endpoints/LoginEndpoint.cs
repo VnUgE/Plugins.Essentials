@@ -27,6 +27,7 @@ using System.Net;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text.Json.Serialization;
 
@@ -44,6 +45,8 @@ using VNLib.Plugins.Essentials.Accounts.Validators;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Users;
 using static VNLib.Plugins.Essentials.Statics;
+using VNLib.Plugins.Essentials.Accounts.MFA.Totp;
+using VNLib.Plugins.Essentials.Accounts.MFA.Fido;
 
 
 /*
@@ -73,7 +76,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 
         private static readonly LoginMessageValidation LmValidator = new();
         
-        private readonly MFAConfig MultiFactor;
+        private readonly MfaAuthManager MultiFactor;
         private readonly IUserManager Users;
         private readonly FailedLoginLockout _lockout;
 
@@ -84,10 +87,25 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             uint maxLogins = config["max_login_attempts"].GetUInt32();
 
             InitPathAndLog(path, pbase.Log);
-           
+
+            MFAConfig conf = pbase.GetConfigElement<MFAConfig>();
             Users = pbase.GetOrCreateSingleton<UserManager>();
-            MultiFactor = pbase.GetConfigElement<MFAConfig>();
             _lockout = new(maxLogins, duration);
+            
+
+            List<IMfaProcessor> proc = [];
+
+            if(conf.TOTPEnabled)
+            {
+                proc.Add(new TotpAuthProcessor(conf.TOTPConfig!));
+            }
+
+            if(conf.FIDOEnabled)
+            {
+                proc.Add(new FidoMfaProcessor(conf.FIDOConfig!));
+            }
+
+            MultiFactor = new(conf, [.. proc]);
         }
 
         protected override ERRNO PreProccess(HttpEntity entity)
@@ -104,14 +122,18 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 return VirtualClose(entity, HttpStatusCode.Conflict);
             }
             
-            //If mfa is enabled, allow processing via mfa
-            if (MultiFactor.FIDOEnabled || MultiFactor.TOTPEnabled)
+            /*
+             * To continue an mfa upgrade, the client must send
+             * an mfa query argument to continue the upgrade process
+             */
+            if (MultiFactor.Armed)
             {
                 if (entity.QueryArgs.ContainsKey("mfa"))
                 {
                     return await ProcessMfaAsync(entity);
                 }
             }
+
             return await ProccesLoginAsync(entity);
         }
 
@@ -165,7 +187,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 }
 
                 //If login return true, the response has been set and we should return
-                if (LoginUser(entity, loginMessage, user, webm))
+                if (LoginOrMfaConnection(entity, loginMessage, user, webm))
                 {
                     goto Cleanup;
                 }
@@ -191,12 +213,11 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
         {
             //Validate password against store
             ERRNO valResult = await Users.ValidatePasswordAsync(user, login.Password!, PassValidateFlags.None, cancellation);
-
-            //Valid results are greater than 0;
+         
             return valResult == UserPassValResult.Success;
         }
 
-        private bool LoginUser(HttpEntity entity, LoginMessage loginMessage, IUser user, MfaUpgradeWebm webm)
+        private bool LoginOrMfaConnection(HttpEntity entity, LoginMessage loginMessage, IUser user, MfaUpgradeWebm webm)
         {
             //Only allow active users
             if (user.Status != UserStatus.Active)
@@ -211,22 +232,14 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 
             try
             {
-                //get the new upgrade jwt string
-                MfaUpgradeMessage? message = user.MFAGetUpgradeIfEnabled(MultiFactor, loginMessage);
-
                 /*
-                 * Mfa is essentially indempodent, the session stores the last upgrade key, so 
-                 * if this method is continually called, new mfa tokens will be generated.
+                 * Determine if the user uses MFA to guard their account. If so 
+                 * force an MFA upgrade before allowing the user to login
                  */
-
-                //if message is null, mfa was not enabled or could not be prepared
-                if (message.HasValue)
+                if (MultiFactor.HasMfaEnabled(user))
                 {
-                    //Store the base64 signature
-                    entity.Session.MfaUpgradeSecret(message.Value.SessionKey);
-
-                    //send challenge message to client
-                    webm.Result = message.Value.ClientJwt;
+                    //the upgrade message
+                    webm.Result = MultiFactor.GetChallengeMessage(entity, user, loginMessage);
                     webm.MultiFactorUpgrade = true;
                 }
                 else
@@ -278,31 +291,18 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 return VirtualClose(entity, webm, HttpStatusCode.BadRequest);
             }
 
-            //Recover upgrade jwt
-            string? upgradeJwt = request.RootElement.GetPropString("upgrade");
-
-            if (webm.Assert(upgradeJwt != null, "Missing required upgrade data"))
-            {
-                return VirtualClose(entity, webm, HttpStatusCode.UnprocessableEntity);
-            }
-            
-            //Recover stored signature
-            string? storedSig = entity.Session.MfaUpgradeSecret();
-
-            if(webm.Assert(!string.IsNullOrWhiteSpace(storedSig), MFA_ERROR_MESSAGE))
-            {
-                return VirtualOk(entity, webm);
-            }
-
-            //Recover upgrade data from upgrade message
-            MFAUpgrade? upgrade = MultiFactor!.RecoverUpgrade(upgradeJwt, storedSig);
+            MfaChallenge? upgrade = MultiFactor.GetChallengeData(entity, request);
            
+            /*
+             * Upgrade may be null if it is not valid, not correctly formatted,
+             * expired, and so on. We cannot leak information about the upgrade
+             * request to the client, so return a generic error message
+             */
             if (webm.Assert(upgrade != null, MFA_ERROR_MESSAGE))
             {
                 return VirtualOk(entity, webm);
             }
             
-            //recover user account 
             using IUser? user = await Users.GetUserFromUsernameAsync(upgrade.UserName!);
 
             if (webm.Assert(user != null, MFA_ERROR_MESSAGE))
@@ -311,79 +311,53 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             }
 
             bool locked = _lockout.CheckOrClear(user, entity.RequestedTimeUtc);
-
-            //Make sure the account has not been locked out
+           
             if (webm.Assert(locked == false, LOCKED_ACCOUNT_MESSAGE))
             {
                 //Locked, so clear stored signature
-                entity.Session.MfaUpgradeSecret(null);
+                MultiFactor.InvalidateUpgrade(entity);
+            }
+            else if (MultiFactor.VerifyResponse(entity, upgrade, user, request))
+            {
+               /*
+                * ###################################################
+                * 
+                *               AUTHORIZATION ZONE
+                *               
+                *       Connection will be elevated to authorized
+                *       this is a successful login!
+                * 
+                * ####################################################
+                */
+
+                MultiFactor.InvalidateUpgrade(entity);
+
+                /*
+                 * Time to authorize the user now. This will cause state changs
+                 * to the client session, and user account. The user
+                 * is now authorized to use the session.
+                 */
+                entity.GenerateAuthorization(upgrade, user, webm);
+           
+                webm.Result = new AccountData()
+                {
+                    EmailAddress = user.EmailAddress,
+                };
+
+                webm.Success = true;
+              
+                Log.Verbose("Successful login for user {uid}...", user.UserID[..8]);
             }
             else
             {
-                //process mfa login
-                LoginMfa(entity, user, request, upgrade, webm);
+                webm.Result = "Please check your input and try again.";
             }
       
-            //Update user on clean process
+            //Flush any changes to the user store
             await user.ReleaseAsync();
 
             //Close rseponse
             return VirtualOk(entity, webm);
-        }
-
-        private void LoginMfa(HttpEntity entity, IUser user, JsonDocument request, MFAUpgrade upgrade, MfaUpgradeWebm webm)
-        {         
-            //Recover the user's local time
-            if(!request.RootElement.TryGetProperty("localtime", out JsonElement ltEl) 
-                && ltEl.TryGetDateTimeOffset(out DateTimeOffset localTime))
-            {
-                webm.Result = MFA_ERROR_MESSAGE;
-                return;
-            }
-
-            //Check mode
-            switch (upgrade.Type)
-            {
-                case MFAType.TOTP:
-                    {
-                        //get totp code from request
-                        uint code = request.RootElement.GetProperty("code").GetUInt32();
-
-                        //Verify totp code
-                        if (!MultiFactor.VerifyTOTP(user, code))
-                        {
-                            webm.Result = "Please check your code.";
-
-                            //Increment flc and update the user in the store
-                            _lockout.Increment(user, entity.RequestedTimeUtc);                           
-                            return;
-                        }
-                        //Valid, complete                         
-                    }
-                    break;
-                default:
-                    webm.Result = MFA_ERROR_MESSAGE;
-                    return;
-            }
-
-            //SUCCESSFUL LOGIN
-
-            //Wipe session signature
-            entity.Session.MfaUpgradeSecret(null);
-
-            //Elevate the login status of the session to reflect the user's status
-            entity.GenerateAuthorization(upgrade, user, webm);
-            
-            //Send the Username (since they already have it)
-            webm.Result = new AccountData()
-            {
-                EmailAddress = user.EmailAddress,
-            };
-
-            webm.Success = true;
-
-            //Write to log
-            Log.Verbose("Successful login for user {uid}...", user.UserID[..8]);
         }
 
         private sealed class MfaUpgradeWebm : ValErrWebMessage

@@ -30,6 +30,7 @@ export type { WebMessage, ServerValidationError } from './types'
 export * from './mfa/login'
 export * from './mfa/pki'
 export * from './mfa/config'
+export * from './mfa/fido'
 
 //Social exports
 export * from './social'

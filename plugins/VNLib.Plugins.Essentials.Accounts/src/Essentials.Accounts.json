@@ -42,6 +42,10 @@
     "enable_key_update": true
   },
 
+  "fido_endpoint": {
+    "path": "/account/fido"
+  },
+
   //If mfa is defined, configures mfa enpoints and enables mfa logins
   "mfa": {
     "upgrade_expires_secs": 180,
@@ -59,14 +63,14 @@
 
     "fido": {
       "challenge_size": 64,
-      "attestation": "none",
       "timeout": 60000,
-      "site_name": "vaughnnugent.com",
+      "attestation_type": "none",
+      "site_name": "localhost",
 
-      "authenticatorSelection": {
+      "authenticator_selection": {
         "authenticatorAttachment": "cross-platform",
         "requireResidentKey": false,
-        "userVerification": "required"
+        "userVerification": "preferred"
       }
     }
   },
