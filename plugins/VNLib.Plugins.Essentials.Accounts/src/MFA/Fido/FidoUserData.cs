@@ -23,11 +23,7 @@
 */
 
 using System;
-using System.Buffers.Binary;
-using System.Formats.Cbor;
 using System.Text.Json.Serialization;
-
-using VNLib.Hashing.IdentityUtility;
 
 namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
 {
