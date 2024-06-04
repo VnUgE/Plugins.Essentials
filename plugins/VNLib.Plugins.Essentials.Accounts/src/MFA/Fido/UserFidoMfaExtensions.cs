@@ -24,7 +24,7 @@
 
 using System;
 using System.Linq;
-
+using System.Buffers;
 using VNLib.Plugins.Essentials.Users;
 
 namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido

@@ -58,5 +58,16 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
                 _ => string.Empty
             };
         }
+
+        public static int GetPublicKeySizeForAlg(int code)
+        {
+            return code switch
+            {
+                -7 => 64,
+                -35 => 96,
+                -36 => 132,
+                _ => -1
+            };
+        }
     }
 }

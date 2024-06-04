@@ -27,7 +27,7 @@ using System.Text.Json.Serialization;
 
 namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
 {
-    public sealed class FidoDeviceCredential
+    public sealed record class FidoDeviceCredential
     {
         [JsonPropertyName("n")]
         public string Name { get; set; } = string.Empty;

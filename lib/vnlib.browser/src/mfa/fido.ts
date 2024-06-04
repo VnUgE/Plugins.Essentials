@@ -46,6 +46,7 @@ export interface IFidoDevice{
 
 interface FidoRegistration{
     readonly id: string;
+    readonly friendlyName: string;
     readonly publicKey?: string;
     readonly publicKeyAlgorithm: number;
     readonly clientDataJSON: string;
@@ -114,18 +115,19 @@ export const useFidoApi = (endpoint: MaybeRef<string>, axiosConfig?: MaybeRef<Ax
         return data.getResultOrThrow();
     }
 
-    const registerCredential = async (registration: RegistrationResponseJSON, commonName: string): Promise<WebMessage> => {
+    const registerCredential = async (reg: RegistrationResponseJSON, commonName: string): Promise<WebMessage> => {
 
-        const response: FidoRegistration = {
-            id: registration.id,
-            publicKey: registration.response.publicKey,
-            publicKeyAlgorithm: registration.response.publicKeyAlgorithm!,
-            clientDataJSON: registration.response.clientDataJSON,
-            authenticatorData: registration.response.authenticatorData,
-            attestationObject: registration.response.attestationObject
+        const registration: FidoRegistration = {
+            id: reg.id,
+            publicKey: reg.response.publicKey,
+            publicKeyAlgorithm: reg.response.publicKeyAlgorithm!,
+            clientDataJSON: reg.response.clientDataJSON,
+            authenticatorData: reg.response.authenticatorData,
+            attestationObject: reg.response.attestationObject,
+            friendlyName: commonName
         }
 
-        const { data } = await axios.value.post<WebMessage>(ep(), { response, commonName });
+        const { data } = await axios.value.post<WebMessage>(ep(), { registration });
         return data;
     }
 

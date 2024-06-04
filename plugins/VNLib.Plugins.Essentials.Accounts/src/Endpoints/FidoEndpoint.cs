@@ -31,6 +31,7 @@ using FluentValidation;
 using VNLib.Utils;
 using VNLib.Utils.Memory;
 using VNLib.Hashing;
+using VNLib.Utils.Logging;
 using VNLib.Plugins.Essentials.Users;
 using VNLib.Plugins.Essentials.Endpoints;
 using VNLib.Plugins.Extensions.Loading;
@@ -99,6 +100,11 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 return VirtualClose(entity, webm, HttpStatusCode.NotFound);
             }
 
+            if(webm.Assert(user.FidoCanAddKey(), "You cannot add another key to this account. You must delete an existing one first"))
+            {
+                return VirtualOk(entity, webm);
+            }
+
             //TODO: Store challenge in user session
             string challenge = RandomHash.GetRandomBase64(16);
 
@@ -138,7 +144,12 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 return VirtualClose(entity, webm, HttpStatusCode.BadRequest);
             }
 
-            if(doc.RootElement.TryGetProperty("response", out JsonElement deviceResponse))
+            /*
+             * Handle a registration response from the client that is used to 
+             * register a new credential to the user's account
+             */
+
+            if (doc.RootElement.TryGetProperty("registration", out JsonElement deviceResponse))
             {
                 //complete registation of new device
                 FidoAuthenticatorResponse? res = deviceResponse.Deserialize<FidoAuthenticatorResponse>();
@@ -185,7 +196,33 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 return VirtualClose(entity, webm, HttpStatusCode.UnprocessableEntity);
             }
 
-            return VirtualOk(entity);
+            FidoDeviceCredential? cred = FidoDecoder.FromResponse(response);
+
+            if (webm.Assert(cred != null, "Your device did not send valid public key data"))
+            {
+                return VirtualClose(entity, webm, HttpStatusCode.BadRequest);
+            }
+
+            Log.Information("Adding new credential\n {cred}", cred);
+
+            using IUser? user = await _users.GetUserFromIDAsync(entity.Session.UserID, entity.EventCancellation);
+
+            if(webm.Assert(user != null, "User not found"))
+            {
+                return VirtualClose(entity, webm, HttpStatusCode.NotFound);
+            }
+
+            if (webm.Assert(user.FidoCanAddKey(), "You cannot add another key to your account, you must delete an existing one"))
+            {
+                return VirtualOk(entity, webm);
+            }
+
+            //user.FidoAddCredential(cred);
+
+            webm.Result = "Your fido device was successfully added to your account";
+            webm.Success = true;
+
+            return VirtualOk(entity, webm);
         }
        
     }
@@ -232,6 +269,12 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 .WithMessage("Fido 'device_id' must be provided")
                 .MaximumLength(256);
 
+            RuleFor(c => c.DeviceName)
+                .NotEmpty()
+                .Matches(@"^[a-zA-Z0-9\s]+$")
+                .WithMessage("Your device name contains invalid characters")
+                .MaximumLength(64);
+
             RuleFor(c => c.Base64PublicKey)
                 .NotEmpty()
                 .WithMessage("Fido 'public_key' must be provided");
@@ -265,18 +308,18 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
         {
             RuleFor(c => c.Base64Challenge)
                 .NotEmpty()
-                .WithMessage("Fido 'challenge' must be provided")
+                .WithMessage("Fido 'challenge' is required")
                 .MaximumLength(4096);
 
             RuleFor(c => c.Origin)
                 .NotEmpty()
-                .WithMessage("Fido 'origin' must be provided")
+                .WithMessage("Fido 'origin' is required")
                 .MaximumLength(1024);
 
             RuleFor(c => c.Type)
                 .NotEmpty()
                 .WithMessage("Fido 'type' must be provided")
-                .MaximumLength(64);
+                .Matches("webauthn.create");
         }
     }
 }

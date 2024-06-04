@@ -46,5 +46,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
         [JsonPropertyName("attestationObject")]
         public string? Base64Attestation { get; set; }
 
+        [JsonPropertyName("friendlyName")]
+        public string? DeviceName { get; set; }
     }
 }
