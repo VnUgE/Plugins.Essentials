@@ -15,6 +15,10 @@ tasks:
     cmds:
      - echo "building module {{.MODULE_NAME}}" 
 
+    #update internal package version
+     - cmd: npm version {{.BUILD_VERSION}}
+       ignore_error: true
+
     #install dependencies and build
      - npm install
      - npm run build
