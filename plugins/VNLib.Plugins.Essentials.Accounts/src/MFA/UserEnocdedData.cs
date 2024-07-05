@@ -93,7 +93,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
             
             JsonSerializer.Serialize(ms, instance, Statics.SR_OPTIONS);
 
-            store[index] = VnEncoding.ToBase64UrlSafeString(ms.AsSpan(), false);
+            store[index] = VnEncoding.Base64UrlEncode(ms.AsSpan(), false);
         }
     }
 }

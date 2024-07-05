@@ -29,6 +29,8 @@ using System.Collections.Generic;
 using VNLib.Utils.Logging;
 using VNLib.Utils.Extensions;
 using VNLib.Plugins.Extensions.Loading;
+using VNLib.Plugins.Essentials.Auth.Social.openid;
+using VNLib.Plugins.Extensions.Loading.Configuration;
 
 namespace VNLib.Plugins.Essentials.Auth.Social
 {
@@ -42,25 +44,25 @@ namespace VNLib.Plugins.Essentials.Auth.Social
 
         public OauthClientConfig(PluginBase plugin, IConfigScope config)
         {
-            EndpointPath = config["path"].GetString() ?? throw new KeyNotFoundException($"Missing required key 'path' in config {config.ScopeName}");
+            EndpointPath = config.GetRequiredProperty("path", p => p.GetString()!);
+            AccountOrigin = config.GetRequiredProperty("account_origin", p => p.GetString()!);
+         
+            OpenIdPortalConfig portalConf = config.Deserialze<OpenIdPortalConfig>()!;
 
-            //Set discord account origin
-            AccountOrigin = config["account_origin"].GetString() ?? throw new KeyNotFoundException($"Missing required key 'account_origin' in config {config.ScopeName}");
-           
-            //Get the auth and token urls
-            string authUrl = config["authorization_url"].GetString() ?? throw new KeyNotFoundException($"Missing required key 'authorization_url' in config {config.ScopeName}");
-            string tokenUrl = config["token_url"].GetString() ?? throw new KeyNotFoundException($"Missing required key 'token_url' in config {config.ScopeName}");
-            string userUrl = config["user_data_url"].GetString() ?? throw new KeyNotFoundException($"Missing required key 'user_data_url' in config {config.ScopeName}");
+            Validate.NotNull(portalConf.AuthorizationEndpoint, $"Missing authorization endpoint for {config.ScopeName}");
+            Validate.NotNull(portalConf.TokenEndpoint, $"Missing token endpoint for {config.ScopeName}");
+            Validate.NotNull(portalConf.UserDataEndpoint, $"Missing user-data endpoint for {config.ScopeName}");
+
             //Create the uris 
-            AccessCodeUrl = new(authUrl);
-            AccessTokenUrl = new(tokenUrl);
-            UserDataUrl = new(userUrl);
+            AuthorizationUrl = new(portalConf.AuthorizationEndpoint);
+            AccessTokenUrl = new(portalConf.TokenEndpoint);
+            UserDataUrl = new(portalConf.UserDataEndpoint);
 
-            AllowForLocalAccounts = config["allow_for_local"].GetBoolean();
-            AllowRegistration = config["allow_registration"].GetBoolean();
-            NonceByteSize = config["nonce_size"].GetUInt32();
-            RandomPasswordSize = config["password_size"].GetInt32();
-            InitClaimValidFor = config["claim_valid_for_sec"].GetTimeSpan(TimeParseType.Seconds);
+            AllowForLocalAccounts = config.GetValueOrDefault("allow_for_local", p => p.GetBoolean(), false);
+            AllowRegistration = config.GetValueOrDefault("allow_registration", p => p.GetBoolean(), false);
+            NonceByteSize = config.GetRequiredProperty("nonce_size", p => p.GetUInt32());
+            RandomPasswordSize = config.GetRequiredProperty("password_size", p => p.GetInt32());
+            InitClaimValidFor = config.GetRequiredProperty("claim_valid_for_sec", p => p.GetTimeSpan(TimeParseType.Seconds));
 
             //Setup async lazy loaders for secrets
             ClientID = plugin.GetSecretAsync($"{config.ScopeName}_client_id")
@@ -101,7 +103,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social
         /// The URL to redirect the user to the OAuth2 service
         /// to begin the authentication process
         /// </summary>       
-        public Uri AccessCodeUrl { get; }
+        public Uri AuthorizationUrl { get; }
 
         /// <summary>
         /// The remote endoint to exchange codes for access tokens

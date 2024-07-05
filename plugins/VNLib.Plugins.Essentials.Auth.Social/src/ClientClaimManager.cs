@@ -120,7 +120,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social
             Cookies.SetCookie(entity, jwt.Compile());
 
             //Encode and store the signing key in the clien't session
-            entity.Session[SESSION_SIG_KEY_NAME] = VnEncoding.ToBase64UrlSafeString(sigKey, false);
+            entity.Session[SESSION_SIG_KEY_NAME] = VnEncoding.Base64UrlEncode(sigKey, false);
 
             //Clear the signing key
             MemoryUtil.InitializeBlock(sigKey);

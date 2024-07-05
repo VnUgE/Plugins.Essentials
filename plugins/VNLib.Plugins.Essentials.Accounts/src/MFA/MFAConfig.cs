@@ -95,6 +95,6 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
         public TimeSpan UpgradeValidFor { get; private set; } = TimeSpan.FromSeconds(120);
 
 
-        public void Validate() => _validator.ValidateAndThrow(this);
+        public void OnValidate() => _validator.ValidateAndThrow(this);
     }
 }

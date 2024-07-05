@@ -63,7 +63,11 @@ namespace VNLib.Plugins.Essentials.Auth.Social
         const string AUTH_GRANT_SESSION_NAME = "auth";
         const string SESSION_TOKEN_KEY_NAME = "soa.tkn";
         const string CLAIM_COOKIE_NAME = "extern-claim";
-       
+
+        private static readonly IValidator<LoginClaim> ClaimValidator = GetClaimValidator();
+        private static readonly IValidator<string> NonceValidator = GetNonceValidator();
+        private static readonly AccountDataValidator AccountDataValidator = new ();
+
 
         /// <summary>
         /// The client configuration struct passed during base class construction
@@ -81,19 +85,13 @@ namespace VNLib.Plugins.Essentials.Auth.Social
         /// <summary>
         /// The user manager used to create and manage user accounts
         /// </summary>
-        protected IUserManager Users { get; }
-
-        private readonly IValidator<LoginClaim> ClaimValidator;
-        private readonly IValidator<string> NonceValidator;
-        private readonly IValidator<AccountData> AccountDataValidator;
+        protected IUserManager Users { get; }        
+        
+        
         private readonly ClientClaimManager _claims;
 
         protected SocialOauthBase(PluginBase plugin, IConfigScope config)
         {
-            ClaimValidator = GetClaimValidator();
-            NonceValidator = GetNonceValidator();
-            AccountDataValidator = new AccountDataValidator();
-         
             //Get the configuration element for the derrived type
             Config = plugin.CreateService<OauthClientConfig>(config);
 

@@ -65,11 +65,11 @@ namespace VNLib.Plugins.Essentials.Auth.Social
                 RandomHash.GetRandomBytes(buffer.Span);
 
                 //Base32-Encode nonce and save it
-                Nonce = VnEncoding.ToBase64UrlSafeString(buffer.Span, false);
+                Nonce = VnEncoding.Base64UrlEncode(buffer.Span, includePadding: false);
             }
             finally
             {
-                MemoryUtil.InitializeBlock(buffer.Span);
+                MemoryUtil.InitializeBlock(ref buffer.GetReference(), buffer.IntLength);
             }
         }
     }

@@ -18,7 +18,7 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import { decodeJwt, type JWTPayload } from "jose";
-import { forEach, isNil } from 'lodash-es';
+import { first, forEach, isNil } from 'lodash-es';
 import { get } from "@vueuse/core";
 import { debugLog } from "../util"
 import { useUser, type ExtendedLoginResponse } from "../user";
@@ -40,9 +40,9 @@ export interface IMfaSubmission {
 
 export interface IMfaMessage extends JWTPayload {
     /**
-     * The type of mfa upgrade
+     * The supported mfa methods for the user
      */
-    readonly type: MfaMethod;
+    readonly capabilities: MfaMethod[];
     /**
      * The time in seconds that the mfa upgrade is valid for
      */
@@ -143,7 +143,7 @@ const getMfaProcessor = (user: IUserInternal, axios:Ref<Axios>) =>{
         debugLog(mfa)
 
         //Select the mfa handler
-        const handler = handlerMap.get(mfa.type);
+        const handler = handlerMap.get(first(mfa.capabilities)!);
 
         //If no handler is found, throw an error
         if(!handler){

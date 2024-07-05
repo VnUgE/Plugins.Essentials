@@ -190,7 +190,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
         [JsonPropertyName("strict_user_agent")]
         public bool StrictUserAgent { get; set; } = true;
 
-        void IOnConfigValidation.Validate()
+        void IOnConfigValidation.OnValidate()
         {
             //Validate the current instance
             _validator.ValidateAndThrow(this);

@@ -478,7 +478,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             [JsonPropertyName("failed_attempt_timeout_sec")]
             public double FailedCountTimeoutSec { get; set; } = 300;
 
-            public void Validate()
+            public void OnValidate()
             {
                 Validator.ValidateAndThrow(this);
             }

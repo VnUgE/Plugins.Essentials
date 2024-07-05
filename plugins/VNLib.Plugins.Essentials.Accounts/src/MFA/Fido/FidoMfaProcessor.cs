@@ -114,7 +114,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
         {
             return new FidoDevUpgradeJson
             {
-                Base64UrlChallange = VnEncoding.ToBase64UrlSafeString(challenge, false),
+                Base64UrlChallange = VnEncoding.Base64UrlEncode(challenge, includePadding: false),
               
                 Timeout = conf.Timeout,
                 

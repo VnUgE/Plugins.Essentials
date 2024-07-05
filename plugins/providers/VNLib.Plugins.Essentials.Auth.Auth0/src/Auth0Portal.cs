@@ -30,7 +30,7 @@ using VNLib.Plugins.Essentials.Auth.Auth0.Endpoints;
 
 namespace VNLib.Plugins.Essentials.Auth.Auth0
 {
-
+  
     [ServiceExport]
     [ConfigurationName(ConfigKey)]
     public sealed class Auth0Portal(PluginBase plugin, IConfigScope config) : IOAuthProvider
