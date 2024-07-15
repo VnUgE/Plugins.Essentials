@@ -28,11 +28,9 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 
 using VNLib.Net.Http;
-using VNLib.Utils.Logging;
 using VNLib.Hashing.Checksums;
 using VNLib.Plugins.Essentials.Endpoints;
 using VNLib.Plugins.Essentials.Extensions;
-using VNLib.Plugins.Extensions.VNCache;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Validation;
 
@@ -46,42 +44,19 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Endpoints
     {
         const int DefaultMaxDataSize = 8 * 1024;
 
-        private readonly IAppDataStore _store;
+        private readonly StorageManager _store;
         private readonly int MaxDataSize;
         private readonly string[] AllowedScopes;
 
         public WebEndpoint(PluginBase plugin, IConfigScope config)
         {
-            string path = config.GetRequiredProperty("path", p => p.GetString())!;
+            string path = config.GetRequiredProperty<string>("path");
             InitPathAndLog(path, plugin.Log.CreateScope("Endpoint"));
 
-            MaxDataSize = config.GetValueOrDefault("max_data_size", p => p.GetInt32(), DefaultMaxDataSize);
-            AllowedScopes = config.GetRequiredProperty("allowed_scopes", p => p.EnumerateArray().Select(p => p.GetString()!)).ToArray();
-
-            bool useCache = false;
-
-            //Cache loading is optional
-            if (plugin.HasConfigForType<CacheStore>())
-            {
-                //See if caching is enabled
-                IConfigScope cacheConfig = plugin.GetConfigForType<CacheStore>();
-                useCache = cacheConfig.GetValueOrDefault("enabled", e => e.GetBoolean(), false);
-
-                if (useCache && plugin.GetDefaultGlobalCache() is null)
-                {
-                    plugin.Log.Error("Cache was enabled but no caching library was loaded. Continuing without cache");
-                    useCache = false;
-                }
-            }
-
-            _store = LoadStore(plugin, useCache);
-        }
-
-        private static IAppDataStore LoadStore(PluginBase plugin, bool withCache)
-        {
-            return withCache 
-                ? plugin.GetOrCreateSingleton<CacheStore>() 
-                : plugin.GetOrCreateSingleton<PersistentStorageManager>();
+            MaxDataSize = config.GetValueOrDefault("max_data_size", DefaultMaxDataSize);
+            AllowedScopes = config.GetRequiredProperty<string[]>("allowed_scopes");
+         
+            _store = plugin.GetOrCreateSingleton<StorageManager>();
         }
 
         protected async override ValueTask<VfReturnType> GetAsync(HttpEntity entity)

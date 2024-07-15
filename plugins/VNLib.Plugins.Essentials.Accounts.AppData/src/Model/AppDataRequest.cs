@@ -3,9 +3,9 @@
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts.AppData
-* File: RecordDataCacheEntry.cs 
+* File: IAppDataStore.cs 
 *
-* RecordDataCacheEntry.cs is part of VNLib.Plugins.Essentials.Accounts.AppData which 
+* IAppDataStore.cs is part of VNLib.Plugins.Essentials.Accounts.AppData which 
 * is part of the larger VNLib collection of libraries and utilities.
 *
 * VNLib.Plugins.Essentials.Accounts is free software: you can redistribute it and/or modify 
@@ -22,17 +22,18 @@
 * along with this program.  If not, see https://www.gnu.org/licenses/.
 */
 
-using MemoryPack;
+using System;
+
+using VNLib.Plugins.Extensions.VNCache.DataModel;
 
 namespace VNLib.Plugins.Essentials.Accounts.AppData.Model
 {
-    [MemoryPackable]
-    internal partial class RecordDataCacheEntry
+    internal sealed record class AppDataRequest(string UserId, string RecordKey) : IEntityCacheKey
     {
-        public byte[] RecordData { get; set; }
+        ///<inheritdoc/>
+        public string GetKey() => $"{UserId}:{RecordKey}";
 
-        public ulong? Checksum { get; set; }
-
-        public long UnixTimestamp { get; set; }
+        ///<inheritdoc/>
+        public override int GetHashCode() => HashCode.Combine(UserId, RecordKey);
     }
 }

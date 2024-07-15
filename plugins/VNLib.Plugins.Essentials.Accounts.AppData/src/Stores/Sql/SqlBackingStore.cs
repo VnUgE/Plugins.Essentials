@@ -29,47 +29,37 @@ using System.Threading.Tasks;
 
 using Microsoft.EntityFrameworkCore;
 
-using VNLib.Utils.Logging;
+using VNLib.Utils;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Sql;
 using VNLib.Plugins.Extensions.Data;
 using VNLib.Plugins.Extensions.Data.Abstractions;
 using VNLib.Plugins.Extensions.Data.Extensions;
+using VNLib.Plugins.Extensions.VNCache.DataModel;
+
 using VNLib.Plugins.Essentials.Accounts.AppData.Model;
 
 namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores.Sql
 {
 
-    internal sealed class SqlBackingStore(PluginBase plugin) : IAppDataStore, IAsyncConfigurable
+    internal sealed class SqlBackingStore(PluginBase plugin) : IEntityStore<UserRecordData, AppDataRequest>, IAsyncConfigurable
     {
         private readonly DbRecordStore _store = new(plugin.GetContextOptionsAsync());
 
         ///<inheritdoc/>
         async Task IAsyncConfigurable.ConfigureServiceAsync(PluginBase plugin)
         {
-            //Wait for the options to be ready
-            await _store.WhenLoaded();
-
             //Add startup delay
             await Task.Delay(2000);
-
-            plugin.Log.Debug("Creating database tables for Account AppData");
-
             await plugin.EnsureDbCreatedAsync<UserRecordDbContext>(plugin);
         }
-
+    
         ///<inheritdoc/>
-        public Task DeleteRecordAsync(string userId, string recordKey, CancellationToken cancellation)
+        public async Task<UserRecordData?> GetAsync(AppDataRequest request, CancellationToken cancellation = default)
         {
-            return _store.DeleteAsync([userId, recordKey], cancellation);
-        }
+            DataRecord? dr = await _store.GetSingleAsync([request.UserId, request.RecordKey]);
 
-        ///<inheritdoc/>
-        public async Task<UserRecordData?> GetRecordAsync(string userId, string recordKey, RecordOpFlags flags, CancellationToken cancellation)
-        {
-            DataRecord? dr = await _store.GetSingleAsync(userId, recordKey);
-
-            if (dr is null)
+            if (dr is null || !string.Equals(dr.UserId, request.UserId, StringComparison.Ordinal))
             {
                 return null;
             }
@@ -77,20 +67,36 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores.Sql
             //get the last modified time in unix time for the caller
             long lastModifed = new DateTimeOffset(dr.LastModified).ToUnixTimeSeconds();
 
-            return new(userId, dr.Data!, lastModifed, unchecked((ulong)dr.Checksum));
+            return new()
+            {
+                Data            = dr.Data,
+                CacheTimestamp  = lastModifed,
+                Checksum        = dr.Checksum == 0 ? null : unchecked((uint)dr.Checksum)
+            };
         }
 
         ///<inheritdoc/>
-        public Task SetRecordAsync(string userId, string recordKey, byte[] data, ulong checksum, RecordOpFlags flags, CancellationToken cancellation)
+        public Task UpsertAsync(AppDataRequest request, UserRecordData entity, CancellationToken cancellation = default)
         {
             return _store.AddOrUpdateAsync(new DataRecord
             {
-                UserId = userId,
-                RecordKey = recordKey,
-                Data = data,
-                Checksum = unchecked((long)checksum)
+                UserId = request.UserId,
+                RecordKey = request.RecordKey,
+                Data = entity.Data,
+                Checksum = entity.Checksum.HasValue ? unchecked((long)entity.Checksum.Value) : 0,
+
             }, cancellation);
         }
+
+        ///<inheritdoc/>
+        public async Task<bool> RemoveAsync(AppDataRequest request, CancellationToken cancellation = default)
+        {
+            ERRNO result = await _store.DeleteAsync([request.UserId, request.RecordKey], cancellation)
+                .ConfigureAwait(false);
+
+            return result > 0;
+        }
+
 
         sealed class DbRecordStore(IAsyncLazy<DbContextOptions> options) : DbStore<DataRecord>
         {
