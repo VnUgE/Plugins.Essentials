@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2023 Vaughn Nugent
+* Copyright (c) 2024 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
@@ -33,6 +33,7 @@ using VNLib.Plugins.Essentials.Extensions;
 using VNLib.Plugins.Extensions.Validation;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Users;
+using VNLib.Plugins.Extensions.Loading.Routing;
 using static VNLib.Plugins.Essentials.Statics;
 
 
@@ -41,19 +42,11 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
     /// <summary>
     /// Provides an http endpoint for user account profile access
     /// </summary>
+    [EndpointPath("{{path}}")]
     [ConfigurationName("profile_endpoint")]
-    internal sealed class ProfileEndpoint : ProtectedWebEndpoint
+    internal sealed class ProfileEndpoint(PluginBase pbase) : ProtectedWebEndpoint
     {
-        private readonly IUserManager Users;
-        
-        public ProfileEndpoint(PluginBase pbase, IConfigScope config)
-        {
-            string? path = config["path"].GetString();
-            
-            InitPathAndLog(path, pbase.Log);
-            //Store user system
-            Users = pbase.GetOrCreateSingleton<UserManager>();
-        }
+        private readonly UserManager Users = pbase.GetOrCreateSingleton<UserManager>();
 
         protected override async ValueTask<VfReturnType> GetAsync(HttpEntity entity)
         {

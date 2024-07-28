@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2023 Vaughn Nugent
+* Copyright (c) 2024 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
@@ -27,27 +27,20 @@ using System;
 using VNLib.Utils.Extensions;
 using VNLib.Plugins.Essentials.Endpoints;
 using VNLib.Plugins.Extensions.Loading;
+using VNLib.Plugins.Extensions.Loading.Routing;
 
 
 namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 {
+    [EndpointPath("{{path}}")]
+    [EndpointLogName("Heartbeat")]
     [ConfigurationName("keepalive_endpoint")]
-    internal sealed class KeepAliveEndpoint : ProtectedWebEndpoint
+    internal sealed class KeepAliveEndpoint(PluginBase plugin, IConfigScope config) : ProtectedWebEndpoint
     {
-        readonly TimeSpan tokenRegenTime;
-
-        /*
-         * Endpoint does not use a log, so IniPathAndLog is never called
-         * and path verification happens verbosly 
-         */
-        public KeepAliveEndpoint(PluginBase pbase, IConfigScope config)
-        {
-            string? path = config["path"].GetString();
-
-            tokenRegenTime = config["token_refresh_sec"].GetTimeSpan(TimeParseType.Seconds);
-
-            InitPathAndLog(path, pbase.Log);
-        }
+        private readonly TimeSpan tokenRegenTime = config.GetRequiredProperty(
+            property: "token_refresh_sec", 
+            static p => p.GetTimeSpan(TimeParseType.Seconds)
+        );
 
         protected override VfReturnType Get(HttpEntity entity) => VirtualOk(entity);
 
@@ -64,8 +57,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 
                 //reauthorize the client
                 entity.ReAuthorizeClient(webm);
-
-                webm.Success = true;                
+              
                 //Send the update message to the client
                 return VirtualOk(entity, webm);
             }

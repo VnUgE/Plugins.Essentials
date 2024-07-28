@@ -34,8 +34,9 @@ using VNLib.Utils.Memory;
 using VNLib.Utils.Logging;
 using VNLib.Utils.Extensions;
 using VNLib.Plugins.Extensions.Loading;
+using VNLib.Plugins.Essentials.Content.Routing.Model;
 
-namespace VNLib.Plugins.Essentials.Content.Routing.Model
+namespace VNLib.Plugins.Essentials.Content.Routing.stores
 {
     [ConfigurationName("store")]
     internal sealed class XmlRouteStore : IRouteStore
@@ -45,7 +46,7 @@ namespace VNLib.Plugins.Essentials.Content.Routing.Model
         public XmlRouteStore(PluginBase plugin, IConfigScope config)
         {
             //Get the route file path
-            _routeFile = config["route_file"].GetString() ?? throw new KeyNotFoundException("Missing required key 'route_file' in 'route_store' configuration element");
+            _routeFile = config.GetRequiredProperty<string>("route_file");
 
             //Make sure the file exists
             if (!FileOperations.FileExists(_routeFile))

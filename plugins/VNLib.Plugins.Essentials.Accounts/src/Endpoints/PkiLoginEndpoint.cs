@@ -46,11 +46,12 @@ using VNLib.Plugins.Extensions.Validation;
 using VNLib.Plugins.Essentials.Accounts.Validators;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Users;
+using VNLib.Plugins.Extensions.Loading.Routing;
 using VNLib.Plugins.Essentials.Accounts.MFA.Otp;
 
 namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 {
-
+    [EndpointPath("{{path}}")]
     [ConfigurationName("pki_auth_endpoint")]
     internal sealed class PkiLoginEndpoint : UnprotectedWebEndpoint
     {
@@ -78,15 +79,10 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 
         public PkiLoginEndpoint(PluginBase plugin, IConfigScope config)
         {
-            string? path = config["path"].GetString();
-            InitPathAndLog(path, plugin.Log);
-
             //Load config
             _config = config.DeserialzeAndValidate<JwtEndpointConfig>();
             _users = plugin.GetOrCreateSingleton<UserManager>();
             _lockout = new((uint)_config.MaxFailedLogins, TimeSpan.FromSeconds(_config.FailedCountTimeoutSec));
-
-            Log.Verbose("PKI endpoint enabled");
         }
 
         protected override ERRNO PreProccess(HttpEntity entity)

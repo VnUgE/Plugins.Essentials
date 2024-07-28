@@ -36,6 +36,7 @@ using VNLib.Plugins.Essentials.Users;
 using VNLib.Plugins.Essentials.Endpoints;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Users;
+using VNLib.Plugins.Extensions.Loading.Routing;
 using VNLib.Plugins.Extensions.Validation;
 using VNLib.Plugins.Essentials.Extensions;
 
@@ -50,39 +51,24 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
     /// This enpdoint requires Fido to be enabled in the MFA configuration.
     /// </para>
     /// </summary>
+    [EndpointPath("{{path}}")]
+    [EndpointLogName("FIDO")]
     [ConfigurationName("fido_endpoint")]
-    internal sealed class FidoEndpoint : ProtectedWebEndpoint
+    internal sealed class FidoEndpoint(PluginBase plugin, IConfigScope config) : ProtectedWebEndpoint
     {
         private static readonly FidoResponseValidator ResponseValidator = new();
         private static readonly FidoClientDataJsonValidtor ClientDataValidator = new();
 
-        private readonly IUserManager _users;
-        private readonly FidoConfig _fidoConfig;
-        private readonly FidoPubkeyAlgorithm[] _supportedAlgs;
-
-        public FidoEndpoint(PluginBase plugin, IConfigScope config)
-        {
-            _users = plugin.GetOrCreateSingleton<UserManager>();
-            _fidoConfig = plugin.GetConfigElement<MFAConfig>().FIDOConfig
+        private readonly IUserManager _users = plugin.GetOrCreateSingleton<UserManager>();
+        private readonly FidoConfig _fidoConfig = plugin.GetConfigElement<MFAConfig>().FIDOConfig
                 ?? throw new ConfigurationValidationException("Fido configuration was not set, but Fido endpoint was enabled");
 
-            InitPathAndLog(
-                path: config.GetRequiredProperty("path", p => p.GetString()!), 
-                log: plugin.Log.CreateScope("Fido-Endpoint")
-            );
-
-            /*
-             * For now hard-code supported algorithms,
-             * ECDSA is easiest for the time being
-             */
-
-            _supportedAlgs =
-            [
-                new FidoPubkeyAlgorithm(algId: -7),    //ES256
-                new FidoPubkeyAlgorithm(algId: -35),   //ES384     
-                new FidoPubkeyAlgorithm(algId: -36),   //ES512
-            ];
-        }
+        private static readonly FidoPubkeyAlgorithm[] _supportedAlgs =
+        [
+            new FidoPubkeyAlgorithm(algId: -7),    //ES256
+            new FidoPubkeyAlgorithm(algId: -35),   //ES384     
+            new FidoPubkeyAlgorithm(algId: -36),   //ES512
+        ];
 
         protected override VfReturnType Get(HttpEntity entity)
         {

@@ -119,19 +119,19 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Totp
             DateTimeOffset currentUtc = DateTimeOffset.UtcNow;
 
             //Start the current window with the minimum window
-            int currenStep = -config.TOTPTimeWindowSteps;
+            int currenStep = -config.TimeWindowSteps;
 
             Span<byte> stepBuffer = stackalloc byte[sizeof(long)];
-            Span<byte> hashBuffer = stackalloc byte[(int)config.TOTPAlg];
+            Span<byte> hashBuffer = stackalloc byte[(int)config.HashAlg];
 
             //Run the loop at least once to allow a 0 step tight window
             do
             {
                 //Calculate the window by multiplying the window by the current step, then add it to the current time offset to produce a new window
-                DateTimeOffset window = currentUtc.Add(config.TOTPPeriod.Multiply(currenStep));
+                DateTimeOffset window = currentUtc.Add(config.Period.Multiply(currenStep));
 
                 //calculate the time step
-                long timeStep = (long)Math.Floor(window.ToUnixTimeSeconds() / config.TOTPPeriod.TotalSeconds);
+                long timeStep = (long)Math.Floor(window.ToUnixTimeSeconds() / config.Period.TotalSeconds);
 
                 //try to compute the hash, must always be storable in the buffer
                 bool writeResult = BitConverter.TryWriteBytes(stepBuffer, timeStep);
@@ -143,18 +143,18 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Totp
                     stepBuffer.Reverse();
                 }
 
-                ERRNO result = ManagedHash.ComputeHmac(userSecret, stepBuffer, hashBuffer, config.TOTPAlg);
+                ERRNO result = ManagedHash.ComputeHmac(userSecret, stepBuffer, hashBuffer, config.HashAlg);
 
                 if (result < 1)
                 {
                     throw new InternalBufferTooSmallException("Failed to compute TOTP time step hash because the buffer was too small");
                 }
 
-                codeMatches |= totpCode == CalcTOTPCode(config.TOTPDigits, hashBuffer[..(int)result]);
+                codeMatches |= totpCode == CalcTOTPCode(config.Digits, hashBuffer[..(int)result]);
 
                 currenStep++;
 
-            } while (currenStep <= config.TOTPTimeWindowSteps);
+            } while (currenStep <= config.TimeWindowSteps);
 
             return codeMatches;
         }
@@ -182,5 +182,14 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Totp
 
         public void ExtendUpgradePayload(in JwtPayload message, IUser user)
         { }
+
+        /// <summary>
+        /// Generates a new TOTP secret according to the system TOTP configuration
+        /// </summary>
+        /// <returns>The random secret of the configured size</returns>
+        public byte[] GenerateNewSecret()
+        {
+            return RandomHash.GetRandomBytes(config.SecretSize);
+        }
     }
 }

@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2023 Vaughn Nugent
+* Copyright (c) 2024 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Content.Routing
@@ -29,6 +29,7 @@ using System.Collections.Generic;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Sql;
 using VNLib.Plugins.Essentials.Content.Routing.Model;
+using VNLib.Plugins.Essentials.Content.Routing.stores;
 
 namespace VNLib.Plugins.Essentials.Content.Routing
 {

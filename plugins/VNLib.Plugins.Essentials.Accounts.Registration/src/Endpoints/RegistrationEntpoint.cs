@@ -49,6 +49,7 @@ using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Sql;
 using VNLib.Plugins.Extensions.Loading.Events;
 using VNLib.Plugins.Extensions.Loading.Users;
+using VNLib.Plugins.Extensions.Loading.Routing;
 using VNLib.Plugins.Extensions.Validation;
 using VNLib.Plugins.Essentials.Accounts.Registration.TokenRevocation;
 using static VNLib.Plugins.Essentials.Accounts.AccountUtil;
@@ -56,8 +57,14 @@ using static VNLib.Plugins.Essentials.Accounts.AccountUtil;
 namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
 {
 
+    /// <summary>
+    /// Creates back-end functionality for a "registration" or "sign-up" page that integrates with the <see cref="AccountUtil"/> plugin
+    /// </summary>
+    /// <param name="Path">The path identifier</param>
+    /// <exception cref="ArgumentException"></exception>
+    [EndpointPath("{{path}}")]
     [ConfigurationName("registration")]
-    internal sealed class RegistrationEntpoint : UnprotectedWebEndpoint
+    internal sealed class RegistrationEntpoint(PluginBase plugin, IConfigScope config) : UnprotectedWebEndpoint
     {
         /// <summary>
         /// Generates a CNG random buffer to use as a nonce
@@ -69,33 +76,14 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
 
         private static readonly IValidator<RegCompletionRequest> RegCompletionValidator = RegCompletionRequest.GetValidator();
 
-        private readonly IUserManager Users;
-        private readonly RevokedTokenStore RevokedTokens;
-        private readonly TransactionalEmailConfig Emails;
-        private readonly IAsyncLazy<ReadOnlyJsonWebKey> RegSignatureKey;
-        private readonly TimeSpan RegExpiresSec;
 
-        /// <summary>
-        /// Creates back-end functionality for a "registration" or "sign-up" page that integrates with the <see cref="AccountUtil"/> plugin
-        /// </summary>
-        /// <param name="Path">The path identifier</param>
-        /// <exception cref="ArgumentException"></exception>
-        public RegistrationEntpoint(PluginBase plugin, IConfigScope config)
-        {
-            string? path = config["path"].GetString();
+        private readonly TimeSpan RegExpiresSec = config.GetRequiredProperty("reg_expires_sec", p => p.GetTimeSpan(TimeParseType.Seconds));
+        private readonly IUserManager Users = plugin.GetOrCreateSingleton<UserManager>();
+        private readonly RevokedTokenStore RevokedTokens = new(plugin.GetContextOptionsAsync());
+        private readonly TransactionalEmailConfig Emails = plugin.GetOrCreateSingleton<TEmailConfig>();
 
-            InitPathAndLog(path, plugin.Log);
-
-            RegExpiresSec = config["reg_expires_sec"].GetTimeSpan(TimeParseType.Seconds);
-           
-            Users = plugin.GetOrCreateSingleton<UserManager>();           
-            Emails = plugin.GetOrCreateSingleton<TEmailConfig>();
-            RevokedTokens = new(plugin.GetContextOptionsAsync());
-
-            //Begin the async op to get the signature key from the vault
-            RegSignatureKey = plugin.GetSecretAsync("reg_sig_key")
+        private readonly IAsyncLazy<ReadOnlyJsonWebKey> RegSignatureKey = plugin.GetSecretAsync("reg_sig_key")
                                 .ToLazy(static sr => sr.GetJsonWebKey());
-        }
 
         //Schedule cleanup interval
         [AsyncInterval(Minutes = 5)]

@@ -80,10 +80,10 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores.Sql
         {
             return _store.AddOrUpdateAsync(new DataRecord
             {
-                UserId = request.UserId,
-                RecordKey = request.RecordKey,
-                Data = entity.Data,
-                Checksum = entity.Checksum.HasValue ? unchecked((long)entity.Checksum.Value) : 0,
+                UserId      = request.UserId,
+                RecordKey   = request.RecordKey,
+                Data        = entity.Data,
+                Checksum    = entity.Checksum.HasValue ? unchecked((long)entity.Checksum.Value) : 0,
 
             }, cancellation);
         }

@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2023 Vaughn Nugent
+* Copyright (c) 2024 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Content.Routing
@@ -35,20 +35,15 @@ using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Sql;
 using VNLib.Plugins.Extensions.Data.Abstractions;
 using VNLib.Plugins.Extensions.Data.Extensions;
+using VNLib.Plugins.Essentials.Content.Routing.Model;
 
-namespace VNLib.Plugins.Essentials.Content.Routing.Model
+namespace VNLib.Plugins.Essentials.Content.Routing.stores
 {
-    internal sealed class DbRouteStore : DbStore<Route>, IRouteStore
+    internal sealed class DbRouteStore(PluginBase plugin) : DbStore<Route>, IRouteStore
     {
-        private readonly IAsyncLazy<DbContextOptions> Options;
+        private readonly IAsyncLazy<DbContextOptions> Options = plugin.GetContextOptionsAsync();
 
         public override IDbQueryLookup<Route> QueryTable { get; } = new DbQueries();
-
-        public DbRouteStore(PluginBase plugin)
-        {
-            //Load the db context options
-            Options = plugin.GetContextOptionsAsync();
-        }
 
         ///<inheritdoc/>
         public Task GetAllRoutesAsync(ICollection<Route> routes, CancellationToken cancellation)
@@ -69,7 +64,7 @@ namespace VNLib.Plugins.Essentials.Content.Routing.Model
             throw new NotSupportedException();
         }
 
-        private sealed record class DbQueries : IDbQueryLookup<Route>
+        private sealed class DbQueries : IDbQueryLookup<Route>
         {
             public IQueryable<Route> GetCollectionQueryBuilder(IDbContextHandle context, params string[] constraints)
             {

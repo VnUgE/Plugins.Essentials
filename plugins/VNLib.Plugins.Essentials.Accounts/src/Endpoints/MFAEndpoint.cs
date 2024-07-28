@@ -40,6 +40,7 @@ using VNLib.Plugins.Extensions.Validation;
 using VNLib.Plugins.Essentials.Endpoints;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Users;
+using VNLib.Plugins.Extensions.Loading.Routing;
 using VNLib.Plugins.Essentials.Accounts.MFA.Otp;
 using VNLib.Plugins.Essentials.Accounts.MFA.Totp;
 using VNLib.Plugins.Essentials.Accounts.MFA.Fido;
@@ -47,33 +48,24 @@ using VNLib.Plugins.Essentials.Accounts.MFA.Fido;
 namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 {
 
+    [EndpointPath("{{path}}")]
+    [EndpointLogName("MFA-Endpoint")]
     [ConfigurationName("mfa_endpoint")]
-    internal sealed class MFAEndpoint : ProtectedWebEndpoint
+    internal sealed class MFAEndpoint(PluginBase pbase) : ProtectedWebEndpoint
     {
         public const int TOTP_URL_MAX_CHARS = 1024;
         private const string CHECK_PASSWORD = "Please check your password";
 
-        private readonly IUserManager Users;
-        private readonly MFAConfig MultiFactor;
-
-        public MFAEndpoint(PluginBase pbase, IConfigScope config)
-        {           
-            InitPathAndLog(
-                path: config.GetRequiredProperty("path", p => p.GetString()!), 
-                log: pbase.Log.CreateScope("Mfa-Endpoint")
-            );
-
-            Users = pbase.GetOrCreateSingleton<UserManager>();
-            MultiFactor = pbase.GetConfigElement<MFAConfig>();
-        }
+        private readonly IUserManager Users = pbase.GetOrCreateSingleton<UserManager>();
+        private readonly MfaAuthManager _mfa = pbase.GetOrCreateSingleton<MfaAuthManager>();
 
         protected override async ValueTask<VfReturnType> GetAsync(HttpEntity entity)
         {
             string[] enabledModes = new string[3];
 
             //Load the MFA entry for the user
-            using IUser? user = await Users.GetUserFromIDAsync(entity.Session.UserID);
-           
+            using IUser? user = await Users.GetUserFromIDAsync(entity.Session.UserID);           
+
             if (user?.TotpEnabled() == true)
             {
                 enabledModes[0] = "totp";
@@ -86,7 +78,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
           
             if (user?.OtpAuthEnabled() == true)
             {
-                enabledModes[2] = "pki";
+                enabledModes[2] = "pkotp";
             }
 
             //Return mfa modes as an array
@@ -150,7 +142,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 case "totp":
                     {
                         //Confirm totp is enabled
-                        if (webm.Assert(MultiFactor.TOTPEnabled, "TOTP is not enabled on the current server"))
+                        if (webm.Assert(_mfa.TotpIsEnabled(), "TOTP is not enabled on the current server"))
                         {
                             return VirtualOk(entity, webm);
                         }
@@ -257,7 +249,8 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
         private async Task UpdateUserTotp(HttpEntity entity, IUser user, WebMessage webm)
         {
             //generate a new secret (passing the buffer which will get copied to an array because the pw bytes can be modified during encryption)
-            byte[] secretBuffer = user.MFAGenreateTOTPSecret(MultiFactor);
+            byte[]? secretBuffer = _mfa.TotpSetNewSecret(user);
+
             //Alloc output buffer
             IMemoryHandle<byte> outputBuffer = MemoryUtil.SafeAlloc(4096, true);
 
@@ -277,10 +270,10 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 {
                     webm.Result = new TOTPUpdateMessage()
                     {
-                        Issuer = MultiFactor.TOTPConfig.IssuerName,
-                        Digits = MultiFactor.TOTPConfig.TOTPDigits,
-                        Period = (int)MultiFactor.TOTPConfig.TOTPPeriod.TotalSeconds,
-                        Algorithm = MultiFactor.TOTPConfig.TOTPAlg.ToString(),
+                        Issuer          = _mfa.Config.TOTPConfig!.IssuerName,
+                        Digits          = _mfa.Config.TOTPConfig.Digits,
+                        Period          = (int)_mfa.Config.TOTPConfig.Period.TotalSeconds,
+                        Algorithm       = _mfa.Config.TOTPConfig.HashAlg.ToString(),
                         //Convert the secret to base64 string to send to client
                         Base64EncSecret = Convert.ToBase64String(outputBuffer.Span[..(int)count])
                     };

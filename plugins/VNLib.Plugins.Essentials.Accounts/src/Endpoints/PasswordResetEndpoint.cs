@@ -38,6 +38,7 @@ using VNLib.Plugins.Essentials.Accounts.MFA;
 using VNLib.Plugins.Extensions.Validation;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Users;
+using VNLib.Plugins.Extensions.Loading.Routing;
 using VNLib.Plugins.Essentials.Accounts.MFA.Totp;
 
 namespace VNLib.Plugins.Essentials.Accounts.Endpoints
@@ -57,41 +58,14 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
     /// Password reset for user's that are logged in and know 
     /// their passwords to reset their MFA methods
     /// </summary>
+    [EndpointPath("{{path}}")]
     [ConfigurationName("password_endpoint")]
-    internal sealed class PasswordChangeEndpoint : ProtectedWebEndpoint
+    internal sealed class PasswordChangeEndpoint(PluginBase pbase, IConfigScope config) : ProtectedWebEndpoint
     {
-        private readonly IUserManager Users;
-        private readonly MFAConfig mFAConfig;
-        private readonly IValidator<PasswordResetMesage> ResetMessValidator;
+        private readonly IValidator<PasswordResetMesage> ResetMessValidator = GetMessageValidator();
+        private readonly UserManager Users = pbase.GetOrCreateSingleton<UserManager>();
+        private readonly MfaAuthManager _mfaAuth = pbase.GetOrCreateSingleton<MfaAuthManager>();
 
-        public PasswordChangeEndpoint(PluginBase pbase, IConfigScope config)
-        {
-            string? path = config["path"].GetString();
-            InitPathAndLog(path, pbase.Log);
-
-            Users = pbase.GetOrCreateSingleton<UserManager>();
-            ResetMessValidator = GetMessageValidator();
-            mFAConfig = pbase.GetConfigElement<MFAConfig>();
-        }
-
-        private static IValidator<PasswordResetMesage> GetMessageValidator()
-        {
-            InlineValidator<PasswordResetMesage> rules = new();
-
-            rules.RuleFor(static pw => pw.Current)
-                .NotEmpty()
-                .WithMessage("You must specify your current password")
-                .Length(8, 100);
-
-            //Use centralized password validator for new passwords
-            rules.RuleFor(static pw => pw.NewPassword)
-                .NotEmpty()
-                .NotEqual(static pm => pm.Current)
-                .WithMessage("Your new password may not equal your new current password")
-                .SetValidator(AccountValidations.PasswordValidator);
-
-            return rules;
-        }
 
         protected override async ValueTask<VfReturnType> PostAsync(HttpEntity entity)
         {
@@ -135,7 +109,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             }
 
             //Check if totp is enabled
-            if (mFAConfig.TOTPEnabled && user.TotpEnabled())
+            if (_mfaAuth.TotpIsEnabled() && user.TotpEnabled())
             {
                 //TOTP code is required
                 if (webm.Assert(pwReset.TotpCode.HasValue, "TOTP is enabled on this user account, you must enter your TOTP code."))
@@ -144,7 +118,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 }
 
                 //Veriy totp code
-                bool verified = mFAConfig.VerifyTOTP(user, pwReset.TotpCode.Value);
+                bool verified = _mfaAuth.TotpVerifyCode(user, pwReset.TotpCode.Value);
 
                 if (webm.Assert(verified, "Please check your TOTP code and try again"))
                 {
@@ -171,12 +145,27 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             return VirtualOk(entity, webm);
         }
 
-        private sealed class PasswordResetMesage : PrivateStringManager
+        private static IValidator<PasswordResetMesage> GetMessageValidator()
         {
-            public PasswordResetMesage() : base(2)
-            {
-            }
+            InlineValidator<PasswordResetMesage> rules = new();
 
+            rules.RuleFor(static pw => pw.Current)
+                .NotEmpty()
+                .WithMessage("You must specify your current password")
+                .Length(8, 100);
+
+            //Use centralized password validator for new passwords
+            rules.RuleFor(static pw => pw.NewPassword)
+                .NotEmpty()
+                .NotEqual(static pm => pm.Current)
+                .WithMessage("Your new password may not equal your new current password")
+                .SetValidator(AccountValidations.PasswordValidator);
+
+            return rules;
+        }
+
+        private sealed class PasswordResetMesage() : PrivateStringManager(2)
+        {
             [JsonPropertyName("current")]
             public string? Current
             {

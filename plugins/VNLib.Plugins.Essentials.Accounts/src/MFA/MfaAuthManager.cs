@@ -42,14 +42,29 @@ using VNLib.Plugins.Extensions.Loading;
 namespace VNLib.Plugins.Essentials.Accounts.MFA
 {
 
-    internal sealed class MfaAuthManager(MFAConfig config, IMfaProcessor[] processors)
+    internal sealed class MfaAuthManager(MFAConfig config)
     {
 
         public const string SESSION_SIG_KEY = "mfa.sig";
-        private const  HashAlg SigAlg = HashAlg.SHA256;
-        private static readonly byte[] UpgradeHeader = CompileJwtHeader();
+        private const HashAlg SigAlg = HashAlg.SHA256;     
+        
+        private readonly IMfaProcessor[] processors = config.GetSupportedProcessors();
+        private readonly byte[] UpgradeHeader = CompileJwtHeader();
+
+        public MfaAuthManager(PluginBase plugin) : this(plugin.GetConfigElement<MFAConfig>())
+        { }
 
         public bool Armed => processors.Length > 0;
+
+        /// <summary>
+        /// Gets the MFA processors available for use
+        /// </summary>
+        public IEnumerable<IMfaProcessor> Processors => processors;
+
+        /// <summary>
+        /// Gets the MFA configuration settings
+        /// </summary>
+        public MFAConfig Config => config;
 
         /// <summary>
         /// Determines if the user has any MFA methods enabled and 
@@ -57,10 +72,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
         /// </summary>
         /// <param name="user">The user to upgrade the mfa request on</param>
         /// <returns>True if the user has any MFA methods enabled</returns>
-        public bool HasMfaEnabled(IUser user)
-        {
-            return processors.Any(p => p.MethodEnabledForUser(user));
-        }
+        public bool HasMfaEnabled(IUser user) => processors.Any(p => p.MethodEnabledForUser(user));
 
         /// <summary>
         /// Gets the upgrade message to send back to the client to 
@@ -156,10 +168,8 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
             return processor.VerifyResponse(upgrade, user, result);
         }
 
-        public void InvalidateUpgrade(HttpEntity entity)
-        {
-            SetUpgradeSecret(in entity.Session, null);
-        }
+        public void InvalidateUpgrade(HttpEntity entity) 
+            => SetUpgradeSecret(in entity.Session, null);
 
         private MFAType[] GetEnbaledTypesForUser(IUser user)
         {
@@ -206,7 +216,8 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
             }
 
             //Recover the upgrade message
-            return doc.RootElement.GetProperty("upgrade").Deserialize<MfaChallenge>();
+            return doc.RootElement.GetProperty("upgrade")
+                .Deserialize<MfaChallenge>();
         }
 
         private void GetUpgradeMessage(MfaChallenge upgrade, ref string clientMessage, ref string secret)

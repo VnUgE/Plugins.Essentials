@@ -86,6 +86,7 @@ namespace VNLib.Plugins.Essentials.Accounts
             if (this.HasConfigForType<PkiLoginEndpoint>())
             {
                 this.Route<PkiLoginEndpoint>();
+                Log.Verbose("Public-key login enabled");
             }
 
             if (this.HasConfigForType<FidoEndpoint>())

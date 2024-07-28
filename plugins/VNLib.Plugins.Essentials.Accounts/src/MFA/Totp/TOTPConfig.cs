@@ -39,34 +39,34 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Totp
         [JsonPropertyName("period_sec")]
         public int PeriodSec
         {
-            get => (int)TOTPPeriod.TotalSeconds;
-            set => TOTPPeriod = TimeSpan.FromSeconds(value);
+            get => (int)Period.TotalSeconds;
+            set => Period = TimeSpan.FromSeconds(value);
         }
 
         [JsonPropertyName("algorithm")]
         public string AlgName
         {
-            get => TOTPAlg.ToString();
-            set => TOTPAlg = Enum.Parse<HashAlg>(value.ToUpper(null));
+            get => HashAlg.ToString();
+            set => HashAlg = Enum.Parse<HashAlg>(value.ToUpper(null));
         }
 
         [JsonPropertyName("digits")]
-        public int TOTPDigits { get; set; } = 6;
+        public int Digits { get; set; } = 6;
 
         [JsonPropertyName("secret_size")]
-        public int TOTPSecretBytes { get; set; } = 32;
+        public int SecretSize { get; set; } = 32;
 
         [JsonPropertyName("window_size")]
-        public int TOTPTimeWindowSteps { get; set; } = 1;
+        public int TimeWindowSteps { get; set; } = 1;
 
         [JsonIgnore]
         public bool Enabled => IssuerName != null;
 
         [JsonIgnore]
-        public HashAlg TOTPAlg { get; set; } = HashAlg.SHA1;
+        public HashAlg HashAlg { get; set; } = HashAlg.SHA1;
 
         [JsonIgnore]
-        public TimeSpan TOTPPeriod { get; set; } = TimeSpan.FromSeconds(30);
+        public TimeSpan Period { get; set; } = TimeSpan.FromSeconds(30);
 
         internal static IValidator<TOTPConfig> GetValidator()
         {
@@ -78,18 +78,20 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Totp
             val.RuleFor(c => c.PeriodSec)
                 .InclusiveBetween(1, 600);
 
-            val.RuleFor(c => c.TOTPAlg)
+            val.RuleFor(c => c.HashAlg)
                 .Must(a => a != HashAlg.None)
                 .WithMessage("TOTP Algorithim name must not be NONE");
 
-            val.RuleFor(c => c.TOTPDigits)
+            val.RuleFor(c => c.Digits)
                 .GreaterThan(1)
-                .WithMessage("You should have more than 1 digit for a totp code");
+                .WithMessage("You should have more than 1 digit for a totp code")
+                .LessThan(10)
+                .WithMessage("You should have less than 10 digits for a totp code");
 
             //We dont neet to check window steps, the user may want to configure 0 or more
-            val.RuleFor(c => c.TOTPTimeWindowSteps);
+            val.RuleFor(c => c.TimeWindowSteps);
 
-            val.RuleFor(c => c.TOTPSecretBytes)
+            val.RuleFor(c => c.SecretSize)
                 .GreaterThan(8)
                 .WithMessage("You should configure a larger TOTP secret size for better security");
 

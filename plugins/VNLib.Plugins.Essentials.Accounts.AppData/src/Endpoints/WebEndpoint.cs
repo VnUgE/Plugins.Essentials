@@ -33,31 +33,24 @@ using VNLib.Plugins.Essentials.Endpoints;
 using VNLib.Plugins.Essentials.Extensions;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Validation;
+using VNLib.Plugins.Extensions.Loading.Routing;
 
 using VNLib.Plugins.Essentials.Accounts.AppData.Model;
 using VNLib.Plugins.Essentials.Accounts.AppData.Stores;
 
 namespace VNLib.Plugins.Essentials.Accounts.AppData.Endpoints
 {
+
+    [EndpointPath("{{path}}")]
+    [EndpointLogName("Endpoint")]
     [ConfigurationName("web_endpoint")]
-    internal sealed class WebEndpoint : ProtectedWebEndpoint
+    internal sealed class WebEndpoint(PluginBase plugin, IConfigScope config) : ProtectedWebEndpoint
     {
         const int DefaultMaxDataSize = 8 * 1024;
 
-        private readonly StorageManager _store;
-        private readonly int MaxDataSize;
-        private readonly string[] AllowedScopes;
-
-        public WebEndpoint(PluginBase plugin, IConfigScope config)
-        {
-            string path = config.GetRequiredProperty<string>("path");
-            InitPathAndLog(path, plugin.Log.CreateScope("Endpoint"));
-
-            MaxDataSize = config.GetValueOrDefault("max_data_size", DefaultMaxDataSize);
-            AllowedScopes = config.GetRequiredProperty<string[]>("allowed_scopes");
-         
-            _store = plugin.GetOrCreateSingleton<StorageManager>();
-        }
+        private readonly StorageManager _store = plugin.GetOrCreateSingleton<StorageManager>();
+        private readonly int MaxDataSize = config.GetValueOrDefault("max_data_size", DefaultMaxDataSize);
+        private readonly string[] AllowedScopes = config.GetRequiredProperty<string[]>("allowed_scopes");
 
         protected async override ValueTask<VfReturnType> GetAsync(HttpEntity entity)
         {

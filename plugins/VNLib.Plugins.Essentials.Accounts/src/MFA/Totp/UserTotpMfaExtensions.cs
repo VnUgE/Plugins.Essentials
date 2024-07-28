@@ -23,8 +23,8 @@
 */
 
 using System;
+using System.Linq;
 
-using VNLib.Hashing;
 using VNLib.Utils;
 using VNLib.Plugins.Essentials.Users;
 
@@ -65,20 +65,66 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Totp
         /// Generates/overwrites the current user's TOTP secret entry and returns a 
         /// byte array of the generated secret bytes
         /// </summary>
-        /// <param name="config">The system MFA configuration</param>
+        /// <param name="manager"></param>
+        /// <param name="user">The user to generate the secret for</param>
         /// <returns>The raw secret that was encrypted and stored in the user's object</returns>
         /// <exception cref="OutOfMemoryException"></exception>
-        internal static byte[] MFAGenreateTOTPSecret(this IUser user, MFAConfig config)
+        internal static byte[]? TotpSetNewSecret(this MfaAuthManager manager, IUser user)
         {
-            _ = config.TOTPConfig ?? throw new NotSupportedException("The loaded configuration does not support TOTP");
-            //Generate a random key
-            byte[] newSecret = RandomHash.GetRandomBytes(config.TOTPConfig.TOTPSecretBytes);
-            //Store secret in user storage
+            ArgumentNullException.ThrowIfNull(manager);
+            ArgumentNullException.ThrowIfNull(user);
+
+            //Get the totp processor if it exists
+            TotpAuthProcessor? proc = manager.Processors
+                    .OfType<TotpAuthProcessor>()
+                    .FirstOrDefault();
+
+            //May not be loaded to return null
+            if(proc is null)
+            {
+                return null;
+            }
+           
+            byte[] newSecret = proc.GenerateNewSecret();
+         
             user.TotpSetSecret(VnEncoding.ToBase32String(newSecret, false));
-            //return the raw secret bytes
+            
             return newSecret;
         }
 
-     
+        /// <summary>
+        /// Verifies a TOTP code for a given user instance. 
+        /// </summary>
+        /// <param name="manager"></param>
+        /// <param name="user">The user to valid the code against</param>
+        /// <param name="code">The TOTP code to verify</param>
+        /// <returns>
+        /// True if totp is enabled and the code matches, false if the provider is no loaded, or the code does not match
+        /// </returns>
+        internal static bool TotpVerifyCode(this MfaAuthManager manager, IUser user, uint code)
+        {
+            ArgumentNullException.ThrowIfNull(manager);
+            ArgumentNullException.ThrowIfNull(user);
+
+            TotpAuthProcessor? proc = manager.Processors
+                    .OfType<TotpAuthProcessor>()
+                    .FirstOrDefault();
+                
+            return proc is not null && proc.VerifyTOTP(user, code);
+        }
+
+        /// <summary>
+        /// Determines if TOTP is enabled for the plugin
+        /// </summary>
+        /// <param name="manager"></param>
+        /// <returns>True if the auth manager has a totp processor enabled</returns>
+        internal static bool TotpIsEnabled(this MfaAuthManager manager)
+        {
+            ArgumentNullException.ThrowIfNull(manager);
+
+            return manager.Processors
+                    .Where(static p => p.Type == MFAType.TOTP)
+                    .Any();
+        }
     }
 }

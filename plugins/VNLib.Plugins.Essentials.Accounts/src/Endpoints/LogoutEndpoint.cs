@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2023 Vaughn Nugent
+* Copyright (c) 2024 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
@@ -24,20 +24,15 @@
 
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Essentials.Endpoints;
+using VNLib.Plugins.Extensions.Loading.Routing;
 
 namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 {
+    [EndpointPath("{{path}}")]
+    [EndpointLogName("LOGOUT")]
     [ConfigurationName("logout_endpoint")]
-    internal class LogoutEndpoint : UnprotectedWebEndpoint
+    internal class LogoutEndpoint(): UnprotectedWebEndpoint
     {
-        
-        public LogoutEndpoint(PluginBase pbase, IConfigScope config)
-        {
-            string? path = config["path"].GetString();
-            InitPathAndLog(path, pbase.Log);
-        }
-
-        
         protected override VfReturnType Post(HttpEntity entity)
         {
             /*

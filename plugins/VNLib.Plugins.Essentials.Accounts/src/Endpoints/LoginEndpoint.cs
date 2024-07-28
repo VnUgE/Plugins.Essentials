@@ -44,6 +44,7 @@ using VNLib.Plugins.Essentials.Accounts.MFA;
 using VNLib.Plugins.Essentials.Accounts.Validators;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Users;
+using VNLib.Plugins.Extensions.Loading.Routing;
 using static VNLib.Plugins.Essentials.Statics;
 using VNLib.Plugins.Essentials.Accounts.MFA.Totp;
 using VNLib.Plugins.Essentials.Accounts.MFA.Fido;
@@ -67,8 +68,10 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
     /// <summary>
     /// Provides an authentication endpoint for user-accounts
     /// </summary>
+    [EndpointPath("{{path}}")]
+    [EndpointLogName("LOGIN")]
     [ConfigurationName("login_endpoint")]
-    internal sealed class LoginEndpoint : UnprotectedWebEndpoint
+    internal sealed class LoginEndpoint(PluginBase pbase, IConfigScope config) : UnprotectedWebEndpoint
     {
         public const string INVALID_MESSAGE = "Please check your email or password. You may get locked out.";
         public const string LOCKED_ACCOUNT_MESSAGE = "You have been timed out, please try again later";
@@ -76,37 +79,13 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 
         private static readonly LoginMessageValidation LmValidator = new();
         
-        private readonly MfaAuthManager MultiFactor;
-        private readonly IUserManager Users;
-        private readonly FailedLoginLockout _lockout;
-
-        public LoginEndpoint(PluginBase pbase, IConfigScope config)
-        {
-            string path = config.GetRequiredProperty("path", p => p.GetString()!);
-            TimeSpan duration = config["failed_attempt_timeout_sec"].GetTimeSpan(TimeParseType.Seconds);
-            uint maxLogins = config["max_login_attempts"].GetUInt32();
-
-            InitPathAndLog(path, pbase.Log);
-
-            MFAConfig conf = pbase.GetConfigElement<MFAConfig>();
-            Users = pbase.GetOrCreateSingleton<UserManager>();
-            _lockout = new(maxLogins, duration);
-            
-
-            List<IMfaProcessor> proc = [];
-
-            if(conf.TOTPEnabled)
-            {
-                proc.Add(new TotpAuthProcessor(conf.TOTPConfig!));
-            }
-
-            if(conf.FIDOEnabled)
-            {
-                proc.Add(new FidoMfaProcessor(conf.FIDOConfig!));
-            }
-
-            MultiFactor = new(conf, [.. proc]);
-        }
+        private readonly MfaAuthManager MultiFactor = pbase.GetOrCreateSingleton<MfaAuthManager>();
+        private readonly IUserManager Users = pbase.GetOrCreateSingleton<UserManager>();
+        
+        private readonly FailedLoginLockout _lockout = new(
+            maxCounts: config.GetRequiredProperty<uint>("max_login_attempts"),
+            maxTimeout: config.GetRequiredProperty("failed_attempt_timeout_sec", p => p.GetTimeSpan(TimeParseType.Seconds))
+        );
 
         protected override ERRNO PreProccess(HttpEntity entity)
         {

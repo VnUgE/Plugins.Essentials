@@ -69,7 +69,7 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores
 
             if(cConfig is null || cConfig.Enabled == false)
             {
-                _logger.Debug("Result cache disabled via configuration, or not set");
+                _logger.Information("Result cache disabled via configuration, or not set");
                 return;
             }
 

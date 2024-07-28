@@ -23,6 +23,7 @@
 */
 
 using System;
+using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
 using FluentValidation;
@@ -86,15 +87,26 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
         public int UpgradeKeyBytes { get; set; } = 32;
 
         [JsonIgnore]
-        public bool TOTPEnabled => TOTPConfig?.Enabled == true;
-
-        [JsonIgnore]
-        public bool FIDOEnabled => FIDOConfig != null;
-
-        [JsonIgnore]
         public TimeSpan UpgradeValidFor { get; private set; } = TimeSpan.FromSeconds(120);
 
 
         public void OnValidate() => _validator.ValidateAndThrow(this);
+    
+        public IMfaProcessor[] GetSupportedProcessors()
+        {
+            List<IMfaProcessor> processors = [];
+
+            if (TOTPConfig?.Enabled == true)
+            {
+                processors.Add(new TotpAuthProcessor(TOTPConfig!));
+            }
+
+            if (FIDOConfig != null)
+            {
+                processors.Add(new FidoMfaProcessor(FIDOConfig));
+            }
+
+            return [.. processors];
+        }
     }
 }
