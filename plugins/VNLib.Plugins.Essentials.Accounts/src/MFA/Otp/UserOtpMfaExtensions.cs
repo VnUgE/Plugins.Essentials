@@ -91,7 +91,8 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Otp
             /*
              * Since multiple keys can be stored, we need to recover the key that matches the desired key id
              */
-            OtpAuthPublicKey? pub = user.OtpGetAllPublicKeys()?.FirstOrDefault(p => string.Equals(keyId, p.KeyId, StringComparison.Ordinal));
+            OtpAuthPublicKey? pub = user.OtpGetAllPublicKeys()
+                ?.FirstOrDefault(p => string.Equals(keyId, p.KeyId, StringComparison.Ordinal));
 
             if (pub == null)
             {

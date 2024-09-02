@@ -216,6 +216,24 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 //Close response, user is now logged-in
                 return VirtualOk(entity, webm);
             }
+            catch(JsonException jse)
+            {
+                //Invalidate incase it was set before the exception was raised
+                entity.InvalidateLogin();
+
+                webm.Errors = new ValidationErrorMessage[1]
+                {
+                    new()
+                    {
+                        ErrorMessage = jse.Message,
+                        PropertyName = "login",
+                    }
+                };
+
+                webm.Result = "Please verify your login token and try again.";
+
+                return VirtualClose(entity, webm, HttpStatusCode.UnprocessableEntity);
+            }
             catch
             {
                 /*
@@ -290,7 +308,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             using IUser? user = await _users.GetUserFromIDAsync(entity.Session.UserID, entity.EventCancellation);
 
             //Confirm not null, this should only happen if user is removed from table while still logged in
-            if(webm.Assert(user != null, "You may not configure PKI authentication"))
+            if(webm.Assert(user != null, "You may not configure OTP authentication"))
             {
                 return VirtualOk(entity, webm);
             }
@@ -331,7 +349,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             //publish changes
             await user.ReleaseAsync();
 
-            webm.Result = "Successfully updated your PKI authentication method";
+            webm.Result = "Successfully updated your OTP authentication method";
             webm.Success = true;
             return VirtualOk(entity, webm);
         }
