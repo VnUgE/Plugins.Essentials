@@ -23,6 +23,7 @@
 */
 
 using System;
+using System.Collections.Generic;
 using System.Net;
 
 using VNLib.Net.Http;
@@ -33,7 +34,7 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Model
     {
         const string ChecksumHeader = "X-Data-Checksum";
 
-        public static void SetRecordResponse(this HttpEntity entity, UserRecordData record, HttpStatusCode code)
+        public static VfReturnType CloseWithRecord(HttpEntity entity, UserRecordData record, HttpStatusCode code)
         {
             //Set checksum header
             entity.Server.Headers.Append(ChecksumHeader, $"{record.Checksum}");
@@ -44,14 +45,16 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Model
                 ContentType.Binary,
                 new BinDataRecordReader(record.Data)
             );
+
+            return VfReturnType.VirtualSkip;
         }
 
-        public static ulong? GetUserDataChecksum(this IConnectionInfo server)
+        public static ulong? GetUserDataChecksum(IConnectionInfo server)
         {
             string? checksumStr = server.Headers[ChecksumHeader];
             return string.IsNullOrWhiteSpace(checksumStr) && ulong.TryParse(checksumStr, out ulong checksum) ? checksum : null;
         }
-
+       
         sealed class BinDataRecordReader(byte[] recordData) : IMemoryResponseReader
         {
             private int _read;

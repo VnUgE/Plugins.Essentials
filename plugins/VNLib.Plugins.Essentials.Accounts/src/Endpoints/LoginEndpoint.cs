@@ -27,7 +27,6 @@ using System.Net;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text.Json.Serialization;
 
@@ -46,9 +45,6 @@ using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Users;
 using VNLib.Plugins.Extensions.Loading.Routing;
 using static VNLib.Plugins.Essentials.Statics;
-using VNLib.Plugins.Essentials.Accounts.MFA.Totp;
-using VNLib.Plugins.Essentials.Accounts.MFA.Fido;
-
 
 /*
   * Password only log-ins should be immune to repeat attacks on the same backend, because sessions are 

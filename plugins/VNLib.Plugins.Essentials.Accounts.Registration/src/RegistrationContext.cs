@@ -43,15 +43,12 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration
         public void OnDatabaseCreating(IDbContextBuilder builder, object? state)
         {
             //Define a table for the revoked tokens
-            builder.DefineTable<RevokedToken>(nameof(RevokedRegistrationTokens))
-                //Define the token column and the created column, let the framework determine the data-types
-                .WithColumn(p => p.Token)
-                    .MaxLength(200)
-                    .Next()
+            builder.DefineTable<RevokedToken>(nameof(RevokedRegistrationTokens), table =>
+            {
+                table.WithColumn(p => p.Token);
+                table.WithColumn(p => p.Created);
+            });
 
-                //Define the next column
-                .WithColumn(p => p.Created)
-                    .AllowNull(false);
         }
     }
 }

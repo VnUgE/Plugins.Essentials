@@ -22,10 +22,11 @@
 * along with this program.  If not, see https://www.gnu.org/licenses/.
 */
 
+using System;
 using System.Net;
 using System.Linq;
-using System.Collections.Generic;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 
 using VNLib.Net.Http;
 using VNLib.Hashing.Checksums;
@@ -37,14 +38,16 @@ using VNLib.Plugins.Extensions.Loading.Routing;
 
 using VNLib.Plugins.Essentials.Accounts.AppData.Model;
 using VNLib.Plugins.Essentials.Accounts.AppData.Stores;
+using VNLib.Plugins.Extensions.Loading.Routing.Mvc;
+using static VNLib.Plugins.Essentials.Endpoints.ResourceEndpointBase;
+using static VNLib.Plugins.Essentials.Accounts.AppData.Model.HttpExtensions;
 
 namespace VNLib.Plugins.Essentials.Accounts.AppData.Endpoints
 {
-
-    [EndpointPath("{{path}}")]
+    
     [EndpointLogName("Endpoint")]
     [ConfigurationName("web_endpoint")]
-    internal sealed class WebEndpoint(PluginBase plugin, IConfigScope config) : ProtectedWebEndpoint
+    internal sealed class WebEndpoint(PluginBase plugin, IConfigScope config) : IHttpController
     {
         const int DefaultMaxDataSize = 8 * 1024;
 
@@ -52,19 +55,24 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Endpoints
         private readonly int MaxDataSize = config.GetValueOrDefault("max_data_size", DefaultMaxDataSize);
         private readonly string[] AllowedScopes = config.GetRequiredProperty<string[]>("allowed_scopes");
 
-        protected async override ValueTask<VfReturnType> GetAsync(HttpEntity entity)
+        ///<inheritdoc/>
+        public ProtectionSettings GetProtectionSettings() => default;
+
+        [HttpStaticRoute("{{path}}", HttpMethod.GET)]
+        [HttpRouteProtection(AuthorzationCheckLevel.Critical)]
+        public async ValueTask<VfReturnType> GetDataAsync(HttpEntity entity)
         {
             WebMessage webm = new();
 
-            string? scopeId = entity.QueryArgs.GetValueOrDefault("scope");
-            bool noCache = entity.QueryArgs.ContainsKey("no_cache");
+            string? scopeId = GetScopeId(entity);
+            bool noCache = NoCacheQuery(entity);
 
             if (webm.Assert(scopeId != null, "Missing scope"))
             {
                 return VirtualClose(entity, webm, HttpStatusCode.BadRequest);
             }
 
-            if (webm.Assert(AllowedScopes.Contains(scopeId), "Invalid scope"))
+            if (webm.Assert(IsScopeAllowed(scopeId), "Invalid scope"))
             {
                 return VirtualClose(entity, webm, HttpStatusCode.BadRequest);
             }
@@ -72,26 +80,28 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Endpoints
             //If the connection has the no-cache header set, also bypass the cache
             noCache |= entity.Server.NoCache();
 
-            //optionally bypass cache if the user requests it
-            RecordOpFlags flags = noCache ? RecordOpFlags.NoCache : RecordOpFlags.None;
-
-            UserRecordData? record = await _store.GetRecordAsync(entity.Session.UserID, scopeId, flags, entity.EventCancellation);
-
-            if (record is null)
-            {
-                return VirtualClose(entity, webm, HttpStatusCode.NotFound);
-            }
+            UserRecordData? record = await _store.GetRecordAsync(
+                entity.Session.UserID, 
+                recordKey: scopeId, 
+                flags: noCache ? RecordOpFlags.NoCache : RecordOpFlags.None,   //optionally bypass cache if the user requests it
+                entity.EventCancellation
+            );
 
             //return the raw data with the checksum header
-            entity.SetRecordResponse(record, HttpStatusCode.OK);
-            return VfReturnType.VirtualSkip;
+
+            return record is null 
+                ? VirtualClose(entity, webm, HttpStatusCode.NotFound) 
+                : CloseWithRecord(entity, record, HttpStatusCode.OK);
         }
 
-        protected override async ValueTask<VfReturnType> PutAsync(HttpEntity entity)
+
+        [HttpStaticRoute("{{path}}", HttpMethod.PUT)]
+        [HttpRouteProtection(AuthorzationCheckLevel.Critical)]
+        public async ValueTask<VfReturnType> UpdateDataAsync(HttpEntity entity)
         {
             WebMessage webm = new();
-            string? scopeId = entity.QueryArgs.GetValueOrDefault("scope");
-            bool flush = entity.QueryArgs.ContainsKey("flush");
+            string? scopeId = GetScopeId(entity);
+            bool flush = NoCacheQuery(entity);
 
             if (webm.Assert(entity.Files.Count == 1, "Invalid file count"))
             {
@@ -103,7 +113,7 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Endpoints
                 return VirtualClose(entity, webm, HttpStatusCode.BadRequest);
             }
 
-            if (webm.Assert(AllowedScopes.Contains(scopeId), "Invalid scope"))
+            if (webm.Assert(IsScopeAllowed(scopeId), "Invalid scope"))
             {
                 return VirtualClose(entity, webm, HttpStatusCode.BadRequest);
             }
@@ -125,7 +135,7 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Endpoints
 
             //Compute checksum on sent data and compare to the header if it exists
             ulong checksum = FNV1a.Compute64(recordData);
-            ulong? userChecksum = entity.Server.GetUserDataChecksum();
+            ulong? userChecksum = GetUserDataChecksum(entity.Server);
 
             if (userChecksum.HasValue)
             {
@@ -144,28 +154,54 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Endpoints
             RecordOpFlags flags = flush ? RecordOpFlags.WriteThrough : RecordOpFlags.None;
 
             //Write the record to the store
-            await _store.SetRecordAsync(entity.Session.UserID, scopeId, recordData, checksum, flags, entity.EventCancellation);
+            await _store.SetRecordAsync(
+                userId: entity.Session.UserID, 
+                recordKey: scopeId, 
+                recordData, 
+                checksum, 
+                flags, 
+                entity.EventCancellation
+            );
+            
             return VirtualClose(entity, HttpStatusCode.Accepted);
         }
 
-        protected override async ValueTask<VfReturnType> DeleteAsync(HttpEntity entity)
+        [HttpStaticRoute("{{path}}", HttpMethod.DELETE)]
+        [HttpRouteProtection(AuthorzationCheckLevel.Critical)]
+        public async ValueTask<VfReturnType> DeleteDataAsync(HttpEntity entity)
         {
             WebMessage webm = new();
-            string? scopeId = entity.QueryArgs.GetValueOrDefault("scope");
+            string? scopeId = GetScopeId(entity);
 
             if (webm.Assert(scopeId != null, "Missing scope"))
             {
                 return VirtualClose(entity, webm, HttpStatusCode.BadRequest);
             }
 
-            if (webm.Assert(AllowedScopes.Contains(scopeId), "Invalid scope"))
+            if (webm.Assert(IsScopeAllowed(scopeId), "Invalid scope"))
             {
                 return VirtualClose(entity, webm, HttpStatusCode.BadRequest);
             }
 
             //Write the record to the store
-            await _store.DeleteRecordAsync(entity.Session.UserID, scopeId, entity.EventCancellation);
+            await _store.DeleteRecordAsync(
+                userId: entity.Session.UserID, 
+                recordKey: scopeId, 
+                entity.EventCancellation
+            );
+            
             return VirtualClose(entity, HttpStatusCode.Accepted);
+        }  
+
+        private bool IsScopeAllowed(string scopeId)
+        {
+            return AllowedScopes.Contains(scopeId, StringComparer.OrdinalIgnoreCase);
         }
+
+        private static string? GetScopeId(HttpEntity entity) 
+            => entity.QueryArgs.GetValueOrDefault("scope");
+
+        private static bool NoCacheQuery(HttpEntity entity) 
+            => entity.QueryArgs.ContainsKey("no_cache");
     }
 }

@@ -42,7 +42,8 @@ using VNLib.Plugins.Essentials.Accounts.AppData.Model;
 namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores.Sql
 {
 
-    internal sealed class SqlBackingStore(PluginBase plugin) : IEntityStore<UserRecordData, AppDataRequest>, IAsyncConfigurable
+    internal sealed class SqlBackingStore(PluginBase plugin) 
+        : IEntityStore<UserRecordData, AppDataRequest>, IAsyncConfigurable
     {
         private readonly DbRecordStore _store = new(plugin.GetContextOptionsAsync());
 
