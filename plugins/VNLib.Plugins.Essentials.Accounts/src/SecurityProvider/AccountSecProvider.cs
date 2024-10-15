@@ -236,6 +236,8 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
 
             return level switch
             {
+                //Always true when no authorization is required, a valid session is checked above
+                AuthorzationCheckLevel.None => true,
                 //Accept the client token or the cookie as any/medium 
                 AuthorzationCheckLevel.Any or AuthorzationCheckLevel.Medium => _authManager.HasMinimalAuthorization(entity),
                 //Critical requires that the client cookie is set and the token is set

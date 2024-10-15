@@ -25,6 +25,7 @@
 using System;
 using System.Linq;
 using System.Buffers;
+
 using VNLib.Plugins.Essentials.Users;
 
 namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
@@ -71,12 +72,20 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
         }
 
         /// <summary>
+        /// Gets the size of the encoded data stored in the user's account object (in bytes)
+        /// </summary>
+        /// <param name="user"></param>
+        /// <returns>The size of the user encoded data in bytes</returns>
+        public static int FidoGetDataSize(this IUser user) => user[FidoUserStoreKey].Length;
+
+
+        /// <summary>
         /// Stores an array of public keys in the user's account object
         /// </summary>
         /// <param name="user"></param>
         /// <param name="creds">The array of device credentials to store for the user</param>
         public static void FidoSetCredentials(this IUser user, FidoDeviceCredential[]? creds)
-            => UserEnocdedData.Encode(user, FidoUserStoreKey, creds);
+            => UserEncodedData.Encode(user, FidoUserStoreKey, creds);
 
         /// <summary>
         /// Gets all public keys stored in the user's account object
@@ -84,7 +93,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
         /// <param name="user"></param>
         /// <returns>The array of device credentials if they exist</returns>
         public static FidoDeviceCredential[]? FidoGetAllCredentials(this IUser user)
-            => UserEnocdedData.Decode<FidoDeviceCredential[]>(user, FidoUserStoreKey);
+            => UserEncodedData.Decode<FidoDeviceCredential[]>(user, FidoUserStoreKey);
 
         /// <summary>
         /// Removes a single pki key by it's id
@@ -100,11 +109,16 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
             }
 
             //Remove the key and store a new array without it
+            FidoDeviceCredential[]? remaining = keys
+                .Where(k => !string.Equals(credId, k.Base64DeviceId, StringComparison.Ordinal))
+                .ToArray();
 
-            FidoSetCredentials(
-                user: user,
-                creds: keys.Where(k => !string.Equals(credId, k.Base64UrlId, StringComparison.Ordinal)).ToArray()
-            );
+            if(remaining.Length == 0)
+            {
+                remaining = null;
+            }
+
+            FidoSetCredentials(user, remaining);
         }
 
         /// <summary>
@@ -125,7 +139,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
             else
             {
                 //remove the key if it already exists, then append the new key
-                keys = keys.Where(k => !string.Equals(key.Base64UrlId, k.Base64UrlId, StringComparison.Ordinal))
+                keys = keys.Where(k => !string.Equals(key.Base64DeviceId, k.Base64DeviceId, StringComparison.Ordinal))
                     .Append(key)
                     .ToArray();
             }

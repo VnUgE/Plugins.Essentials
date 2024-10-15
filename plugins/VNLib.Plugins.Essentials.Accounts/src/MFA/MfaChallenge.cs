@@ -3,9 +3,9 @@
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
-* File: MFAUpgrade.cs 
+* File: MfaChallenge.cs 
 *
-* MFAUpgrade.cs is part of VNLib.Plugins.Essentials.Accounts which is part of the larger 
+* MfaChallenge.cs is part of VNLib.Plugins.Essentials.Accounts which is part of the larger 
 * VNLib collection of libraries and utilities.
 *
 * VNLib.Plugins.Essentials.Accounts is free software: you can redistribute it and/or modify 
@@ -26,29 +26,33 @@ using System.Text.Json.Serialization;
 
 namespace VNLib.Plugins.Essentials.Accounts.MFA
 {
-    internal class MfaChallenge : IClientSecInfo
+    internal sealed class MfaChallenge : IClientSecInfo
     {
         /// <summary>
         /// The login's client id specifier
         /// </summary>
         [JsonPropertyName("cid")]
         public string? ClientId { get; set; }
+
         /// <summary>
         /// The id of the user that is requesting a login
         /// </summary>
         [JsonPropertyName("uname")]
         public string? UserName{ get; set; }
+
         /// <summary>
-        /// The <see cref="MFAType"/> of the upgrade request
+        /// The supported mfa types enabled for the user
         /// </summary>
         [JsonPropertyName("types")]
-        public MFAType[] Types { get; set; }
+        public string[] Types { get; set; }
+
         /// <summary>
         /// The a base64 encoded string of the user's 
         /// public key
         /// </summary>
         [JsonPropertyName("pubkey")]
         public string? PublicKey { get; set; }
+
         /// <summary>
         /// The user's specified language
         /// </summary>

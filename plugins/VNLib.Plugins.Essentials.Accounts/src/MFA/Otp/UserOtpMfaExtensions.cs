@@ -80,6 +80,13 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Otp
         }
 
         /// <summary>
+        /// Gets the size of the user's stored PKI key data
+        /// </summary>
+        /// <param name="user"></param>
+        /// <returns>The size in bytes of the stored pki key data</returns>
+        public static int OtpGetDataSize(this IUser user) => user[OtpUserStoreKey].Length;
+
+        /// <summary>
         /// Verifies a PKI login JWT against the user's stored login key data
         /// </summary>
         /// <param name="user">The user requesting a login</param>
@@ -109,7 +116,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Otp
         /// <param name="user"></param>
         /// <param name="authKeys">The array of jwk format keys to store for the user</param>
         public static void OtpSetPublicKeys(this IUser user, OtpAuthPublicKey[]? authKeys)
-            => UserEnocdedData.Encode(user, OtpUserStoreKey, authKeys);
+            => UserEncodedData.Encode(user, OtpUserStoreKey, authKeys);
 
         /// <summary>
         /// Gets all public keys stored in the user's account object
@@ -117,7 +124,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Otp
         /// <param name="user"></param>
         /// <returns>The array of public keys if the exist</returns>
         public static OtpAuthPublicKey[]? OtpGetAllPublicKeys(this IUser user)
-            => UserEnocdedData.Decode<OtpAuthPublicKey[]>(user, OtpUserStoreKey);
+            => UserEncodedData.Decode<OtpAuthPublicKey[]>(user, OtpUserStoreKey);
 
         /// <summary>
         /// Removes a single pki key by it's id
@@ -133,10 +140,17 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Otp
             }
 
             //Remove the key and store a new array without it
+            OtpAuthPublicKey[]? remaining = keys
+                .Where(k => !string.Equals(keyId, k.KeyId, StringComparison.Ordinal))
+                .ToArray();
 
-            user.OtpSetPublicKeys(
-                authKeys: keys.Where(k => !string.Equals(keyId, k.KeyId, StringComparison.Ordinal)).ToArray()
-            );
+            //If there are no keys left, set the user's key data to null
+            if (remaining.Length == 0)
+            {
+                remaining = null;
+            }
+
+            OtpSetPublicKeys(user, remaining);
         }
 
         /// <summary>

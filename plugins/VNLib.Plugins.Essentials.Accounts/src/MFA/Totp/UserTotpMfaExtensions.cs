@@ -25,7 +25,6 @@
 using System;
 using System.Linq;
 
-using VNLib.Utils;
 using VNLib.Plugins.Essentials.Users;
 
 namespace VNLib.Plugins.Essentials.Accounts.MFA.Totp
@@ -62,35 +61,16 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Totp
         public static void TotpDisable(this IUser user) => user[TOTP_KEY_ENTRY] = null!;
 
         /// <summary>
-        /// Generates/overwrites the current user's TOTP secret entry and returns a 
-        /// byte array of the generated secret bytes
+        /// Retrieves the TOTP processor from the auth manager if
+        /// it's loaded and enabled
         /// </summary>
         /// <param name="manager"></param>
-        /// <param name="user">The user to generate the secret for</param>
-        /// <returns>The raw secret that was encrypted and stored in the user's object</returns>
-        /// <exception cref="OutOfMemoryException"></exception>
-        internal static byte[]? TotpSetNewSecret(this MfaAuthManager manager, IUser user)
-        {
-            ArgumentNullException.ThrowIfNull(manager);
-            ArgumentNullException.ThrowIfNull(user);
+        /// <returns></returns>
+        internal static TotpMfaProcessor? TotpGetProcessor(this MfaAuthManager manager) 
+            => manager.Processors
+            .OfType<TotpMfaProcessor>()
+            .FirstOrDefault();
 
-            //Get the totp processor if it exists
-            TotpAuthProcessor? proc = manager.Processors
-                    .OfType<TotpAuthProcessor>()
-                    .FirstOrDefault();
-
-            //May not be loaded to return null
-            if(proc is null)
-            {
-                return null;
-            }
-           
-            byte[] newSecret = proc.GenerateNewSecret();
-         
-            user.TotpSetSecret(VnEncoding.ToBase32String(newSecret, false));
-            
-            return newSecret;
-        }
 
         /// <summary>
         /// Verifies a TOTP code for a given user instance. 
@@ -106,11 +86,10 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Totp
             ArgumentNullException.ThrowIfNull(manager);
             ArgumentNullException.ThrowIfNull(user);
 
-            TotpAuthProcessor? proc = manager.Processors
-                    .OfType<TotpAuthProcessor>()
-                    .FirstOrDefault();
+            TotpMfaProcessor? proc = TotpGetProcessor(manager);
                 
-            return proc is not null && proc.VerifyTOTP(user, code);
+            return proc is not null 
+                && proc.VerifyTOTP(user, code);
         }
 
         /// <summary>
@@ -123,7 +102,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Totp
             ArgumentNullException.ThrowIfNull(manager);
 
             return manager.Processors
-                    .Where(static p => p.Type == MFAType.TOTP)
+                    .OfType<TotpMfaProcessor>()
                     .Any();
         }
     }

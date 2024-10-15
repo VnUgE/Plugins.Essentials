@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vaughn Nugent
+// Copyright (c) 2024 Vaughn Nugent
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -19,7 +19,7 @@
 
 import { isRef, type Ref } from "vue";
 import { useIntervalFn, syncRef, get, type MaybeRef } from "@vueuse/core";
-import { useUser } from "../user";
+import { useAccount } from "../account";
 import { useSession } from "../session";
 
 export interface IAutoHeartbeatControls {
@@ -44,11 +44,11 @@ export interface IAutoHeartbeatControls {
 export const useAutoHeartbeat = (interval: Readonly<MaybeRef<number>>, enabled: MaybeRef<boolean>): IAutoHeartbeatControls =>{
 
     //Get heartbeat method to invoke when the timer fires
-    const { heartbeat } = useUser();
-    const { loggedIn } = useSession();
+    const { heartbeat } = useAccount();
+    const { isLoggedIn } = useSession();
 
     //Setup the automatic heartbeat interval
-    const { isActive, pause, resume } = useIntervalFn(() => loggedIn.value ? heartbeat() : null, interval);
+    const { isActive, pause, resume } = useIntervalFn(async () => (await isLoggedIn()) ? heartbeat() : null, interval);
 
     //Sync the enabled ref with the active state if it is a ref
     if(isRef(enabled)){

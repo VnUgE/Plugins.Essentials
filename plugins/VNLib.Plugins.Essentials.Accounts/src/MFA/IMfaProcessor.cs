@@ -23,6 +23,7 @@
 */
 
 using System.Text.Json;
+using System.Threading.Tasks;
 
 using VNLib.Hashing.IdentityUtility;
 using VNLib.Plugins.Essentials.Users;
@@ -30,14 +31,68 @@ using VNLib.Plugins.Essentials.Users;
 
 namespace VNLib.Plugins.Essentials.Accounts.MFA
 {
-    internal interface IMfaProcessor
+    /// <summary>
+    /// Represents a multi-factor authentication processor that can be used to
+    /// authenticate a user against a specific MFA method.
+    /// </summary>
+    public interface IMfaProcessor
     {
-        MFAType Type { get; }
+        /// <summary>
+        /// The processor type identifier
+        /// </summary>
+        string Type { get; }
 
+        /// <summary>
+        /// Determines if this processor is active for the specified user
+        /// </summary>
+        /// <param name="user">The user to check enabled method for</param>
+        /// <returns>A value that indicates this processor is active for the user, false otherwise</returns>
         bool MethodEnabledForUser(IUser user);
 
+        /// <summary>
+        /// Determines if this processor is armed for the specified user. This
+        /// means this method will be used to guard the user's account.
+        /// </summary>
+        /// <param name="user">The user to check enabled method for</param>
+        /// <returns>A value that indicates this processor is armed for the user, false otherwise</returns>
+        bool ArmedForUser(IUser user);
+
+        /// <summary>
+        /// Extends the upgrade payload with information specific to this processor 
+        /// which will be signed and returned during the verification process. This 
+        /// data may be used by the client to determine the type of MFA to use.
+        /// </summary>
+        /// <param name="message">The payload message to add data to</param>
+        /// <param name="user">The user instance this upgrade is for</param>
         void ExtendUpgradePayload(in JwtPayload message, IUser user);
 
-        bool VerifyResponse(MfaChallenge upgrade, IUser user, JsonDocument result);
+        /// <summary>
+        /// Called when this processor is selected to authenticate a user against 
+        /// it's mfa data. If this method returns true, this user's session will
+        /// be authorized and the user will be logged in.
+        /// </summary>
+        /// <param name="user">The user account wishing to authenticate</param>
+        /// <param name="request">The request message data the client submitted to </param>
+        /// <returns>True if the user successfully logged-in, false otherwise</returns>
+        bool VerifyResponse(IUser user, JsonElement request);
+
+        /// <summary>
+        /// Called when the client requests data for data to be mutated or displayed. May return
+        /// any specialized data for the desired processor, it will be serialized into json.
+        /// </summary>
+        /// <param name="entity">The request entity issuing this action</param>
+        /// <param name="request">The entire request entity json message</param>
+        /// <param name="user">The user object matching the user making this request</param>
+        /// <returns>A value task that resolves the object to serialize and return to the user</returns>
+        ValueTask<object?> OnHandleMessageAsync(HttpEntity entity, JsonElement request, IUser user);
+
+        /// <summary>
+        /// Called when the client requests data for this processor to be displayed. May return 
+        /// any specialized data for the desired processor, it will be serialized into json.
+        /// </summary>
+        /// <param name="entity">The request entity asking for data</param>
+        /// <param name="user">The user entity requesting data against</param>
+        /// <returns>A value task that resolves the object to serialize and return to the user</returns>
+        ValueTask<object?> OnUserGetAsync(HttpEntity entity, IUser user);
     }
 }

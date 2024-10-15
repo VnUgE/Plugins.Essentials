@@ -23,65 +23,102 @@
 */
 
 using System;
-using System.Buffers.Binary;
-using System.Formats.Cbor;
+using System.Security.Cryptography;
+
 
 using VNLib.Utils;
 using VNLib.Utils.Memory;
+using VNLib.Plugins.Essentials.Accounts.MFA.Fido.JsonTypes;
 
 namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
 {
     internal static class FidoDecoder
     {
-        public static FidoDeviceCredential? FromResponse(FidoAuthenticatorResponse response)
+
+        /// <summary>
+        /// Attemts to validate the response from the Fido authenticator by verifying the 
+        /// attestation data signature
+        /// </summary>
+        /// <param name="response">The authentication response object</param>
+        /// <param name="credential">The device to assign fields to</param>
+        /// <returns>A value that indicates if the response data is valid and verified</returns>
+        public static bool ValidateResponse(FidoAuthenticatorResponse response, out FidoDeviceCredential credential)
         {
+            credential = new();
+
             //Make sure the response has a public key and a valid algorithm
-            if (!response.CoseAlgorithmNumber.HasValue || string.IsNullOrWhiteSpace(response.Base64PublicKey))
+            if (
+                !response.CoseAlgorithmNumber.HasValue 
+                || string.IsNullOrWhiteSpace(response.Base64PublicKey)
+                || string.IsNullOrWhiteSpace(response.Base64AuthenticatorData)
+            )
             {
-                return null;
+                return false;
             }
 
-            if(!VerifyKeySizes(response.CoseAlgorithmNumber.Value, response.Base64PublicKey))
+            /*
+             * The public key is a bit more complicated to extract, so I'm going to use the 
+             * one provided by the browser during the request. If the signature matches with
+             * the public key sent, then we know the key and data is valid. 
+             */
+
+            credential.Name           = response.DeviceName ?? string.Empty;
+            credential.CoseAlgId      = response.CoseAlgorithmNumber!.Value;
+            credential.Base64DeviceId = response.DeviceId;
+
+            //Try to get the ecdsa object which will be used to verify attestation data
+            using ECDsa? sigAlg = GetSigningAlgForKey(response.Base64PublicKey, credential.CoseAlgId);
+
+            if (sigAlg is null)
             {
-                return null;
+                return false;
             }
 
-            return new FidoDeviceCredential
+            //Export the key parameters to get the x and y coordinates
+            ECParameters keyParams = sigAlg.ExportParameters(includePrivateParameters: false);
+
+            if(keyParams.Q.X?.Length != CoseEncodings.GetCoordSizeForAlg(credential.CoseAlgId))
             {
-                Base64UrlId = response.DeviceId,
-                CoseAlgId = response.CoseAlgorithmNumber.Value,
-                Base64PublicKey = response.Base64PublicKey,
-                Name = response.DeviceName ?? string.Empty
-            };
+                return false;
+            }
+
+            //Assign key coordinates to the credential object
+            credential.Base64XCoord = VnEncoding.Base64UrlEncode(keyParams.Q.X, includePadding: false);
+            credential.Base64YCoord = VnEncoding.Base64UrlEncode(keyParams.Q.Y, includePadding: false);
+
+            return true;
         }
+        
        
-
-        private static bool VerifyKeySizes(int algCode, string pubkey)
+        private static ECDsa? GetSigningAlgForKey(string spki, int algId)
         {
-            using UnsafeMemoryHandle<byte> binBuffer = MemoryUtil.UnsafeAlloc<byte>(pubkey.Length + 16, true);
+            using UnsafeMemoryHandle<byte> pubKeyBuffer = MemoryUtil.UnsafeAlloc<byte>(spki.Length + 16, true);
 
-            ERRNO decoded = VnEncoding.Base64UrlDecode(pubkey, binBuffer.Span);
+            //Recover the base64url public key into it's spki binary format
+            ERRNO pubkeySize = VnEncoding.Base64UrlDecode(spki, pubKeyBuffer.Span);
+            ReadOnlySpan<byte> spkiPubKey = pubKeyBuffer.AsSpan(0, pubkeySize);
 
-            if(!decoded)
+            if (spkiPubKey.IsEmpty)
             {
-                return false;
+                return null;
             }
 
-            Span<byte> guid = binBuffer.AsSpan(0, 16);
-            Span<byte> lenBin = binBuffer.AsSpan(16, 2);
+            //Create the alg from the curve code
+            ECDsa alg = ECDsa.Create(
+                CoseEncodings.GetECCurveFromCode(algId)
+            );
 
-            ushort idLen = BinaryPrimitives.ReadUInt16LittleEndian(lenBin);
-            
-            //Id length is outside the size of the buffer
-            if(idLen + 18 > decoded)
+            try
             {
-                return false;
+                //Read the public key data into the algorithm object
+                alg.ImportSubjectPublicKeyInfo(spkiPubKey, out _);
+                return alg;
             }
-
-            Span<byte> key = binBuffer.AsSpan(18, idLen);
-            Span<byte> pubKey = binBuffer.AsSpan(18 + idLen);   //Finally the actual public key length
-
-            return pubKey.Length == CoseEncodings.GetPublicKeySizeForAlg(algCode);
+            catch
+            {
+                alg.Dispose();
+                throw;
+            }
         }
     }
 }

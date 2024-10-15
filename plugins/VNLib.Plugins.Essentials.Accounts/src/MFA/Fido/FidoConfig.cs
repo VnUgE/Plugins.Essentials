@@ -26,15 +26,27 @@ using System.Text.Json.Serialization;
 
 using FluentValidation;
 
+using VNLib.Plugins.Extensions.Loading;
+using VNLib.Plugins.Essentials.Accounts.MFA.Fido.JsonTypes;
+
+
 namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
 {
 
-    internal sealed class FidoConfig
+    internal sealed class FidoConfig: IOnConfigValidation
     {
-       
+
+        /// <summary>
+        /// The size in bytes of the challenge to be sent 
+        /// to the authenticator.
+        /// </summary>
         [JsonPropertyName("challenge_size")]
         public int ChallangeSize { get; set; }
 
+        /// <summary>
+        /// The time (in milliseconds) for the authenicator to
+        /// respond to the challenge.
+        /// </summary>
         [JsonPropertyName("timeout")]
         public int Timeout { get; set; }
 
@@ -50,7 +62,16 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
         [JsonPropertyName("transport")]
         public string[] Transports { get; set; } = ["usb", "nfc", "ble"];
 
-        internal static IValidator<FidoConfig> GetValidator()
+        /// <summary>
+        /// Requires that authenticators return the same origin as the 
+        /// server that issued the login request. The origin will be signed
+        /// by the authenticator and verified by the server.
+        /// </summary>
+        [JsonPropertyName("strict_origin")]
+        public bool StrictOrigin { get; set; } = true;
+
+        ///<inheritdoc/>
+        public void OnValidate()
         {
             InlineValidator<FidoConfig> val = new();
 
@@ -79,7 +100,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
                 .ForEach(p => p.NotEmpty())
                 .WithMessage("Fido 'transport' must be provided");
 
-            return val;
+            val.ValidateAndThrow(this);
         }
     }
 }

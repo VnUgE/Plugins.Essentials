@@ -35,26 +35,39 @@ using VNLib.Hashing.IdentityUtility;
 using VNLib.Utils.Memory;
 using VNLib.Utils.Extensions;
 using VNLib.Plugins.Essentials.Users;
-using VNLib.Plugins.Essentials.Extensions;
 using VNLib.Plugins.Essentials.Sessions;
 using VNLib.Plugins.Extensions.Loading;
 
 namespace VNLib.Plugins.Essentials.Accounts.MFA
 {
 
-    internal sealed class MfaAuthManager(MFAConfig config)
+    internal sealed class MfaAuthManager(MfaProcessorLoader loader)
     {
 
         public const string SESSION_SIG_KEY = "mfa.sig";
         private const HashAlg SigAlg = HashAlg.SHA256;     
         
-        private readonly IMfaProcessor[] processors = config.GetSupportedProcessors();
+        private readonly IMfaProcessor[] processors = loader.GetProcessors();
         private readonly byte[] UpgradeHeader = CompileJwtHeader();
 
-        public MfaAuthManager(PluginBase plugin) : this(plugin.GetConfigElement<MFAConfig>())
-        { }
+        public MfaAuthManager(PluginBase plugin) 
+            : this(plugin.GetOrCreateSingleton<MfaProcessorLoader>())
+        {
+            //Cache supported methods
+            SupportedMethods = processors
+                .Select(static p => p.Type)
+                .ToArray();
+        }
 
+        /// <summary>
+        /// A value that indicates if the MFA manager is armed with any processors
+        /// </summary>
         public bool Armed => processors.Length > 0;
+
+        /// <summary>
+        /// Gets the supported MFA methods available for use
+        /// </summary>
+        public string[] SupportedMethods { get; } = [];
 
         /// <summary>
         /// Gets the MFA processors available for use
@@ -64,7 +77,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
         /// <summary>
         /// Gets the MFA configuration settings
         /// </summary>
-        public MFAConfig Config => config;
+        public MfaConfig Config => loader.MfaSettings;
 
         /// <summary>
         /// Determines if the user has any MFA methods enabled and 
@@ -72,7 +85,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
         /// </summary>
         /// <param name="user">The user to upgrade the mfa request on</param>
         /// <returns>True if the user has any MFA methods enabled</returns>
-        public bool HasMfaEnabled(IUser user) => processors.Any(p => p.MethodEnabledForUser(user));
+        public bool RequiredForUser(IUser user) => processors.Any(p => p.ArmedForUser(user));
 
         /// <summary>
         /// Gets the upgrade message to send back to the client to 
@@ -94,16 +107,19 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
             MfaChallenge upgrade = new()
             {
                 //Set totp upgrade type
-                Types = GetEnbaledTypesForUser(user),
+                Types               = GetEnabledTypesForUser(user),
 
                 //Store login message details
-                UserName = login.UserName,
-                ClientId = login.ClientId,
-                PublicKey = login.ClientPublicKey,
+                UserName            = login.UserName,
+                ClientId            = login.ClientId,
+                PublicKey           = login.ClientPublicKey,
                 ClientLocalLanguage = login.LocalLanguage,
             };
 
-            GetUpgradeMessage(upgrade, ref clientJwt, ref secret);
+            //Get the origin value from the request to match the current server
+            string origin = entity.Server.RequestUri.GetLeftPart(UriPartial.Authority);
+
+            GetUpgradeMessage(upgrade, origin, user, ref clientJwt, ref secret);
 
             //Store the upgrade message in the session
             SetUpgradeSecret(in entity.Session, secret);
@@ -117,10 +133,10 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
         /// <param name="entity">The entity requesting the completation</param>
         /// <param name="result">The client's result of an mfa upgrade operation</param>
         /// <returns>The </returns>
-        public MfaChallenge? GetChallengeData(HttpEntity entity, JsonDocument result)
+        public MfaChallenge? GetChallengeData(HttpEntity entity, JsonElement result)
         {
             //Recover upgrade jwt
-            string? upgradeJwt = result.RootElement.GetPropString("upgrade");
+            string? upgradeJwt = result.GetPropString("upgrade");
             string? storedSecret = GetUpgradeSecret(in entity.Session);
 
             if (string.IsNullOrEmpty(upgradeJwt) || string.IsNullOrEmpty(storedSecret))
@@ -136,21 +152,24 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
         /// Verifies the response from the client to the MFA upgrade request
         /// and determines if the upgrade was successful
         /// </summary>
-        /// <param name="entity"></param>
         /// <param name="upgrade">The validated upgrade message returned by the client</param>
         /// <param name="user">The user account to validate against</param>
-        /// <param name="result">The client's result message from the upgrade challenge</param>
+        /// <param name="request">The client's result message from the upgrade challenge</param>
         /// <returns>True if the client successfully validated</returns>
-        public bool VerifyResponse(HttpEntity entity, MfaChallenge upgrade, IUser user, JsonDocument result)
+        public bool VerifyResponse(MfaChallenge upgrade, IUser user, JsonElement request)
         {
-            string? desiredMfaType = entity.QueryArgs.GetValueOrDefault("mfa");
-
-            if (!Enum.TryParse(desiredMfaType, true, out MFAType desiredType))
+            //Get the desired mfa type the submission is for
+            if(
+                !request.TryGetProperty("type", out JsonElement mfaTypeEl) 
+                || mfaTypeEl.ValueKind != JsonValueKind.String
+            )
             {
                 return false;
             }
 
-            //See if upgrade allows the desired type
+            string desiredType = mfaTypeEl.GetString()!;
+
+            //See if signed upgrade allows the desired type
             if (!upgrade.Types.Contains(desiredType))
             {
                 return false;
@@ -159,21 +178,26 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
             //Get the processor for the desired type
             IMfaProcessor? processor = processors.FirstOrDefault(p => p.Type == desiredType);
 
-            if (processor == null)
-            {
-                return false;
-            }
-
             //Verify the response using the desired processor
-            return processor.VerifyResponse(upgrade, user, result);
+            return processor is not null 
+                && processor.VerifyResponse(user, request);
         }
 
-        public void InvalidateUpgrade(HttpEntity entity) 
-            => SetUpgradeSecret(in entity.Session, null);
+#pragma warning disable CA1822 // Mark members as static
 
-        private MFAType[] GetEnbaledTypesForUser(IUser user)
+        /// <summary>
+        /// Invalidates an existing upgrade request for a client's session
+        /// </summary>
+        /// <param name="entity">The connection to invalidate</param>
+        public void InvalidateUpgrade(HttpEntity entity)
+            => SetUpgradeSecret(in entity.Session, base32Signature: null);
+
+#pragma warning restore CA1822 // Mark members as static
+
+        private string[] GetEnabledTypesForUser(IUser user)
         {
-            return processors.Where(p => p.MethodEnabledForUser(user))
+            return processors
+                .Where(p => p.MethodEnabledForUser(user))
                 .Select(static p => p.Type)
                 .ToArray();
         }
@@ -209,7 +233,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
             long iatMs = doc.RootElement.GetProperty("iat").GetInt64();
             DateTimeOffset iat = DateTimeOffset.FromUnixTimeMilliseconds(iatMs);
 
-            if (iat.Add(config.UpgradeValidFor) < now)
+            if (iat.Add(Config.UpgradeValidFor) < now)
             {
                 //expired
                 return null;
@@ -220,30 +244,53 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
                 .Deserialize<MfaChallenge>();
         }
 
-        private void GetUpgradeMessage(MfaChallenge upgrade, ref string clientMessage, ref string secret)
+        private void GetUpgradeMessage(
+            MfaChallenge upgrade, 
+            string origin, 
+            IUser user, 
+            ref string clientMessage, 
+            ref string secret
+        )
         {
             //Add some random entropy to the upgrade message, to help prevent forgery
-            string entropy = RandomHash.GetRandomBase32(config.NonceLenBytes);
-            byte[] sigKey = RandomHash.GetRandomBytes(config.UpgradeKeyBytes);
+            string entropy = RandomHash.GetRandomBase32(Config.NonceLenBytes);
+            byte[] sigKey = RandomHash.GetRandomBytes(Config.UpgradeKeyBytes);
 
             using JsonWebToken upgradeJwt = new();
         
             upgradeJwt.WriteHeader(UpgradeHeader);
           
-            string[] mfaTypes = upgrade.Types.Select(static t => t.ToString().ToLower(null)).ToArray();
+            string[] mfaTypes = upgrade.Types
+                .Select(static t => t.ToString().ToLower(null))
+                .ToArray();
 
-            upgradeJwt.InitPayloadClaim()
+            JwtPayload payload = upgradeJwt.InitPayloadClaim()
                 .AddClaim("iat", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
                 .AddClaim("upgrade", upgrade)
                 .AddClaim("capabilities", mfaTypes)
-                .AddClaim("expires", config.UpgradeValidFor.TotalSeconds)
-                .AddClaim("a", entropy)
-                .CommitClaims();
-            
+                .AddClaim("sub", origin)
+                .AddClaim("iss", origin)
+                .AddClaim("expires", Config.UpgradeValidFor.TotalSeconds)
+                .AddClaim("a", entropy);
+
+            //Exten upgrade claims with processor specific data
+            ExtendUpgradeClaims(in payload, user);
+
+            //Write claims to jwt
+            payload.CommitClaims();
+
             upgradeJwt.Sign(sigKey, SigAlg);
 
             clientMessage = upgradeJwt.Compile();
             secret = VnEncoding.ToBase32String(sigKey);
+        }
+
+        private void ExtendUpgradeClaims(in JwtPayload claims, IUser user)
+        {
+            foreach(IMfaProcessor proc in processors)
+            {
+                proc.ExtendUpgradePayload(in claims, user);
+            }
         }
 
         private static byte[] CompileJwtHeader()
@@ -253,6 +300,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
                 { "alg","HS256" },
                 { "typ", "JWT" }
             };
+
             return JsonSerializer.SerializeToUtf8Bytes(header);
         }
     }

@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vaughn Nugent
+// Copyright (c) 2024 Vaughn Nugent
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -17,13 +17,15 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import { computed } from 'vue';
-import { toSafeInteger } from 'lodash-es';
-import { toRefs } from "@vueuse/core";
-import { createCookieMonitor } from "./cookies";
-import { StorageKey, createStorageSlot, getGlobalStateInternal } from "../globalState";
-import { createSession, type IKeyStorage, type IStateStorage } from "./internal";
+import { getGlobalStateInternal } from "../globalState";
+import { createStorageSlot, manualComputed } from "../storage";
+import { 
+    createSession, 
+    type IKeyStorage, 
+    type IStateStorage 
+} from "./internal";
 import type { ISession } from "./types";
+import Cookies from 'universal-cookie';
 
 //Export all internal types
 export type * from './types'
@@ -32,19 +34,24 @@ export type * from './types'
  * Gets the global session api instance
  * @returns The session api instance
  */
-export const useSession = (() => {
+const _sessionInternal = (() => {
 
     //Use reactive config
-    const { session }  = getGlobalStateInternal()
-    const { cookiesEnabled } = toRefs(session)
-    
-    const liCookieName = computed<string | undefined>(() => session.value.loginCookieName)
+    const conf = getGlobalStateInternal()
+    const session = manualComputed(() => conf.get('session'));
 
-    const loginCookie = createCookieMonitor(cookiesEnabled, liCookieName, v => toSafeInteger(v));
+    //create reactive storage slots (with defaults)
+    const sessionState = createStorageSlot<IStateStorage>('_vn-session', { token: null, browserId: null });
+    const keyStore = createStorageSlot<IKeyStorage>('_vn-keys', { priv: null, pub: null });
 
-    //create reactive storage slots
-    const keyStore = createStorageSlot<IKeyStorage>(StorageKey.Keys, { priv: null, pub: null })
-    const sessionState = createStorageSlot<IStateStorage>(StorageKey.Session, { token: null, browserId: null })
+    const cookies = new Cookies();
 
-    return (): ISession => createSession(session, loginCookie, keyStore, sessionState);
+    return () => createSession(session, keyStore, sessionState, cookies);
 })();
+
+/**
+ * Gets the global session api instance
+ * @returns The session api instance
+ */
+export const useSession = (): ISession => _sessionInternal();
+

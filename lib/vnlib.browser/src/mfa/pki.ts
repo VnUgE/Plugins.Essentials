@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vaughn Nugent
+// Copyright (c) 2024 Vaughn Nugent
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -18,16 +18,13 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import { decodeJwt } from "jose"
-import { get } from "@vueuse/core"
-import { type MaybeRef } from "vue";
-import { useAxiosInternal } from "../axios"
-import { useUser } from "../user"
+import { trim } from "lodash-es";
+import { useAccount, useAccountRpc } from "../account"
 import { debugLog } from "../util"
 import type { WebMessage } from '../types'
-import type { IUserLoginRequest } from "../user/types"
+import type { IUserLoginRequest } from "../account/types"
 import type { ITokenResponse } from "../session"
-import type { UserArg } from "./config";
-
+import type { MfaApi } from "./config";
 
 /**
  * Represents the server api for loging in with a signed OTP
@@ -50,28 +47,28 @@ export interface PkiPublicKey {
     readonly y: string;
 }
 
+export interface IOtpRequestOptions extends Record<string, any> {
+    readonly password: string;
+}
+
 /**
  * A base, non-mfa integrated PKI endpoint adapter interface
  */
-export interface PkiApi {
+export interface OtpApi {
     /**
     * Initializes or updates the pki method for the current user
     * @param publicKey The user's public key to initialize or update the pki method
     * @param options Optional extended configuration for the pki method. Gets passed to the server
     */
-    addOrUpdate(publicKey: PkiPublicKey, options?: UserArg): Promise<WebMessage>;
+    addOrUpdate(publicKey: PkiPublicKey, options?: Partial<IOtpRequestOptions>): Promise<string>;
     /**
      * Disables the pki method for the current user and passes the given options to the server
      */
-    disable(options?: UserArg): Promise<WebMessage>;
-    /**
-     * Gets all public keys for the current user
-     */
-    getAllKeys(): Promise<PkiPublicKey[]>;
+    disable(options?: Partial<IOtpRequestOptions>): Promise<string>;
     /**
      * Removes a single public key by it's id for the current user
      */
-    removeKey(kid: string): Promise<WebMessage>;
+    removeKey(key: PkiPublicKey, options?: Partial<IOtpRequestOptions>): Promise<string>;
 }
 
 interface PkiLoginRequest extends IUserLoginRequest{
@@ -81,12 +78,15 @@ interface PkiLoginRequest extends IUserLoginRequest{
 /**
  * Creates a pki login api that allows for authentication with a signed JWT
  */
-export const usePkiAuth = (pkiEndpoint: MaybeRef<string>): PkiLogin =>{
+export const useOtpAuth = (): PkiLogin =>{
 
-    const axios = useAxiosInternal()
-    const { prepareLogin } = useUser()
+    const { prepareLogin } = useAccount()
+    const { exec } = useAccountRpc()
 
     const login = async <T>(pkiJwt: string): Promise<WebMessage<T>> => {
+
+        //trim any padding 
+        pkiJwt = trim(pkiJwt);
 
         //try to decode the jwt to confirm its form is valid
         const jwt = decodeJwt(pkiJwt)
@@ -98,13 +98,14 @@ export const usePkiAuth = (pkiEndpoint: MaybeRef<string>): PkiLogin =>{
         //Set the 'login' field to the otp
         loginMessage.login = pkiJwt;
 
-        const { post } = get(axios)
-        const { data } = await post<ITokenResponse>(get(pkiEndpoint), loginMessage)
+        const data = await exec('otp.login', loginMessage)
 
         data.getResultOrThrow();
 
-        //Finalize the login
-        await loginMessage.finalize(data);
+        if('token' in data){
+            //Finalize the login
+            await loginMessage.finalize(data as ITokenResponse);
+        }
 
         return data as WebMessage<T>;
     }
@@ -117,34 +118,33 @@ export const usePkiAuth = (pkiEndpoint: MaybeRef<string>): PkiLogin =>{
  * @param pkiEndpoint The server pki endpoint relative to the base url
  * @returns An object containing the pki api
  */
-export const usePkiConfig = (pkiEndpoint: MaybeRef<string>): PkiApi => {
+export const useOtpApi = ({ sendRequest }: MfaApi): OtpApi => {
 
-    const axios = useAxiosInternal(null)
-
-    const addOrUpdate = async (publicKey: PkiPublicKey, options?: UserArg): Promise<WebMessage> => {
-        const { patch } = get(axios);
-        const { data } = await patch<WebMessage>(get(pkiEndpoint), { ...publicKey, ...options });
-        return data;
+    const addOrUpdate = async (publicKey: PkiPublicKey, options?: Partial<IOtpRequestOptions>): Promise<string> => {
+        return sendRequest<string>({
+            ...options,
+            type: 'pkotp',
+            action: 'add_key',
+            public_key: publicKey
+        })
     }
 
-    const getAllKeys = async (): Promise<PkiPublicKey[]> => {
-        const { data } = await axios.value.get<WebMessage<PkiPublicKey[]>>(get(pkiEndpoint));
-        return data.getResultOrThrow();
+    const disable = (options?: Partial<IOtpRequestOptions>): Promise<string> => {
+        return sendRequest<string>({
+            ...options,
+            type: 'pkotp',
+            action: 'disable'
+        })
     }
 
-    const disable = async (options?: UserArg): Promise<WebMessage> => {
-        const { delete: del } = get(axios);
-        //emtpy delete request deletes all keys
-        const { data } = await del<WebMessage>(get(pkiEndpoint), options);
-        return data;
+    const removeKey = (key: PkiPublicKey, options?: Partial<IOtpRequestOptions>): Promise<string> => {
+        return sendRequest<string>({
+            ...options,
+            type: 'pkotp',
+            action: 'remove_key',
+            delete_id: key.kid
+        })
     }
 
-    const removeKey = async (kid: string): Promise<WebMessage> => {
-        const { delete: del } = get(axios);
-        //Delete request with the id parameter deletes a single key
-        const { data } = await del<WebMessage>(`${get(pkiEndpoint)}?id=${kid}`);
-        return data;
-    }
-
-    return { addOrUpdate, disable, getAllKeys, removeKey }
+    return { addOrUpdate, disable, removeKey }
 }

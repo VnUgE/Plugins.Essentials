@@ -17,32 +17,41 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import { get } from "@vueuse/core";
-import { type MaybeRef } from "vue";
-import { useAxiosInternal } from "../axios";
-import type { WebMessage } from "../types";
-import type { AxiosRequestConfig } from "axios";
 import type { 
-    IMfaFlowContinuiation, 
+    IMfaFlow, 
     IMfaMessage, 
     IMfaTypeProcessor, 
-    MfaSumissionHandler 
+    MfaSumissionHandler,
+    IMfaSubmission
 } from "./login";
-import { startRegistration } from "@simplewebauthn/browser";
-import type { RegistrationResponseJSON, PublicKeyCredentialCreationOptionsJSON } from "@simplewebauthn/types";
+import { 
+    startRegistration, 
+    startAuthentication, 
+    browserSupportsWebAuthn 
+} from "@simplewebauthn/browser";
+import type { 
+    RegistrationResponseJSON, 
+    PublicKeyCredentialCreationOptionsJSON, 
+    PublicKeyCredentialRequestOptionsJSON
+} from "@simplewebauthn/types";
+import type { WebMessage } from "../types";
+import { type MfaApi } from "./config";
 
 export type IFidoServerOptions = PublicKeyCredentialCreationOptionsJSON
 
-export interface IFidoRequestOptions{
+export interface IFidoMfaFlow extends IMfaFlow {
+    readonly authenticate: <T>(useAutoFill: boolean, options?: Partial<IFidoRequestOptions>) => Promise<WebMessage<T>>;
+}
+
+export interface IFidoRequestOptions extends Record<string, any>{
     readonly password: string;
 }
 
 export interface IFidoDevice{
+    readonly n: string;
     readonly id: string;
-    readonly name: string;
-    readonly registered_at: number;
+    readonly alg: number;
 }
-
 
 interface FidoRegistration{
     readonly id: string;
@@ -55,6 +64,7 @@ interface FidoRegistration{
 }
 
 export interface IFidoApi {
+    isSupported(): boolean;
     /**
      * Gets fido credential options from the server for a currently logged-in user
      * @returns A promise that resolves to the server options for the FIDO API
@@ -66,19 +76,13 @@ export interface IFidoApi {
      * @param credential The credential to create
      * @returns A promise that resolves to a web message
      */
-    registerCredential: (credential: RegistrationResponseJSON, commonName: string) => Promise<WebMessage>;
+    registerCredential: (credential: RegistrationResponseJSON, commonName: string) => Promise<string>;
     
     /**
      * Registers the default device for the currently logged-in user
      * @returns A promise that resolves to a web message status of the operation
      */
-    registerDefaultDevice: (commonName: string, options?: Partial<IFidoRequestOptions>) => Promise<WebMessage>;
-
-    /**
-     * Lists all devices for the currently logged-in user
-     * @returns A promise that resolves to a list of devices
-     */
-    listDevices: () => Promise<IFidoDevice[]>;
+    registerDefaultDevice: (commonName: string, options?: Partial<IFidoRequestOptions>) => Promise<string>;
 
     /**
      * Disables a device for the currently logged-in user.
@@ -87,7 +91,7 @@ export interface IFidoApi {
      * @param options The options to pass to the server
      * @returns A promise that resolves to a web message status of the operation
      */
-    disableDevice: (device: IFidoDevice, options?: Partial<IFidoRequestOptions>) => Promise<WebMessage>;
+    disableDevice: (device: IFidoDevice, options?: Partial<IFidoRequestOptions>) => Promise<string>;
 
     /**
      * Disables all devices for the currently logged-in user.
@@ -95,7 +99,7 @@ export interface IFidoApi {
      * @param options The options to pass to the server
      * @returns A promise that resolves to a web message status of the operation
      */
-    disableAllDevices: (options?: Partial<IFidoRequestOptions>) => Promise<WebMessage>;
+    disableAllDevices: (options?: Partial<IFidoRequestOptions>) => Promise<string>;
 }
 
 /**
@@ -104,18 +108,17 @@ export interface IFidoApi {
  * @param axiosConfig The optional axios configuration to use
  * @returns An object containing the fido api
  */
-export const useFidoApi = (endpoint: MaybeRef<string>, axiosConfig?: MaybeRef<AxiosRequestConfig | undefined | null>)
-    : IFidoApi =>{
-    const ep = () => get(endpoint);
-    
-    const axios = useAxiosInternal(axiosConfig)
+export const useFidoApi = ({ sendRequest }: MfaApi): IFidoApi =>{
 
     const beginRegistration = async (options?: Partial<IFidoRequestOptions>) : Promise<IFidoServerOptions> => {
-        const { data } = await axios.value.put<WebMessage<IFidoServerOptions>>(ep(), options);
-        return data.getResultOrThrow();
+        return sendRequest<IFidoServerOptions>({ 
+            type: 'fido', 
+            action: 'prepare_device', 
+            ...options 
+        });
     }
 
-    const registerCredential = async (reg: RegistrationResponseJSON, commonName: string): Promise<WebMessage> => {
+    const registerCredential = (reg: RegistrationResponseJSON, commonName: string, options?: Partial<IFidoRequestOptions>): Promise<string> => {
 
         const registration: FidoRegistration = {
             id: reg.id,
@@ -127,39 +130,46 @@ export const useFidoApi = (endpoint: MaybeRef<string>, axiosConfig?: MaybeRef<Ax
             friendlyName: commonName
         }
 
-        const { data } = await axios.value.post<WebMessage>(ep(), { registration });
-        return data;
+        return sendRequest<string>({
+            ...options,
+            type: 'fido',
+            action: 'register_device',
+            registration
+        })
     }
 
-    const registerDefaultDevice = async (commonName: string, options?: Partial<IFidoRequestOptions>): Promise<WebMessage> => {
+    const registerDefaultDevice = async (commonName: string, options?: Partial<IFidoRequestOptions>): Promise<string> => {
         //begin registration
         const serverOptions = await beginRegistration(options);
 
         const reg = await startRegistration(serverOptions);
     
-        return await registerCredential(reg, commonName);
+        return await registerCredential(reg, commonName, options);
     }
 
-    const listDevices = async (): Promise<IFidoDevice[]> => {
-        const { data } = await axios.value.get<WebMessage<IFidoDevice[]>>(ep());
-        return data.getResultOrThrow();
+    const disableDevice = async (device: IFidoDevice, options?: Partial<IFidoRequestOptions>): Promise<string> => {
+        return sendRequest<string>({
+            ...options,
+            type: 'fido',
+            action: 'disable_device',
+            device_id: device.id
+        })
     }
 
-    const disableDevice = async (device: IFidoDevice, options?: Partial<IFidoRequestOptions>): Promise<WebMessage> => {
-        const { data } = await axios.value.post<WebMessage>(ep(), { delete: device, ...options });
-        return data;
-    }
-
-    const disableAllDevices = async (options?: Partial<IFidoRequestOptions>): Promise<WebMessage> => {
-        const { data } = await axios.value.post<WebMessage>(ep(), options);
-        return data;
+    const disableAllDevices = async (options?: Partial<IFidoRequestOptions>): Promise<string> => {
+        return sendRequest<string>({
+            ...options,
+            type: 'fido',
+            password: '',
+            action: 'disable_all_devices'
+        })
     }
 
     return {
+        isSupported: browserSupportsWebAuthn,
         beginRegistration,
         registerCredential,
         registerDefaultDevice,
-        listDevices,
         disableDevice,
         disableAllDevices
     }
@@ -171,16 +181,32 @@ export const useFidoApi = (endpoint: MaybeRef<string>, axiosConfig?: MaybeRef<Ax
  */
 export const fidoMfaProcessor = () : IMfaTypeProcessor => {
     
-    const processMfa = (payload: IMfaMessage, onSubmit: MfaSumissionHandler) : Promise<IMfaFlowContinuiation> => {
+    const getContinuation = (payload: IMfaMessage, onSubmit: MfaSumissionHandler) : Promise<IFidoMfaFlow> => {
+
+        const authenticate = async <T>(useAutoFill: boolean, options?: Partial<IFidoRequestOptions>) : Promise<WebMessage<T>> => {
+            
+            if(!('fido' in payload)){
+                throw new Error('Fido mfa flow is not supported by the server. This is an internal error.');
+            }
+            
+            const { fido } = (payload as any) as { fido: PublicKeyCredentialRequestOptionsJSON }; 
+
+            const result = await startAuthentication(fido, useAutoFill) as IMfaSubmission
+
+            return await onSubmit.submit({ fido: result, ...options });
+        }
 
         return Promise.resolve({
             ...payload,
+            authenticate,
+            type: 'fido',
             submit: onSubmit.submit,
         })
     }
 
     return{
         type: "fido",
-        processMfa
+        getContinuation,
+        isSupported: browserSupportsWebAuthn
     }
 }

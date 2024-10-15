@@ -17,15 +17,14 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import { defaults, isEmpty, isNil, noop } from 'lodash-es';
-import { computed, watch, type Ref } from "vue";
-import { get, set, toRefs } from '@vueuse/core';
+import { defer, isEmpty, isNil } from 'lodash-es';
 import { SignJWT } from 'jose'
 import { getCryptoOrThrow, decryptAsync, getRandomHex } from "../webcrypto";
 import { ArrayBuffToBase64, Base64ToUint8Array } from '../binhelpers'
 import { debugLog } from "../util";
-import type { CookieMonitor } from './cookies'
+import { type AsyncStorageItem, type ReadonlyManualRef } from '../storage'
 import type { ISession, ISessionKeyStore, ITokenResponse, ClientCredential, SessionConfig } from './types'
+import type Cookies from 'universal-cookie';
 
 export interface IStateStorage {
     token: string | null;
@@ -40,26 +39,25 @@ interface IInternalKeyStore extends ISessionKeyStore {
     getPublicKey(): Promise<string>;
     clearKeys(): void;
 }
+const keyStore = (
+    storage: AsyncStorageItem<IKeyStorage>, 
+    config: ReadonlyManualRef<SessionConfig>
+): IInternalKeyStore => {
 
-
-enum ServerLiTokenValues{
-    NoToken = 0,
-    LocalAccount = 1,
-    ExternalAccount = 2
-}
-
-const createKeyStore = (storage: Ref<IKeyStorage>, keyAlg: Ref<AlgorithmIdentifier>): IInternalKeyStore => {
-
-    const { priv, pub } = toRefs(storage)
+    const { priv, pub } = storage;
 
     const getPublicKey = async (): Promise<string> => {
+
+        let pubKey = await pub.get();
+
         //Check if we have a public key
-        if (isNil(pub.value)) {
+        if (isNil(pubKey)) {
             //If not, generate a new key pair
             await checkAndSetKeysAsync();
-            return pub.value!;
+            return await pub.get() || "";
         }
-        return pub.value;
+        
+        return pubKey;
     }
 
     const setCredentialAsync = async (keypair: CryptoKeyPair): Promise<void> => {
@@ -70,25 +68,34 @@ const createKeyStore = (storage: Ref<IKeyStorage>, keyAlg: Ref<AlgorithmIdentifi
         const newPubRaw = await crypto.exportKey('spki', keypair.publicKey);
 
         //Store keys as base64 strings
-        priv.value = ArrayBuffToBase64(newPrivRaw);
-        pub.value = ArrayBuffToBase64(newPubRaw);
+        await Promise.all([
+            priv.set(ArrayBuffToBase64(newPrivRaw)),
+            pub.set(ArrayBuffToBase64(newPubRaw))
+        ]);
     }
 
     const clearKeys = async (): Promise<void> => {
-        set(priv, null);
-        set(pub, null);
+        await Promise.all([
+            priv.set(null), //Set null in parallel 
+            pub.set(null)
+        ]);
     }
 
     const checkAndSetKeysAsync = async (): Promise<void> => {
+        const pubKey = await pub.get();
+        const privKey = await priv.get();
+        
         // Check if we have a key pair already
-        if (!isNil(priv.value) && !isNil(pub.value)) {
+        if (!isNil(pubKey) && !isNil(privKey)) {
             return;
         }
 
         const crypto = getCryptoOrThrow();
 
+        const { keyAlgorithm } = config.get();
+
         // If not, generate a new key pair
-        const keypair = await crypto.generateKey(keyAlg.value, true, ['encrypt', 'decrypt']) as CryptoKeyPair;
+        const keypair = await crypto.generateKey(keyAlgorithm, true, ['encrypt', 'decrypt']) as CryptoKeyPair;
        
         await setCredentialAsync(keypair);
 
@@ -102,15 +109,19 @@ const createKeyStore = (storage: Ref<IKeyStorage>, keyAlg: Ref<AlgorithmIdentifi
     }
 
     const decryptDataAsync = async (data: string | ArrayBuffer): Promise<ArrayBuffer> => {
+        const secKey = await priv.get();
+        
         // Convert the private key to a Uint8Array from its base64 string
-        const keyData = Base64ToUint8Array(priv.value || "")
+        const keyData = Base64ToUint8Array(secKey || "")
 
         const crypto = getCryptoOrThrow();
 
+        const { keyAlgorithm } = config.get();
+
         //import private key as pkcs8
-        const privKey = await crypto.importKey('pkcs8', keyData, keyAlg.value, false, ['decrypt'])
+        const privKey = await crypto.importKey('pkcs8', keyData, keyAlgorithm, false, ['decrypt'])
        
-        return await decryptAsync(keyAlg.value, privKey, data, false) as ArrayBuffer
+        return await decryptAsync(keyAlgorithm, privKey, data, false) as ArrayBuffer
     }
 
     const decryptAndHashAsync = async (data: string | ArrayBuffer): Promise<string> => {
@@ -135,25 +146,33 @@ const createKeyStore = (storage: Ref<IKeyStorage>, keyAlg: Ref<AlgorithmIdentifi
     }
 }
 
-const createUtil = (utilState: Ref<SessionConfig>, sessionStorage: Ref<IStateStorage>, keyStorage: Ref<IKeyStorage>) => {
-
+export const createSession = (
+    config: ReadonlyManualRef<SessionConfig>, 
+    keyStorage: AsyncStorageItem<IKeyStorage>,
+    state: AsyncStorageItem<IStateStorage>,
+    cookies: Cookies
+): ISession =>
+{
     const otpNonceSize = 16;
-    const { browserIdSize, signatureAlgorithm: sigAlg, keyAlgorithm: keyAlg } = toRefs(utilState);
-
-    const KeyStore = createKeyStore(keyStorage, keyAlg);
 
     //Create session state and key store
-    const { browserId, token } = toRefs(sessionStorage);
+    const { browserId, token } = state;
+    const KeyStore = keyStore(keyStorage, config);
 
-    const getBrowserId = (): string => {
+    const getBrowserId = async (): Promise<string> => {
+
+        let val = await browserId.get();
+
         // Check browser id
-        if (isNil(browserId.value)) {
+        if (isNil(val)) {
+            const { browserIdSize } = config.get();
             // generate a new random value and store it
-            browserId.value = getRandomHex(browserIdSize.value);
+            val = getRandomHex(browserIdSize);
+            await browserId.set(val);
             debugLog("Generated new browser id, none was found")
         }
 
-        return browserId.value;
+        return val;
     }
 
     const updateCredentials = async (response: ITokenResponse): Promise<void> => {
@@ -165,12 +184,14 @@ const createUtil = (utilState: Ref<SessionConfig>, sessionStorage: Ref<IStateSto
         const decrypted = await KeyStore.decryptDataAsync(response.token)
 
         // Convert the hash to a base64 string and store it
-        token.value = ArrayBuffToBase64(decrypted)
+        await token.set(ArrayBuffToBase64(decrypted));
     }
 
     const generateOneTimeToken = async (path: string): Promise<string | null> => {
+        const tokenVal = await token.get();
+
         //we need to get the shared key from storage and decode it, it may be null if not set
-        const sharedKey = token.value ? Base64ToUint8Array(token.value) : null
+        const sharedKey = tokenVal ? Base64ToUint8Array(tokenVal) : null
 
         if (!sharedKey) {
             return null;
@@ -178,9 +199,9 @@ const createUtil = (utilState: Ref<SessionConfig>, sessionStorage: Ref<IStateSto
 
         //Inint jwt with a random nonce
         const nonce = getRandomHex(otpNonceSize);
-
-        //Get the alg from the config
-        const alg = get(sigAlg);
+ 
+        //Get the user desired signature algorithm
+        const { signatureAlgorithm: alg } = config.get();
 
         const jwt = new SignJWT({ 'nonce': nonce, path })
         //Set alg
@@ -196,58 +217,84 @@ const createUtil = (utilState: Ref<SessionConfig>, sessionStorage: Ref<IStateSto
     }
 
     const clearLoginState = (): void => {
-        set(browserId, null);
-        set(token, null);
+        browserId.set(null);
+        token.set(null);
         KeyStore.clearKeys();
     }
 
     const getClientSecInfo = async (): Promise<ClientCredential> => {
         //Generate and get the credential info
         const publicKey = await KeyStore.getPublicKey();
-        const browserId = getBrowserId();
+        const browserId = await getBrowserId();
         return { publicKey, browserId };
     }
 
-    return { 
+    const getCookie = () => {
+        const { cookiesEnabled, loginCookieName } = config.get();
+
+        const value = cookiesEnabled
+            ? cookies.get<string>(loginCookieName || '', { doNotParse: true })
+            : undefined;
+
+        return {
+            enabled: cookiesEnabled,
+            cookieValue: value,
+        }
+    }
+
+    const isTokenSet = (token: string | null) => {
+        return !isEmpty(token);
+    }
+
+    const isCookieValueValid = (cookieValue: string | undefined) => {
+        return cookieValue === "1" || cookieValue === "2";
+    }
+
+    const isLoggedIn = async (): Promise<boolean> => {
+        const tokenVal = await state.token.get();
+        const { enabled, cookieValue } = getCookie();
+
+        return isTokenSet(tokenVal) && (enabled ? isCookieValueValid(cookieValue) : true);
+    }
+
+    const isLocalAccount = async () => {
+        const { cookieValue } = getCookie();
+        return cookieValue === "1";
+    }
+
+    const reconcileState = (): void => {
+
+        defer(async () => {
+            /**
+             * If
+             *  - cookies are enabled,
+             *  - there is no cookie value
+             * 
+             * Then the token can be cleared so ui is reset and ready for the 
+             * next login
+             */
+
+            const { enabled, cookieValue } = getCookie();
+
+            if (enabled && isNil(cookieValue)) {
+                await token.set(null);
+            }
+        })
+    }
+
+    const addChangeListener = (callback: () => void) => {
+        cookies.addChangeListener(callback);
+    }
+
+    return {
         KeyStore,
-        getClientSecInfo, 
+        isLoggedIn,
+        isLocalAccount,
         updateCredentials,
         generateOneTimeToken,
-        clearLoginState 
-    };
-}
-
-export const createSession = (
-    sessionConfig: Readonly<Ref<SessionConfig>>, 
-    cookies: CookieMonitor<number>, 
-    keys: Ref<IKeyStorage>, 
-    state: Ref<IStateStorage>
-): ISession =>{
-
-    //assign defaults to storage slots before toRefs call
-    defaults(state.value, { token: null, browserId: null });
-    defaults(keys.value, { priv: null, pub: null });
-
-    //Create the session util
-    const util = createUtil(sessionConfig, state, keys);
-    const { token } = toRefs(state);
-    const isServerTokenSet = computed<boolean>(() => !isEmpty(token.value));
-
-    //Translate the cookie value to a LoginCookieValue
-    const { enabled, cookieValue } = cookies
-
-    //If cookies are disabled, only allow the user to be logged in if the token is set
-    const loggedIn = computed<boolean>(() => enabled.value ? cookieValue.value > 0 && isServerTokenSet.value : isServerTokenSet.value);
-
-    const isLocalAccount = computed<boolean>(() => cookieValue.value === ServerLiTokenValues.LocalAccount);
-
-    //Watch the logged in cookie value and if it changes from true to false, clear the token
-    watch(cookieValue, value => value ? noop() : set(token, null));
-
-    return { 
-        loggedIn,
-        isLocalAccount,
-        ...util
+        clearLoginState,
+        getClientSecInfo,
+        reconcileState,
+        addChangeListener
     }
 }
-

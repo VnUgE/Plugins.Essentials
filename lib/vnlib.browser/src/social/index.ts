@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vaughn Nugent
+// Copyright (c) 2024 Vaughn Nugent
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -18,9 +18,9 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import { find, first, isArray, isEqual, map } from "lodash-es";
-import { Mutable, get } from "@vueuse/core";
+import { type Mutable } from "@vueuse/core";
 import Cookies from "universal-cookie";
-import { useUser } from "../user";
+import { useAccount } from "../account";
 import { useAxios } from "../axios";
 import { useSession, type ITokenResponse } from "../session";
 import { type WebMessage } from "../types";
@@ -148,8 +148,6 @@ export const useOauthLogin = <T extends OAuthMethod>(methods: T[]): SocialLoginA
 
     const cookieName = 'active-social-login';
 
-    const { loggedIn } = useSession();
-
     //A cookie will hold the status of the current login method
     const c = new Cookies(null, { sameSite: 'strict', httpOnly: false });
 
@@ -177,9 +175,6 @@ export const useOauthLogin = <T extends OAuthMethod>(methods: T[]): SocialLoginA
     }
 
     const logout = async (): Promise<boolean> => {
-        if (!get(loggedIn)) {
-            return false;
-        }
 
         //see if any methods are active, then call logout on the active method
         const method = getActiveMethod();
@@ -215,7 +210,7 @@ export const useOauthLogin = <T extends OAuthMethod>(methods: T[]): SocialLoginA
 export const fromSocialConnections = <T extends SocialOauthMethod>(methods: T[], axiosConfig?: Partial<AxiosRequestConfig>): OAuthMethod[] =>{
 
     const { KeyStore } = useSession();
-    const { prepareLogin, logout:userLogout } = useUser();
+    const { prepareLogin, logout: userLogout } = useAccount();
     const axios = useAxios(axiosConfig);
 
     const getNonceQuery = () => new URLSearchParams(window.location.search).get('nonce');

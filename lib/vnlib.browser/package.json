@@ -20,13 +20,13 @@
     "@babel/types": "^7.x",
     "@simplewebauthn/types": "^10.0.0",
     "@types/lodash-es": "^4.14.x",
-    "@types/node": "^20.5.1",
-    "@typescript-eslint/eslint-plugin": "^7.x.x",
+    "@types/node": "^22.x",
+    "@typescript-eslint/eslint-plugin": "^8.x.x",
     "eslint": "^9.7.0"
   },
   "peerDependencies": {
-    "@simplewebauthn/browser": "^10.0.0",
-    "@vueuse/core": "^10.x",
+    "@simplewebauthn/browser": "^10.x.x",
+    "@vueuse/core": "^11.x",
     "axios": "^1.x",
     "jose": "^5.x",
     "lodash-es": "^4.x",

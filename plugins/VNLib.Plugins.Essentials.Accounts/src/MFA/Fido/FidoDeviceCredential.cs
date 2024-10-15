@@ -22,6 +22,8 @@
 * along with this program.  If not, see https://www.gnu.org/licenses/.
 */
 
+using FluentValidation;
+
 using System.Text.Json.Serialization;
 
 
@@ -32,13 +34,47 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
         [JsonPropertyName("n")]
         public string Name { get; set; } = string.Empty;
 
-        [JsonPropertyName("id")]
-        public string Base64UrlId { get; set; }
-
-        [JsonPropertyName("pk")]
-        public string Base64PublicKey { get; set; }
-
         [JsonPropertyName("alg")]
         public int CoseAlgId { get; set; }
+
+        [JsonPropertyName("id")]
+        public string? Base64DeviceId { get; set; }
+
+        [JsonPropertyName("x")]
+        public string? Base64XCoord { get; set; }
+
+        [JsonPropertyName("y")]
+        public string? Base64YCoord { get; set; }
+
+        /*
+         * This validator exists to valide fields that are
+         * decoded after the credential format validation 
+         * is performed. It's used to protect the storage
+         * system even if a key seems to be providing valid 
+         * data. It is still possible the user or device sends
+         * an overly large device id causing the user to run
+         * out of storage or cause server errors when saving 
+         * data
+         */
+
+        public static IValidator<FidoDeviceCredential> GetValidator()
+        {
+            InlineValidator<FidoDeviceCredential> validator = new();
+
+            validator.RuleFor(d => d.Name)
+                .Length(1, 64)
+                .Matches(@"^[a-zA-Z0-9\s\p{P}]+$")
+                .WithMessage("Your device name contains invalid characters");
+
+            validator.RuleFor(d => d.Base64DeviceId)
+                .Matches(@"^[a-zA-Z0-9\+/=/-]+$")     //Must be base64url encoded
+                .MaximumLength(72)
+                .WithMessage("Your fido device id is too long to store");
+
+            //The rest of the properties are stored internally
+
+            return validator;
+        }
+       
     }
 }

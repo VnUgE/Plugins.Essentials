@@ -31,20 +31,18 @@ using VNLib.Utils;
 using VNLib.Utils.Memory;
 using VNLib.Utils.Logging;
 using VNLib.Plugins.Essentials.Users;
-using VNLib.Plugins.Essentials.Middleware;
-using VNLib.Plugins.Essentials.Accounts.MFA;
 using VNLib.Plugins.Essentials.Accounts.Endpoints;
 using VNLib.Plugins.Essentials.Accounts.SecurityProvider;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Users;
 using VNLib.Plugins.Extensions.Loading.Routing;
+using VNLib.Plugins.Extensions.Loading.Routing.Mvc;
 using VNLib.Plugins.Essentials.Accounts.MFA.Otp;
 using VNLib.Plugins.Essentials.Accounts.MFA.Totp;
 using VNLib.Plugins.Essentials.Accounts.MFA.Fido;
 
 namespace VNLib.Plugins.Essentials.Accounts
 {
-
     public sealed class AccountsEntryPoint : PluginBase
     {
 
@@ -55,44 +53,12 @@ namespace VNLib.Plugins.Essentials.Accounts
         /// <inheritdoc/>
         protected override void OnLoad()
         {
-            //Add optional endpoint routing
-
-            if (this.HasConfigForType<LoginEndpoint>())
-            {
-                this.Route<LoginEndpoint>();
-                this.Route<LogoutEndpoint>();
-            }
-
-            if (this.HasConfigForType<KeepAliveEndpoint>())
-            {
-                this.Route<KeepAliveEndpoint>();
-            }
-
-            if (this.HasConfigForType<ProfileEndpoint>())
-            {
-                this.Route<ProfileEndpoint>();
-            }
-
             if (this.HasConfigForType<PasswordChangeEndpoint>())
             {
                 this.Route<PasswordChangeEndpoint>();
             }
 
-            if (this.HasConfigForType<MFAEndpoint>())
-            {
-                this.Route<MFAEndpoint>();
-            }
-
-            if (this.HasConfigForType<PkiLoginEndpoint>())
-            {
-                this.Route<PkiLoginEndpoint>();
-                Log.Verbose("Public-key login enabled");
-            }
-
-            if (this.HasConfigForType<FidoEndpoint>())
-            {
-                this.Route<FidoEndpoint>();
-            }
+            this.Route<AccountRpcEndpoint>();           
 
             //Only export the account security service if the configuration element is defined
             if (this.HasConfigForType<AccountSecProvider>())
@@ -101,8 +67,9 @@ namespace VNLib.Plugins.Essentials.Accounts
                 AccountSecProvider securityProvider = this.GetOrCreateSingleton<AccountSecProvider>();
                 this.ExportService<IAccountSecurityProvider>(securityProvider);
 
-                //Also add the middleware array
-                this.ExportService<IHttpMiddleware[]>([ securityProvider ]);
+                //Also add the provider as a middlware processor
+                this.Middleware()
+                    .Add(securityProvider);
 
                 Log.Information("Configuring the account security provider service");
             }
@@ -350,7 +317,7 @@ Commands:
                             }
 
                             //Validate
-                            ValidationResult res = PkiLoginEndpoint.UserJwkValidator.Validate(pubkey);
+                            ValidationResult res = OtpMfaProcessor.OtpKeyValidator.Validate(pubkey);
                             if (!res.IsValid)
                             {
                                 Log.Error("The public key JWK is not valid:\n{errors}", res.ToDictionary());

@@ -28,10 +28,11 @@ using System.Text.Json.Serialization;
 using FluentValidation;
 
 using VNLib.Hashing;
+using VNLib.Plugins.Extensions.Loading;
 
 namespace VNLib.Plugins.Essentials.Accounts.MFA.Totp
 {
-    internal sealed class TOTPConfig
+    internal sealed class TOTPConfig: IOnConfigValidation
     {        
         [JsonPropertyName("issuer")]
         public string? IssuerName { get; set; }
@@ -68,6 +69,18 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Totp
         [JsonIgnore]
         public TimeSpan Period { get; set; } = TimeSpan.FromSeconds(30);
 
+        ///<inheritdoc/>
+        public void OnValidate()
+        {
+            if (IssuerName != null)
+            {
+                IssuerName = IssuerName.Trim();
+            }
+
+            GetValidator().ValidateAndThrow(this);
+        }
+
+
         internal static IValidator<TOTPConfig> GetValidator()
         {
             InlineValidator<TOTPConfig> val = new();
@@ -96,7 +109,6 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Totp
                 .WithMessage("You should configure a larger TOTP secret size for better security");
 
             return val;
-        }
-
+        }       
     }
 }
