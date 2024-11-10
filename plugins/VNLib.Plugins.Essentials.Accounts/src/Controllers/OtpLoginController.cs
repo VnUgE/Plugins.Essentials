@@ -258,7 +258,6 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
                 return RpcCommandResult.Okay(webm);
             }
 
-
             private bool IsOriginValid(IConnectionInfo server, AuthenticationInfo info)
             {
                 //If strict origin check is enabled, we need to verify the site origin

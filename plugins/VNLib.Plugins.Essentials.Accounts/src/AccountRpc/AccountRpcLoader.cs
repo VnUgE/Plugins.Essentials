@@ -69,6 +69,7 @@ namespace VNLib.Plugins.Essentials.Accounts.AccountRpc
                     return plugin.GetOrCreateSingleton<LoginController>();
 
                 case "otp-auth":
+                    //Otp is still experimental so let the user know
                     plugin.Log.Information("PK-OTP Authentication is enabled");
                     return plugin.GetOrCreateSingleton<OtpLoginController>();
 
@@ -77,6 +78,9 @@ namespace VNLib.Plugins.Essentials.Accounts.AccountRpc
 
                 case "profile":
                     return plugin.GetOrCreateSingleton<ProfileController>();
+
+                case "password-reset":
+                    return plugin.GetOrCreateSingleton<PasswordResetController>();
 
                 default:
                     plugin.Log.Warn("Unknown rpc controller type '{type}', ignoring controller", method.Type);

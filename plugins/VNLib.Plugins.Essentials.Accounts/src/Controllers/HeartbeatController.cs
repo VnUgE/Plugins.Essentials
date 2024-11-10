@@ -68,8 +68,8 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
                 {
                     return ValueTask.FromResult<object?>(new OnGetResult
                     {
-                        Type = "heartbeat",
-                        RegenSeconds = (int)tokenRegenTime.TotalSeconds
+                        Type            = "heartbeat",
+                        RegenSeconds    = (int)tokenRegenTime.TotalSeconds
                     });
                 }
 

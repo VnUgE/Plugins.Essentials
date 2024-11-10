@@ -160,8 +160,7 @@ export const useFidoApi = ({ sendRequest }: MfaApi): IFidoApi =>{
         return sendRequest<string>({
             ...options,
             type: 'fido',
-            password: '',
-            action: 'disable_all_devices'
+            action: 'disable_all'
         })
     }
 

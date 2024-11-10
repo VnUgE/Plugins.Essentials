@@ -33,6 +33,7 @@ using System.Text.Json.Serialization;
 using FluentValidation;
 
 using VNLib.Utils;
+using VNLib.Utils.Logging;
 using VNLib.Net.Http;
 using VNLib.Plugins.Essentials.Endpoints;
 using VNLib.Plugins.Essentials.Extensions;
@@ -86,6 +87,9 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                     Options     = GetOptionsForMethod(method)
                 })
                 .ToArray();
+
+            plugin.Log.CreateScope("RPC Endpoint")
+                .Verbose("RPC methods: {methods}", _methodTable.Select(static p => p.Key));
         }
 
         private static string[] GetOptionsForMethod(IAccountRpcMethod method)
@@ -145,7 +149,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 
             RpcResponseMessage response = new();
 
-            //Ensure the user sent a file in the request
+            //Ensure the user sent a file in the request (entity body is required for jRPC)
             if (response.Assert(entity.Files.Count > 0, "Missing request entity body"))
             {
                 return Error(entity, HttpStatusCode.BadRequest, response);
@@ -177,7 +181,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 return Error(entity, HttpStatusCode.BadRequest, response);
             }
 
-            //Assign the method and id to the response
+            //Assign the method and id to the response so it can be sent back to the client
             response.Method = methodReq.Method;
             response.Id     = methodReq.Id;
 

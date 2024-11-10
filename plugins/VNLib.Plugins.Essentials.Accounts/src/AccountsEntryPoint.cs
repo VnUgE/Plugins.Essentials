@@ -46,6 +46,7 @@ namespace VNLib.Plugins.Essentials.Accounts
     public sealed class AccountsEntryPoint : PluginBase
     {
 
+        ///<inheritdoc/>
         public override string PluginName => "Essentials.Accounts";
 
         private bool SetupMode => HostArgs.HasArgument("--account-setup");
@@ -53,10 +54,6 @@ namespace VNLib.Plugins.Essentials.Accounts
         /// <inheritdoc/>
         protected override void OnLoad()
         {
-            if (this.HasConfigForType<PasswordChangeEndpoint>())
-            {
-                this.Route<PasswordChangeEndpoint>();
-            }
 
             this.Route<AccountRpcEndpoint>();           
 
@@ -83,14 +80,14 @@ namespace VNLib.Plugins.Essentials.Accounts
             Log.Information("Plugin loaded");
         }
 
-     
-
+        ///<inheritdoc/>
         protected override void OnUnLoad()
         {
             //Write closing messsage and dispose the log
             Log.Information("Plugin unloaded");
         }
       
+        ///<inheritdoc/>
         protected override async void ProcessHostCommand(string cmd)
         {
             //Only process commands if the plugin is in setup mode
