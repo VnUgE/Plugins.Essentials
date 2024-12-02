@@ -20,13 +20,13 @@ tasks:
        ignore_error: true
 
     #install dependencies and build
-     - npm install
-     - npm run build
+     - cmd: npm install
+     - cmd: npm run build
 
   postbuild_success:
     vars:
       TAR_FILES:
-        dist/
+        dist
         LICENSE.txt
         README.md
         package.json
