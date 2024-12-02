@@ -83,7 +83,6 @@ namespace VNLib.Plugins.Essentials.Accounts
         ///<inheritdoc/>
         protected override void OnUnLoad()
         {
-            //Write closing messsage and dispose the log
             Log.Information("Plugin unloaded");
         }
       
@@ -156,7 +155,7 @@ Commands:
                             };
 
                             //Create the user
-                            using IUser user = await Users.CreateUserAsync(creation, null); 
+                            using IUser user = await Users.CreateUserAsync(creation, userId: null, hashProvider: null);
                            
                             //Set local account
                             user.SetAccountOrigin(AccountUtil.LOCAL_ACCOUNT_ORIGIN);

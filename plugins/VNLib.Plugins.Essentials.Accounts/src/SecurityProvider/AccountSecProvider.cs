@@ -56,11 +56,11 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
         private readonly ILogProvider _logger;
 
         public AccountSecProvider(PluginBase plugin)
-            :this(plugin, new AccountSecConfig())
+            : this(plugin, new AccountSecConfig())
         { }
 
         public AccountSecProvider(PluginBase plugin, IConfigScope config)
-            :this(
+            : this(
                  plugin,
                  config.DeserialzeAndValidate<AccountSecConfig>()
             )
@@ -74,11 +74,11 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             //Status cookie handler
             _statusCookie = new(_config.ClientStatusCookieName, _config.AuthorizationValidFor)
             {
-                Domain = _config.CookieDomain,
-                Path = _config.CookiePath,
-                SameSite = CookieSameSite.Strict,
-                HttpOnly = false,   //allow javascript to read this cookie
-                Secure = true
+                Domain      = _config.CookieDomain,
+                Path        = _config.CookiePath,
+                SameSite    = CookieSameSite.Strict,
+                HttpOnly    = false,   //allow javascript to read this cookie
+                Secure      = true
             };
 
             _logger = plugin.Log.CreateScope("Acnt-Sec");
@@ -219,7 +219,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
         void IAccountSecurityProvider.InvalidateLogin(HttpEntity entity)
         {
             //Client should also destroy the session
-            ExpireCookies(entity, true);
+            ExpireCookies(entity, force: true);
 
             //Clear known security keys
             _authManager.DestroyAuthorization(entity);
@@ -229,7 +229,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
         bool IAccountSecurityProvider.IsClientAuthorized(HttpEntity entity, AuthorzationCheckLevel level)
         {
             //Session must be loaded and not-new for an authorization to exist
-            if(!IsSessionStateValid(in entity.Session))
+            if (!IsSessionStateValid(in entity.Session))
             {
                 return false;
             }
@@ -263,7 +263,8 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             return RsaClientDataEncryption.TryEncrypt(entity.PublicKey, data, outputBuffer);
         }
 
-        private static bool IsSessionStateValid(in SessionInfo session) => session.IsSet && !session.IsNew && session.SessionType == SessionType.Web;
+        private static bool IsSessionStateValid(in SessionInfo session)
+            => session.IsSet && !session.IsNew && session.SessionType == SessionType.Web;
 
         #endregion   
 
@@ -279,7 +280,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             public object GetClientAuthData() => ClientAuthToken;
 
             ///<inheritdoc/>
-            public string GetClientAuthDataString() => ClientAuthToken;            
+            public string GetClientAuthDataString() => ClientAuthToken;
         }
     }
 }

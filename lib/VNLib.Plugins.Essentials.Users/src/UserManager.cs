@@ -75,10 +75,10 @@ namespace VNLib.Plugins.Essentials.Users
             _ = plugin.ObserveWork(() => CreateDatabaseTables(plugin), randomDelay);
         }
 
-        public UserManager(PluginBase plugin, IConfigScope config):this(plugin)
+        public UserManager(PluginBase plugin, IConfigScope config) : this(plugin)
         {
             _randomPasswordLength = config.GetValueOrDefault(
-                property: "random_password_length", 
+                property: "random_password_length",
                 DefaultRandomPasswordLength
             );
         }
@@ -115,21 +115,21 @@ namespace VNLib.Plugins.Essentials.Users
             try
             {
                 RandomHash.GetRandomBytes(randBuffer.Span);
-                
+
                 return hashProvider.Hash(randBuffer.Span);
             }
             finally
             {
                 //Zero the block and return to pool
                 MemoryUtil.InitializeBlock(
-                    ref randBuffer.GetReference(), 
+                    ref randBuffer.GetReference(),
                     randBuffer.IntLength
                 );
             }
         }
 
         private static PrivateString GetRandomPassword(int size)
-        {            
+        {
             using UnsafeMemoryHandle<byte> randBuffer = MemoryUtil.UnsafeAlloc(size);
             try
             {
@@ -140,7 +140,7 @@ namespace VNLib.Plugins.Essentials.Users
                  * a database with character restrictions.
                  */
                 return new(
-                    VnEncoding.Base64UrlEncode(randBuffer.Span, includePadding: false), 
+                    VnEncoding.Base64UrlEncode(randBuffer.Span, includePadding: false),
                     ownsReferrence: true
                 );
             }
@@ -166,12 +166,12 @@ namespace VNLib.Plugins.Essentials.Users
             if (exists)
             {
                 //Rollback transaction
-                await db.SaveAndCloseAsync(false, cancellation);
+                _ = await db.SaveAndCloseAsync(false, cancellation);
 
                 throw new UserExistsException("The user already exists");
             }
 
-            db.Users.Add(user);
+            _ = db.Users.Add(user);
 
             ERRNO count = await db.SaveAndCloseAsync(true, cancellation);
 
@@ -188,7 +188,7 @@ namespace VNLib.Plugins.Essentials.Users
 
         ///<inheritdoc/>
         public async Task<IUser> CreateUserAsync(
-            IUserCreationRequest creation, 
+            IUserCreationRequest creation,
             string? userId,
             IPasswordHashingProvider? hashProvider,
             CancellationToken cancellation = default
@@ -196,10 +196,10 @@ namespace VNLib.Plugins.Essentials.Users
         {
             ArgumentNullException.ThrowIfNull(creation);
             ArgumentException.ThrowIfNullOrEmpty(creation.Username, nameof(creation.Username));
-           
+
             PStringWrapper storedPassword;
 
-            if(creation.Password is null)
+            if (creation.Password is null)
             {
                 /*
                  * Password is null so we need to generate a new password and 
@@ -298,13 +298,13 @@ namespace VNLib.Plugins.Essentials.Users
                 creation.UseRawPassword ? null : GetHashProvider(),
                 cancellation
             );
-        }        
+        }
 
         ///<inheritdoc/>
         public async Task<ERRNO> ValidatePasswordAsync(
-            IUser user, 
-            PrivateString password, 
-            IPasswordHashingProvider? hashProvider, 
+            IUser user,
+            PrivateString password,
+            IPasswordHashingProvider? hashProvider,
             CancellationToken cancellation = default
         )
         {
@@ -346,7 +346,7 @@ namespace VNLib.Plugins.Essentials.Users
                  * identical to be considered equal.
                  */
                 return CryptographicOperations.FixedTimeEquals(
-                    MemoryMarshal.AsBytes(aSpan), 
+                    MemoryMarshal.AsBytes(aSpan),
                     MemoryMarshal.AsBytes(bSpan)
                 );
             }
@@ -369,7 +369,7 @@ namespace VNLib.Plugins.Essentials.Users
         {
             ArgumentNullException.ThrowIfNull(user);
 
-            await using UsersContext db = new(_dbOptions.Value);           
+            await using UsersContext db = new(_dbOptions.Value);
 
             //Get a user entry that only contains the password hash and user-id
             UserEntry? usr = await (from s in db.Users
@@ -383,18 +383,17 @@ namespace VNLib.Plugins.Essentials.Users
                                    .SingleOrDefaultAsync(cancellation);
 
             //Close transactions and return
-            await db.SaveAndCloseAsync(true, cancellation);
+            _ = await db.SaveAndCloseAsync(commit: true, cancellation);
 
             //Convert to private string
-            return PrivateString.ToPrivateString(usr?.PassHash, true);
+            return PrivateString.ToPrivateString(usr?.PassHash, ownsString: true);
         }
 
-      
 
         public async Task<ERRNO> UpdatePasswordAsync(
-            IUser user, 
-            PrivateString newPass, 
-            IPasswordHashingProvider? hashProvider, 
+            IUser user,
+            PrivateString newPass,
+            IPasswordHashingProvider? hashProvider,
             CancellationToken cancellation = default
         )
         {
@@ -411,7 +410,7 @@ namespace VNLib.Plugins.Essentials.Users
             await using UsersContext db = new(_dbOptions.Value);
 
             //Track the entry again
-            db.Users.Attach(entry);
+            _ = db.Users.Attach(entry);
 
             entry.LastModified = DateTime.UtcNow;
 
@@ -419,9 +418,9 @@ namespace VNLib.Plugins.Essentials.Users
             {
                 //Update password (must cast)
                 entry.PassHash = (string?)newPass;
-                
+
                 int recordsModified = await db.SaveAndCloseAsync(true, cancellation);
-              
+
                 entry.PassHash = null;
 
                 return recordsModified;
@@ -433,9 +432,9 @@ namespace VNLib.Plugins.Essentials.Users
 
                 //Update password (must cast)
                 entry.PassHash = (string?)passwordHash;
-              
+
                 int recordsModified = await db.SaveAndCloseAsync(true, cancellation);
-              
+
                 entry.PassHash = null;
 
                 return recordsModified;
@@ -461,12 +460,12 @@ namespace VNLib.Plugins.Essentials.Users
 
         ///<inheritdoc/>
         public async Task<long> GetUserCountAsync(CancellationToken cancellation = default)
-        {         
+        {
             await using UsersContext db = new(_dbOptions.Value);
-           
+
             long count = await db.Users.LongCountAsync(cancellation);
-           
-            await db.SaveAndCloseAsync(true, cancellation);
+
+            await db.SaveAndCloseAsync(commit: true, cancellation);
 
             return count;
         }
@@ -479,8 +478,8 @@ namespace VNLib.Plugins.Essentials.Users
         public async Task<IUser?> GetUserFromUsernameAsync(string username, CancellationToken cancellationToken = default)
         {
             ArgumentException.ThrowIfNullOrEmpty(username);
-          
-            await using UsersContext db = new(_dbOptions.Value);           
+
+            await using UsersContext db = new(_dbOptions.Value);
 
             //Get user without password
             UserEntry? usr = await (from s in db.Users
@@ -499,7 +498,7 @@ namespace VNLib.Plugins.Essentials.Users
                                    .SingleOrDefaultAsync(cancellationToken);
 
             //Close transactions and return
-            await db.SaveAndCloseAsync(true, cancellationToken);
+            _ = await db.SaveAndCloseAsync(commit: true, cancellationToken);
 
             return usr == null ? null : new UserData(this, usr);
         }
@@ -508,7 +507,7 @@ namespace VNLib.Plugins.Essentials.Users
         public async Task<IUser?> GetUserFromIDAsync(string userId, CancellationToken cancellationToken = default)
         {
             ArgumentException.ThrowIfNullOrEmpty(userId);
-          
+
             await using UsersContext db = new(_dbOptions.Value);
 
             //Get user without a password
@@ -529,10 +528,10 @@ namespace VNLib.Plugins.Essentials.Users
 
 
             //Close transactions and return
-            await db.SaveAndCloseAsync(true, cancellationToken);
-            
-            return usr == null 
-                ? null 
+            _ = await db.SaveAndCloseAsync(commit: true, cancellationToken);
+
+            return usr == null
+                ? null
                 : new UserData(this, usr);
         }
 
@@ -543,11 +542,11 @@ namespace VNLib.Plugins.Essentials.Users
             UserEntry entry = (state as UserEntry)!;
             ERRNO result;
             try
-            {                
-                await using UsersContext db = new(_dbOptions.Value);              
+            {
+                await using UsersContext db = new(_dbOptions.Value);
 
                 //Track the entry again
-                db.Users.Attach(entry);
+                _ = db.Users.Attach(entry);
 
                 //Set all mutable entry modified flags
                 db.Entry(entry).Property(x => x.UserData).IsModified = true;
@@ -556,7 +555,6 @@ namespace VNLib.Plugins.Essentials.Users
                 //Update modified time
                 entry.LastModified = DateTime.UtcNow;
 
-                
                 result = await db.SaveAndCloseAsync(true, cancellation);
             }
             catch (Exception ex)
@@ -576,12 +574,12 @@ namespace VNLib.Plugins.Essentials.Users
             UserData user = (resource as UserData)!;
             ERRNO result;
             try
-            {                
-                await using UsersContext db = new(_dbOptions.Value);              
+            {
+                await using UsersContext db = new(_dbOptions.Value);
 
                 //Delete the user from the database
-                db.Users.Remove(user.Entry);
-              
+                _ = db.Users.Remove(user.Entry);
+
                 result = await db.SaveAndCloseAsync(true, cancellation);
             }
             catch (Exception ex)

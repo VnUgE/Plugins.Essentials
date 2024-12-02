@@ -35,6 +35,7 @@ using VNLib.Utils.Logging;
 using VNLib.Utils.Extensions;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Essentials.Content.Routing.Model;
+using VNLib.Plugins.Extensions.Loading.Configuration;
 
 namespace VNLib.Plugins.Essentials.Content.Routing.stores
 {
@@ -48,11 +49,7 @@ namespace VNLib.Plugins.Essentials.Content.Routing.stores
             //Get the route file path
             _routeFile = config.GetRequiredProperty<string>("route_file");
 
-            //Make sure the file exists
-            if (!FileOperations.FileExists(_routeFile))
-            {
-                throw new FileNotFoundException("Missing required route xml file", _routeFile);
-            }
+            Validate.FileExists(_routeFile);
 
             plugin.Log.Debug("Loading routes from {0}", _routeFile);
         }
@@ -70,7 +67,7 @@ namespace VNLib.Plugins.Essentials.Content.Routing.stores
             }
 
             //Rewind the memory stream
-            memStream.Seek(0, SeekOrigin.Begin);
+            _ = memStream.Seek(0, SeekOrigin.Begin);
 
             //Parse elements into routes
             ParseElements(memStream, routes);

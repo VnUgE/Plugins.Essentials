@@ -44,12 +44,12 @@ using static VNLib.Plugins.Essentials.Accounts.AppData.Model.HttpExtensions;
 
 namespace VNLib.Plugins.Essentials.Accounts.AppData.Endpoints
 {
-    
+
     [EndpointLogName("Endpoint")]
     [ConfigurationName("web_endpoint")]
     internal sealed class WebEndpoint(PluginBase plugin, IConfigScope config) : IHttpController
     {
-        const int DefaultMaxDataSize = 8 * 1024;
+        private const int DefaultMaxDataSize = 8 * 1024;
 
         private readonly StorageManager _store = plugin.GetOrCreateSingleton<StorageManager>();
         private readonly int MaxDataSize = config.GetValueOrDefault("max_data_size", DefaultMaxDataSize);
@@ -81,16 +81,16 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Endpoints
             noCache |= entity.Server.NoCache();
 
             UserRecordData? record = await _store.GetRecordAsync(
-                entity.Session.UserID, 
-                recordKey: scopeId, 
+                entity.Session.UserID,
+                recordKey: scopeId,
                 flags: noCache ? RecordOpFlags.NoCache : RecordOpFlags.None,   //optionally bypass cache if the user requests it
                 entity.EventCancellation
             );
 
             //return the raw data with the checksum header
 
-            return record is null 
-                ? VirtualClose(entity, webm, HttpStatusCode.NotFound) 
+            return record is null
+                ? VirtualClose(entity, webm, HttpStatusCode.NotFound)
                 : CloseWithRecord(entity, record, HttpStatusCode.OK);
         }
 
@@ -155,14 +155,14 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Endpoints
 
             //Write the record to the store
             await _store.SetRecordAsync(
-                userId: entity.Session.UserID, 
-                recordKey: scopeId, 
-                recordData, 
-                checksum, 
-                flags, 
+                userId: entity.Session.UserID,
+                recordKey: scopeId,
+                recordData,
+                checksum,
+                flags,
                 entity.EventCancellation
             );
-            
+
             return VirtualClose(entity, HttpStatusCode.Accepted);
         }
 
@@ -185,23 +185,23 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Endpoints
 
             //Write the record to the store
             await _store.DeleteRecordAsync(
-                userId: entity.Session.UserID, 
-                recordKey: scopeId, 
+                userId: entity.Session.UserID,
+                recordKey: scopeId,
                 entity.EventCancellation
             );
-            
+
             return VirtualClose(entity, HttpStatusCode.Accepted);
-        }  
+        }
 
         private bool IsScopeAllowed(string scopeId)
         {
             return AllowedScopes.Contains(scopeId, StringComparer.OrdinalIgnoreCase);
         }
 
-        private static string? GetScopeId(HttpEntity entity) 
+        private static string? GetScopeId(HttpEntity entity)
             => entity.QueryArgs.GetValueOrDefault("scope");
 
-        private static bool NoCacheQuery(HttpEntity entity) 
+        private static bool NoCacheQuery(HttpEntity entity)
             => entity.QueryArgs.ContainsKey("no_cache");
     }
 }

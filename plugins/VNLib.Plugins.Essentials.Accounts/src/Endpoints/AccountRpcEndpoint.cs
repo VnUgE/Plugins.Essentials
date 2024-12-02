@@ -76,7 +76,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             _methodTable = _rpcManager
                 .LoadAllMethods()
                 .ToFrozenDictionary(
-                    static m => m.MethodName, 
+                    static m => m.MethodName,
                     static m => m
                 );
 
@@ -94,12 +94,9 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 
         private static string[] GetOptionsForMethod(IAccountRpcMethod method)
         {
-            if(method.Flags == RpcMethodOptions.AuthRequired)
-            {
-                return [ "auth_required" ];
-            }
-
-            return [];
+            return method.Flags == RpcMethodOptions.AuthRequired
+                ? (["auth_required"])
+                : ([]);
         }
 
         ///<inheritdoc/>
@@ -120,8 +117,8 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             foreach (IAccountRpcMethod method in _methodTable.Values)
             {
                 object? getResult = await method.OnUserGetAsync(entity);
-                
-                if(getResult is not null)
+
+                if (getResult is not null)
                 {
                     req.ExtendedProperties.Add(getResult);
                 }
@@ -140,7 +137,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
         public async ValueTask<VfReturnType> OnPostAsync(HttpEntity entity)
         {
             //Ensure the client accepts json responses
-            if(!entity.Server.Accepts(ContentType.Json))
+            if (!entity.Server.Accepts(ContentType.Json))
             {
                 //406 Not Acceptable
                 entity.CloseResponse(HttpStatusCode.NotAcceptable);
@@ -186,12 +183,12 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             response.Id     = methodReq.Id;
 
             //validate the rpc request
-            if (AccountJRpcValidator.Validate(methodReq, response) == false)
+            if (!AccountJRpcValidator.Validate(methodReq, response))
             {
                 return Error(entity, HttpStatusCode.UnprocessableEntity, response);
             }
 
-            if(!_methodTable.TryGetValue(methodReq.Method!, out IAccountRpcMethod? method))
+            if (!_methodTable.TryGetValue(methodReq.Method!, out IAccountRpcMethod? method))
             {
                 response.Result = "The requested rpc method does not exit";
                 return Error(entity, HttpStatusCode.NotFound, response);
@@ -218,7 +215,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             RpcCommandResult result = await method.InvokeAsync(entity, methodReq, requestArgs);
 
             //Mirror result if the callee returns a webmessage object
-            if(result.Response is WebMessage webm)
+            if (result.Response is WebMessage webm)
             {
                 response.Success    = webm.Success;
                 response.Result     = webm.Result;
@@ -239,15 +236,14 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             /*
              * If a status code is returned (not succesful) then return the error
              */
-            return result.Status > 0 
-                ? Error(entity, result.Status, response) 
+            return result.Status > 0
+                ? Error(entity, result.Status, response)
                 : Okay(entity, response);
         }
 
 
-        private static bool RequiresAuth(IAccountRpcMethod method) 
+        private static bool RequiresAuth(IAccountRpcMethod method)
             => (method.Flags & RpcMethodOptions.AuthRequired) > 0;
-      
 
         private static VfReturnType Error(HttpEntity entity, HttpStatusCode code, RpcResponseMessage msg)
         {
