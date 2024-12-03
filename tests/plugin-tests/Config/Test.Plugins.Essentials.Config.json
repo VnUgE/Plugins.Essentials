@@ -25,7 +25,7 @@
 
     //enable memory cache
     "memory_cache": {
-      "buckets": 1,
+      "buckets": 2,
       "bucket_size": 50,
       "max_age_sec": 600,
       "refresh_interval_sec": 60,

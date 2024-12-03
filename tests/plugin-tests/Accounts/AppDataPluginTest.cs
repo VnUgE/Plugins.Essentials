@@ -1,6 +1,6 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 
-using System;
+using Plugins.Essentials.Tests.Config;
 
 using VNLib.Plugins.Essentials.Accounts.AppData;
 using VNLib.Plugins.Essentials.Runtime;
@@ -11,15 +11,13 @@ namespace Plugins.Essentials.Tests.Accounts
     [TestClass()]
     public class AppDataPluginTest
     {
-        private static string HostConfigFilePath => Environment.GetEnvironmentVariable("TEST_HOST_CONFIG_FILE")!;
-
         [TestMethod()]
         public void LoadAppDataPlugin()
         {
             new TestPluginLoader<AppDataEntry>()
                 .WithCliArgs(["--verbose"])
-                .WithHostConfigFile(HostConfigFilePath)
-                .WithPluginConfigFile("Essentials.AppData.json")
+                .WithLocalHostConfig()
+                .WithLocalPluignConfig("Essentials.AppData.json")
                 .Load()
                 .GetServices(services =>
                 {
@@ -30,7 +28,7 @@ namespace Plugins.Essentials.Tests.Accounts
                     //Only 1 endpoint should be loaded for app-data
                     Assert.AreEqual(1, services.GetEndpoints().Length);
                 })
-                .Unload(delayMilliseconds: 3000)
+                .Unload(delayMilliseconds: 5000)
                 .TryDispose();
         }
     }

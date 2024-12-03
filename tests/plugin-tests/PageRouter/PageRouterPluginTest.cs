@@ -1,6 +1,4 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
-
-using System;
 using System.Collections.Generic;
 
 using VNLib.Plugins.Essentials.Runtime;
@@ -9,23 +7,21 @@ using VNLib.Plugins.Essentials.Content.Routing;
 using VNLib.Plugins.Essentials.Content;
 using VNLib.Plugins.Essentials.Middleware;
 
+using Plugins.Essentials.Tests.Config;
+
 namespace Plugins.Essentials.Tests.PageRouter
 {
+
     [TestClass()]
     public class PageRouterPluginTest
     {
-        private static string HostConfigFilePath => Environment.GetEnvironmentVariable("TEST_HOST_CONFIG_FILE")!;
-
-        //Load local test route file
-        private const string StoreConfig = @"{ ""store"": { ""route_file"": ""../../..//PageRouter/test-routes.xml"" } }";
-
         [TestMethod()]
         public void LoadPageRouterPlugin()
         {
             new TestPluginLoader<PageRouterEntry>()
                 .WithCliArgs(["--verbose"])
-                .WithHostConfigFile(HostConfigFilePath)
-                .WithPluginConfigData(StoreConfig)
+                .WithLocalHostConfig()
+                .WithLocalPluignConfig("PageRouter.json")
                 .Load()
                 .GetServices(services =>
                 {
@@ -39,7 +35,7 @@ namespace Plugins.Essentials.Tests.PageRouter
                     Assert.IsTrue(services.HasService<IPageRouter>());
 
                 })
-                .Unload(delayMilliseconds: 2000)
+                .Unload(delayMilliseconds: 5000)
                 .TryDispose();
         }
     }

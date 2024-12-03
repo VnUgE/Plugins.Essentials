@@ -9,21 +9,21 @@ using VNLib.Plugins.Essentials.Middleware;
 using VNLib.Plugins.Essentials.Runtime;
 using VNLib.Plugins.Essentials.ServiceStack.Testing;
 
+using Plugins.Essentials.Tests.Config;
+
 namespace Plugins.Essentials.Tests.Accounts
 {
 
     [TestClass()]
     public class AccountsPluginTest
     {
-        private static string HostConfigFilePath => Environment.GetEnvironmentVariable("TEST_HOST_CONFIG_FILE")!;
-
         [TestMethod()]
         public void LoadAccountsPlugin()
         {
             new TestPluginLoader<AccountsEntryPoint>()
                 .WithCliArgs(["--verbose", "--account-setup"])  //Enable verbose logging and account setup mode
-                .WithHostConfigFile(HostConfigFilePath)
-                .WithPluginConfigFile("Essentials.Accounts.json")
+                .WithLocalHostConfig()
+                .WithExternalPluginConfig("Essentials.Accounts.json")
                 .Load()
                 .GetServices(services =>
                 {
@@ -40,7 +40,7 @@ namespace Plugins.Essentials.Tests.Accounts
                     //Must export the security provider as middleware also
                     //Assert.AreEqual(1, services.GetService<IEnumerable<IHttpMiddleware>>().Count());
                 })
-                .Unload(delayMilliseconds: 3500)
+                .Unload(delayMilliseconds: 5000)
                 .TryDispose();
         }
     }
