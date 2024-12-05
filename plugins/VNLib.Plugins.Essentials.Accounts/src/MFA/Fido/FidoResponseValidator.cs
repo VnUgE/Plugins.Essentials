@@ -3,10 +3,10 @@
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
-* File: FidoEndpoint.cs 
+* File: FidoResponseValidator.cs 
 *
-* FidoEndpoint.cs is part of VNLib.Plugins.Essentials.Accounts which is part of the larger 
-* VNLib collection of libraries and utilities.
+* FidoResponseValidator.cs is part of VNLib.Plugins.Essentials.Accounts which 
+* is part of the larger VNLib collection of libraries and utilities.
 *
 * VNLib.Plugins.Essentials.Accounts is free software: you can redistribute it and/or modify 
 * it under the terms of the GNU Affero General Public License as 
@@ -22,8 +22,8 @@
 * along with this program.  If not, see https://www.gnu.org/licenses/.
 */
 using FluentValidation;
-using VNLib.Plugins.Essentials.Accounts.MFA.Fido.JsonTypes;
 
+using VNLib.Plugins.Essentials.Accounts.MFA.Fido.JsonTypes;
 
 namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
 {

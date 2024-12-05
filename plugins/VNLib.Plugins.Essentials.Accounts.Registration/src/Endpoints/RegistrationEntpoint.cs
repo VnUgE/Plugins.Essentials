@@ -101,12 +101,12 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
             //Get the json request data from client
             using RegCompletionRequest? request = await entity.GetJsonFromFileAsync<RegCompletionRequest>();
 
-            if(webm.Assert(request != null, "No request data present"))
+            if (webm.Assert(request != null, "No request data present"))
             {
                 return VirtualClose(entity, webm, HttpStatusCode.BadRequest);
             }
 
-            if(!RegCompletionValidator.Validate(request, webm))
+            if (!RegCompletionValidator.Validate(request, webm))
             {
                 return VirtualClose(entity, webm, HttpStatusCode.UnprocessableEntity);
             }
@@ -160,11 +160,16 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
                 };
 
                 //Create the new user with random user-id
-                using IUser user = await Users.CreateUserAsync(creation, null, entity.EventCancellation);
-                
+                using IUser user = await Users.CreateUserAsync(
+                    creation,
+                    userId: null,
+                    hashProvider: Users.GetHashProvider(),
+                    entity.EventCancellation
+                );
+
                 //set local account origin
                 user.SetAccountOrigin(LOCAL_ACCOUNT_ORIGIN);
-                
+
                 //set user verification 
                 await user.ReleaseAsync();
 
@@ -180,18 +185,18 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
             catch (UserExistsException)
             {
             }
-            catch(UserCreationFailedException)
+            catch (UserCreationFailedException)
             {
             }
 
             webm.Result = FAILED_AUTH_ERR;
             return VirtualOk(entity, webm);
-        } 
+        }
 
         protected override async ValueTask<VfReturnType> PutAsync(HttpEntity entity)
         {
             ValErrWebMessage webm = new();
-            
+
             //Get the request
             RegRequestMessage? request = await entity.GetJsonFromFileAsync<RegRequestMessage>();
             if (webm.Assert(request != null, "Request is invalid"))
@@ -218,7 +223,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
                     goto Exit;
                 }
             }
-          
+
             //Get exact timestamp
             DateTimeOffset timeStamp = entity.RequestedTimeUtc;
 
@@ -260,7 +265,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
             entity.CloseResponse(webm);
             return VfReturnType.VirtualSkip;
         }
-      
+
 
         private async Task SendRegEmailAsync(string emailAddress, string url, DateTimeOffset current)
         {
@@ -275,10 +280,10 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
                     //Set the security code variable string
                     .AddVariable("reg_url", url)
                     .AddVariable("date", current.ToString("f"));
-              
+
                 //Send the email
                 TransactionResult result = await Emails.SendEmailAsync(emailTemplate);
-                
+
                 if (!result.Success)
                 {
                     Log.Debug("Registration email failed to send, SMTP status code: {smtp}", result.SmtpStatus);

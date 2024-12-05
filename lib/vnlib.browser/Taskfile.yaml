@@ -8,6 +8,9 @@
 
 version: '3'
 
+vars:
+  BINARY_DIR: '{{ .BINARY_DIR | default "bin" }}'
+
 tasks:
 
 #called by build pipeline to build module
@@ -34,9 +37,9 @@ tasks:
         tsconfig.json
 
     cmds:
-    - powershell -Command "mkdir bin -Force"
+    - cmd: powershell mkdir {{ .BINARY_DIR }} -Force
     #tgz the dist folder
-    - tar -czf bin/release.tgz {{ .TAR_FILES }}
+    - cmd: tar -czf {{ .BINARY_DIR }}/release.tgz {{ .TAR_FILES }}
 
 #called by build pipeline to clean module
   clean:
@@ -44,4 +47,4 @@ tasks:
     cmds:
      #delete dist folder
     - for: ['bin/', 'dist/', 'node_modules/']
-      cmd: powershell -Command "Remove-Item -Recurse -Force {{ .ITEM_NAME }}"
+      cmd: powershell rm -Recurse -Force "{{ .ITEM_NAME }}"

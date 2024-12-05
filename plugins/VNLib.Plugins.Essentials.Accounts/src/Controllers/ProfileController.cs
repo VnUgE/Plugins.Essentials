@@ -27,26 +27,21 @@ using System.Text.Json;
 using System.Threading.Tasks;
 
 using FluentValidation;
+
 using VNLib.Utils.Logging;
 using VNLib.Plugins.Essentials.Users;
+using VNLib.Plugins.Essentials.Extensions;
 using VNLib.Plugins.Extensions.Validation;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Users;
 using static VNLib.Plugins.Essentials.Statics;
+
 using VNLib.Plugins.Essentials.Accounts.AccountRpc;
 
 namespace VNLib.Plugins.Essentials.Accounts.Controllers
 {
     internal sealed class ProfileController(PluginBase plugin) : IAccountRpcController
     {
-        /*
-        * This key is temporary until the essentials library gets updated
-        * to handle encoded data. I am short cutting the extension helpers
-        * and storing the user-data base64 encoded instead of nested json
-        * to avoid the json overhead and save some space.
-        */
-        private const string ProfileStorageKey = "__.prof";
-
         private readonly UserManager _users = plugin.GetOrCreateSingleton<UserManager>();
         private readonly ILogProvider _log = plugin.Log.CreateScope("Profile RPC");
 
@@ -81,7 +76,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
                     return RpcCommandResult.Error(HttpStatusCode.NotFound);
                 }
 
-                AccountData? profile = UserEncodedData.Decode<AccountData>(user, ProfileStorageKey);
+                AccountData? profile = user.GetProfile();
 
                 //No profile found, so return an empty "profile"
                 profile ??= new();
@@ -111,7 +106,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
                 ValErrWebMessage webm = new();
                 try
                 {
-                    if(args.ValueKind != JsonValueKind.Object)
+                    if (args.ValueKind != JsonValueKind.Object)
                     {
                         return RpcCommandResult.Error(HttpStatusCode.BadRequest);
                     }
@@ -143,7 +138,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
                     updateMessage.EmailAddress = null;
                     updateMessage.Created = null;
 
-                    UserEncodedData.Encode(user, ProfileStorageKey, updateMessage);
+                    user.SetProfile(updateMessage);
 
                     //Update the user only if successful
                     await user.ReleaseAsync();

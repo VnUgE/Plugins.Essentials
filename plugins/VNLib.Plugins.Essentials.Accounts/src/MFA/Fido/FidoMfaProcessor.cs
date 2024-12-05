@@ -36,7 +36,7 @@ using VNLib.Hashing;
 using VNLib.Hashing.IdentityUtility;
 using VNLib.Utils;
 using VNLib.Utils.Memory;
-using VNLib.Utils.Logging;
+//using VNLib.Utils.Logging;
 using VNLib.Utils.Extensions;
 using VNLib.Plugins.Essentials.Users;
 using VNLib.Plugins.Extensions.Loading;
@@ -67,7 +67,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
         private readonly IUserManager _users = plugin.GetOrCreateSingleton<UserManager>();
         //private readonly ILogProvider _log = plugin.Log.CreateScope("FIDO");
 
-        const string JwtClaimKey = "fido";
+        private const string JwtClaimKey = "fido";
 
         ///<inheritdoc/>
         public string Type => "fido";
@@ -87,7 +87,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
                 return;
             }
 
-            using UnsafeMemoryHandle<byte> challBuffer = MemoryUtil.UnsafeAlloc(_config.ChallangeSize, true);
+            using UnsafeMemoryHandle<byte> challBuffer = MemoryUtil.UnsafeAlloc(_config.ChallangeSize, zero: true);
 
             RandomHash.GetRandomBytes(challBuffer.Span);
 
@@ -198,7 +198,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
             switch (req.Action)
             {
                 case "prepare_device":
-                    
+
                     PrepareDevice(_config, entity, user, webm);
                     break;
 
@@ -233,6 +233,10 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
                     //Push changes to database
                     await user.ReleaseAsync(entity.EventCancellation);
 
+                    break;
+
+                default:
+                    webm.Result = "Invalid action";
                     break;
             }
 
@@ -368,7 +372,6 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
             webm.Result = "Successfully removed your fido device";
             webm.Success = true;
         }
-      
 
         private static FidoDeviceCredential? GetSelectedDevice(IUser user, FidoUpgradeResponse response)
         {
@@ -424,8 +427,8 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
                 .GetPropString("challenge");
 
             return string.Equals(
-                challenge, 
-                clientData.Base64Challenge, 
+                challenge,
+                clientData.Base64Challenge,
                 StringComparison.OrdinalIgnoreCase
             );
         }
@@ -447,7 +450,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
                 .ToArray(),
             };
         }
-     
+
         private static bool VerifySignedData(
             FidoAuthenticatorAssertionResponse assertion, 
             FidoDeviceCredential device
@@ -476,7 +479,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
 
             //Verify the signature over the signed data
             return VerifySignature(
-                device, 
+                device,
                 signedData: writer.AsSpan(),
                 assertion.Base64UrlSignature
             );
@@ -490,14 +493,14 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
             outputBuffer.Advance(authSize);
             return authSize;
         }
-       
+
         private static bool BuildSignedDataBuffer(ref ForwardOnlyWriter<byte> outputBuffer, string base64ClientData)
         {
             using UnsafeMemoryHandle<byte> clientDataBuffer = MemoryUtil.UnsafeAlloc<byte>(base64ClientData.Length + 16);
-          
+
             ERRNO clientDataSize = VnEncoding.Base64UrlDecode(base64ClientData, clientDataBuffer.Span);
 
-            if(clientDataSize <= 0)
+            if (clientDataSize <= 0)
             {
                 return false;
             }

@@ -171,7 +171,8 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Otp
             else
             {
                 //remove the key if it already exists, then append the new key
-                keys = keys.Where(k => !string.Equals(key.KeyId, k.KeyId, StringComparison.Ordinal))
+                keys = keys
+                    .Where(k => !string.Equals(key.KeyId, k.KeyId, StringComparison.Ordinal))
                     .Append(key)
                     .ToArray();
             }

@@ -112,9 +112,9 @@ export const useFidoApi = ({ sendRequest }: MfaApi): IFidoApi =>{
 
     const beginRegistration = async (options?: Partial<IFidoRequestOptions>) : Promise<IFidoServerOptions> => {
         return sendRequest<IFidoServerOptions>({ 
-            type: 'fido', 
-            action: 'prepare_device', 
-            ...options 
+             ...options,
+            type: 'fido',
+            action: 'prepare_device'
         });
     }
 

@@ -142,6 +142,10 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Totp
 
                     webm.Result = "Your code is not valid, please try again";
                     break;
+
+                default:
+                    webm.Result = "Invalid action requested";
+                    break;
             }
 
             return webm;
@@ -265,12 +269,18 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Totp
             if (BitConverter.IsLittleEndian)
             {
                 //Store the code components
-                TOTPCode = (hash[offset] & 0x7Fu) << 24 | (hash[offset + 1] & 0xFFu) << 16 | (hash[offset + 2] & 0xFFu) << 8 | hash[offset + 3] & 0xFFu;
+                TOTPCode = ((hash[offset] & 0x7Fu) << 24)
+                    | ((hash[offset + 1] & 0xFFu) << 16)
+                    | ((hash[offset + 2] & 0xFFu) << 8)
+                    | (hash[offset + 3] & 0xFFu);
             }
             else
             {
                 //Store the code components (In reverse order for big-endian machines)
-                TOTPCode = (hash[offset + 3] & 0x7Fu) << 24 | (hash[offset + 2] & 0xFFu) << 16 | (hash[offset + 1] & 0xFFu) << 8 | hash[offset] & 0xFFu;
+                TOTPCode = ((hash[offset + 3] & 0x7Fu) << 24)
+                    | ((hash[offset + 2] & 0xFFu) << 16)
+                    | ((hash[offset + 1] & 0xFFu) << 8)
+                    | (hash[offset] & 0xFFu);
             }
             //calculate the modulus value
             TOTPCode %= (uint)Math.Pow(10, digits);
@@ -289,7 +299,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Totp
                 "verify" => false,
 
                 //Default to pw required
-                _ => true   
+                _ => true
             };
         }
 
@@ -344,7 +354,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Totp
                         //Convert the secret to base64 string to send to client
                         Base64EncSecret = Convert.ToBase64String(outputBuffer.AsSpan(0, count))
                     };
-                   
+
                     webm.Success = true;
 
                     //Store secret in the user account

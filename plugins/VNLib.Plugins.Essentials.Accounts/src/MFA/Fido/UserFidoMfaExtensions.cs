@@ -113,7 +113,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
                 .Where(k => !string.Equals(credId, k.Base64DeviceId, StringComparison.Ordinal))
                 .ToArray();
 
-            if(remaining.Length == 0)
+            if (remaining.Length == 0)
             {
                 remaining = null;
             }

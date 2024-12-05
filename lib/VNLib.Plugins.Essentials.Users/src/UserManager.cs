@@ -51,29 +51,13 @@ namespace VNLib.Plugins.Essentials.Users
     /// </summary>
     [ServiceExport]
     [ConfigurationName("users", Required = false)]
-    public sealed class UserManager : IUserManager, IAsyncResourceStateHandler
+    public sealed class UserManager(PluginBase plugin) : IUserManager, IAsyncResourceStateHandler, IAsyncConfigurable
     {
         private const int DefaultRandomPasswordLength = 128;
 
-        private readonly IAsyncLazy<DbContextOptions> _dbOptions;
-        private readonly IPasswordHashingProvider _passwords;
+        private readonly IAsyncLazy<DbContextOptions> _dbOptions = plugin.GetContextOptionsAsync();
+        private readonly IPasswordHashingProvider _passwords = plugin.GetOrCreateSingleton<ManagedPasswordHashing>();
         private readonly int _randomPasswordLength = DefaultRandomPasswordLength;
-
-        public UserManager(PluginBase plugin)
-        {
-            //Get the connection factory
-            _dbOptions = plugin.GetContextOptionsAsync();
-
-            //Load password hashing provider
-            _passwords = plugin.GetOrCreateSingleton<ManagedPasswordHashing>();
-
-#pragma warning disable CA5394 // Do not use insecure randomness
-            int randomDelay = Random.Shared.Next(1000, 4000);
-#pragma warning restore CA5394 // Do not use insecure randomness
-
-            //Create tables, but give plenty of delay on startup
-            _ = plugin.ObserveWork(() => CreateDatabaseTables(plugin), randomDelay);
-        }
 
         public UserManager(PluginBase plugin, IConfigScope config) : this(plugin)
         {
@@ -83,11 +67,17 @@ namespace VNLib.Plugins.Essentials.Users
             );
         }
 
-        /*
-         * Create the databases!
-         */
-        private static async Task CreateDatabaseTables(PluginBase plugin)
+        ///<inheritdoc/>
+        public async Task ConfigureServiceAsync(PluginBase plugin)
         {
+            //Add random startup delay to prevent excess startup load
+
+#pragma warning disable CA5394 // Do not use insecure randomness
+            int randomDelay = Random.Shared.Next(1000, 4000);
+#pragma warning restore CA5394 // Do not use insecure randomness
+
+            await Task.Delay(randomDelay);
+
             //Ensure the database is created
             await plugin.EnsureDbCreatedAsync<UsersContext>(plugin);
         }
@@ -287,20 +277,6 @@ namespace VNLib.Plugins.Essentials.Users
         }
 
         ///<inheritdoc/>
-        public Task<IUser> CreateUserAsync(IUserCreationRequest creation, string? userId, CancellationToken cancellation = default)
-        {
-            ArgumentNullException.ThrowIfNull(creation);
-
-            return CreateUserAsync(
-                creation,
-                userId,
-                //Pass null if password is not meant to be hashed
-                creation.UseRawPassword ? null : GetHashProvider(),
-                cancellation
-            );
-        }
-
-        ///<inheritdoc/>
         public async Task<ERRNO> ValidatePasswordAsync(
             IUser user,
             PrivateString password,
@@ -350,18 +326,6 @@ namespace VNLib.Plugins.Essentials.Users
                     MemoryMarshal.AsBytes(bSpan)
                 );
             }
-        }
-
-        ///<inheritdoc/>
-        public Task<ERRNO> ValidatePasswordAsync(IUser user, PrivateString password, PassValidateFlags flags, CancellationToken cancellation = default)
-        {
-            return ValidatePasswordAsync(
-                user,
-                password,
-                //No hashing provider if the user requested a bypass
-                (flags & PassValidateFlags.BypassHashing) > 0 ? null : GetHashProvider(),
-                cancellation
-            );
         }
 
         ///<inheritdoc/>
@@ -419,7 +383,7 @@ namespace VNLib.Plugins.Essentials.Users
                 //Update password (must cast)
                 entry.PassHash = (string?)newPass;
 
-                int recordsModified = await db.SaveAndCloseAsync(true, cancellation);
+                int recordsModified = await db.SaveAndCloseAsync(commit: true, cancellation);
 
                 entry.PassHash = null;
 
@@ -433,29 +397,12 @@ namespace VNLib.Plugins.Essentials.Users
                 //Update password (must cast)
                 entry.PassHash = (string?)passwordHash;
 
-                int recordsModified = await db.SaveAndCloseAsync(true, cancellation);
+                int recordsModified = await db.SaveAndCloseAsync(commit: true, cancellation);
 
                 entry.PassHash = null;
 
                 return recordsModified;
             }
-        }
-
-
-        ///<inheritdoc/>
-        public Task<ERRNO> UpdatePasswordAsync(IUser user, PrivateString newPass, CancellationToken cancellation = default)
-        {
-            /*
-             * Added backward compatability for obsolete methods. The default 
-             * condition is to use the default password hashing provider.
-             */
-
-            return UpdatePasswordAsync(
-                user,
-                newPass,
-                GetHashProvider(),
-                cancellation
-            );
         }
 
         ///<inheritdoc/>
@@ -469,10 +416,6 @@ namespace VNLib.Plugins.Essentials.Users
 
             return count;
         }
-
-        [Obsolete("Removed in favor of GetUserFromUsernameAsync, transition away from email address")]
-        public Task<IUser?> GetUserFromEmailAsync(string emailAddress, CancellationToken cancellation = default) 
-            => GetUserFromUsernameAsync(emailAddress, cancellation);
 
         ///<inheritdoc/>
         public async Task<IUser?> GetUserFromUsernameAsync(string username, CancellationToken cancellationToken = default)
@@ -591,6 +534,8 @@ namespace VNLib.Plugins.Essentials.Users
                 throw new UserDeleteException("Failed to delete the user account because of a database failure, the user may already be deleted", null);
             }
         }
+
+
 
         private readonly struct PStringWrapper(PrivateString? value, bool ownsString)
         {

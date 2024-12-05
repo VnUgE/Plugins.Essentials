@@ -48,7 +48,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
 
             //Make sure the response has a public key and a valid algorithm
             if (
-                !response.CoseAlgorithmNumber.HasValue 
+                !response.CoseAlgorithmNumber.HasValue
                 || string.IsNullOrWhiteSpace(response.Base64PublicKey)
                 || string.IsNullOrWhiteSpace(response.Base64AuthenticatorData)
             )
@@ -77,7 +77,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
             //Export the key parameters to get the x and y coordinates
             ECParameters keyParams = sigAlg.ExportParameters(includePrivateParameters: false);
 
-            if(keyParams.Q.X?.Length != CoseEncodings.GetCoordSizeForAlg(credential.CoseAlgId))
+            if (keyParams.Q.X?.Length != CoseEncodings.GetCoordSizeForAlg(credential.CoseAlgId))
             {
                 return false;
             }
@@ -88,15 +88,14 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
 
             return true;
         }
-        
-       
+
         private static ECDsa? GetSigningAlgForKey(string spki, int algId)
         {
-            using UnsafeMemoryHandle<byte> pubKeyBuffer = MemoryUtil.UnsafeAlloc<byte>(spki.Length + 16, true);
+            using UnsafeMemoryHandle<byte> pubKeyBuffer = MemoryUtil.UnsafeAlloc<byte>(spki.Length + 16, zero: true);
 
             //Recover the base64url public key into it's spki binary format
             ERRNO pubkeySize = VnEncoding.Base64UrlDecode(spki, pubKeyBuffer.Span);
-            ReadOnlySpan<byte> spkiPubKey = pubKeyBuffer.AsSpan(0, pubkeySize);
+            ReadOnlySpan<byte> spkiPubKey = pubKeyBuffer.AsSpan(start: 0, pubkeySize);
 
             if (spkiPubKey.IsEmpty)
             {
