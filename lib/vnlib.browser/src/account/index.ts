@@ -26,41 +26,16 @@ import type { WebMessage } from '../types'
 import type { 
     AccountApi, 
     UserProfile, 
-    ExtendedLoginResponse 
+    ExtendedLoginResponse, 
+    UserLoginCredential,
+    AccountRpcApi,
+    AccountRpcMethod,
+    AccountRpcResponse
 } from './types'
 import { manualComputed } from '../storage'
 import { useJrpc } from '../helpers/jrpc'
 
-//Export public types
-export type * from './types'
-
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE'
-
-export interface AccountRpcMethod {
-    readonly method: string;
-    readonly options: string[];
-}
-
-export interface AccountRpcResponse<T> extends WebMessage<T> {
-    readonly id: string;
-    readonly code: number;
-    readonly method?: string;
-}
-
-export interface AccountRpcRequest{
-    readonly id: string;
-    readonly method: string;
-    readonly args: object;
-}
-
-export interface AccountRpcApi<TMethod>{
-    getMethods(): Promise<AccountRpcMethod[]>;
-    exec<T = any>(method: AccountRpcMethod | TMethod, args?: object): Promise<AccountRpcResponse<T>>;
-}
-
-export interface AccountRpcApiConfig{
-    readonly endpointUrl: string;
-}
 
 interface RpcGetResponse {
     readonly httpMethods: HttpMethod[];
@@ -136,7 +111,7 @@ export const useAccount = (): AccountApi => {
         return result;
     }
 
-    const login = async <T>(userName: string, password: string): Promise<ExtendedLoginResponse<T>> => {
+    const login = async <T>({ userName, password }: UserLoginCredential): Promise<ExtendedLoginResponse<T>> => {
 
         const prepped = await prepareLogin();
 
@@ -180,7 +155,7 @@ export const useAccount = (): AccountApi => {
             new_password: newPass,
         });
 
-        return data
+        return data;
     }
 
     const heartbeat = async (): Promise<void> => {

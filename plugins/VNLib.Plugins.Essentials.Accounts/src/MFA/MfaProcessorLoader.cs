@@ -39,6 +39,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
     [ConfigurationName("mfa")]
     internal sealed class MfaProcessorLoader(PluginBase plugin, IConfigScope config)
     {
+        private readonly bool Enabled = config.GetValueOrDefault("enabled", true);
         private readonly MfaProcessorConfig[] _processors = config.GetRequiredProperty<MfaProcessorConfig[]>("processors");
 
         /// <summary>
@@ -53,6 +54,12 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
         public IMfaProcessor[] GetProcessors()
         {
             ValidateConfig();
+
+            if (!Enabled)
+            {
+                plugin.Log.Debug("MFA system is disabled, no processors will be loaded");
+                return [];
+            }
 
             //Build processor array from their loaded configuration objects
             IMfaProcessor[] procs = _processors

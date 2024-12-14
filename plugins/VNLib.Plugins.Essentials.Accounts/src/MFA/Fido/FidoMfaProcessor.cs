@@ -51,11 +51,12 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
     [ConfigurationName("fido_settings")]
     internal sealed class FidoMfaProcessor(PluginBase plugin, IConfigScope config) : IMfaProcessor
     {
-        private static readonly FidoAuthValidator _authValidator = new();
-        private static readonly FidoMessageValidator FidoReqVal = new();
+        private static readonly FidoUpgradeValidator UpgradeValidator = new();
+        private static readonly FidoMessageValidator FidoRequestValidator = new();
         private static readonly FidoResponseValidator ResponseValidator = new();
         private static readonly FidoClientDataJsonValidtor ClientDataValidator = new();
 
+        //The current implementation only supports nist elliptic curves
         private static readonly FidoPubkeyAlgorithm[] _supportedAlgs =
         [
             new FidoPubkeyAlgorithm(algId: -7),    //ES256
@@ -91,7 +92,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
 
             RandomHash.GetRandomBytes(challBuffer.Span);
 
-            message.AddClaim(
+            _ = message.AddClaim(
                 claim: JwtClaimKey,
                 value: GetChallengeData(_config, challBuffer.Span, devices)
             );
@@ -106,7 +107,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
         ///<inheritdoc/>
         public bool VerifyResponse(IUser user, JsonElement request)
         {
-            if(request.TryGetProperty("fido", out JsonElement fidoEl) == false)
+            if (!request.TryGetProperty("fido", out JsonElement fidoEl))
             {
                 return false;
             }
@@ -125,7 +126,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
              * that the user gets this feedback as it means their device
              * is sending bad data or it's not supported
              */
-            if (!_authValidator.Validate(fidoResponse).IsValid)
+            if (!UpgradeValidator.Validate(fidoResponse).IsValid)
             {
                 return false;
             }
@@ -159,12 +160,12 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
         public ValueTask<object?> OnUserGetAsync(HttpEntity entity, IUser user)
         {
             return ValueTask.FromResult<object?>(new UserGetResult
-                {
-                    Devices         = user.FidoGetAllCredentials() ?? [],
-                    CanAddDevices   = user.FidoCanAddKey(),
-                    DataSize        = user.FidoGetDataSize(),
-                    MaxSize         = UserFidoMfaExtensions.MaxEncodedSize
-                }
+            {
+                Devices         = user.FidoGetAllCredentials() ?? [],
+                CanAddDevices   = user.FidoCanAddKey(),
+                DataSize        = user.FidoGetDataSize(),
+                MaxSize         = UserFidoMfaExtensions.MaxEncodedSize
+            }
             );
         }
 
@@ -179,7 +180,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
                 return webm;
             }
 
-            if (!FidoReqVal.Validate(req, webm))
+            if (!FidoRequestValidator.Validate(req, webm))
             {
                 return webm;
             }
@@ -452,7 +453,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
         }
 
         private static bool VerifySignedData(
-            FidoAuthenticatorAssertionResponse assertion, 
+            FidoAuthenticatorAssertionResponse assertion,
             FidoDeviceCredential device
         )
         {
@@ -530,8 +531,8 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
             using ECDsa alg = GetSigAlgForDevice(device);
 
             return alg.VerifyData(
-                data: signedData, 
-                signature: signatureBuffer.AsSpan(0, size), 
+                data: signedData,
+                signature: signatureBuffer.AsSpan(0, size),
                 hashAlgorithm: HashAlg.SHA256.GetAlgName(),
                 DSASignatureFormat.Rfc3279DerSequence
             );
@@ -598,13 +599,13 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
 
                 //Standard resource exhuastion protection (large passwords take time to hash)
                 RuleFor(p => p.Password)
-                    .MaximumLength(200);
+                    .SetValidator(AccountValidations.PasswordValidator);
             }
         }
 
-        private sealed class FidoAuthValidator : AbstractValidator<FidoUpgradeResponse>
+        private sealed class FidoUpgradeValidator : AbstractValidator<FidoUpgradeResponse>
         {
-            public FidoAuthValidator()
+            public FidoUpgradeValidator()
             {
                 RuleFor(p => p.Response)
                     .NotNull()

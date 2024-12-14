@@ -35,10 +35,10 @@ using VNLib.Plugins.Essentials.Extensions;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Validation;
 using VNLib.Plugins.Extensions.Loading.Routing;
+using VNLib.Plugins.Extensions.Loading.Routing.Mvc;
 
 using VNLib.Plugins.Essentials.Accounts.AppData.Model;
 using VNLib.Plugins.Essentials.Accounts.AppData.Stores;
-using VNLib.Plugins.Extensions.Loading.Routing.Mvc;
 using static VNLib.Plugins.Essentials.Endpoints.ResourceEndpointBase;
 using static VNLib.Plugins.Essentials.Accounts.AppData.Model.HttpExtensions;
 
@@ -125,7 +125,7 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Endpoints
                 return VirtualClose(entity, webm, HttpStatusCode.RequestEntityTooLarge);
             }
 
-            byte[] recordData = new byte[data.Length];
+            byte[] recordData = GC.AllocateUninitializedArray<byte>((int)data.Length, pinned: false);
             int read = await data.FileData.ReadAsync(recordData, entity.EventCancellation);
 
             if (webm.Assert(read == recordData.Length, "Failed to read data"))

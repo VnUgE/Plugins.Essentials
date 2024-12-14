@@ -67,7 +67,7 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores
 
             CacheConfig? cConfig = config.GetValueOrDefault<CacheConfig?>("cache", defaultValue: null);
 
-            if(cConfig is null || cConfig.Enabled == false)
+            if (cConfig is null || !cConfig.Enabled)
             {
                 _logger.Information("Result cache disabled via configuration, or not set");
                 return;
@@ -93,7 +93,7 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores
              * and logged to the console.
              */
             if (string.IsNullOrWhiteSpace(cConfig.Prefix))
-            {              
+            {
                 cConfig.Prefix = RandomHash.GetRandomBase32(8);
                 _logger.Warn("CACHE: No prefix was set, using random prefix: {prefix}", cConfig.Prefix);
             }
@@ -113,13 +113,13 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores
                 .WithTaskPolicy(cacheTaskPolicy)
                 .Build();
         }
-      
+
         public Task DeleteRecordAsync(string userId, string recordKey, CancellationToken cancellation)
         {
             AppDataRequest adr = new (userId, recordKey);
 
             //Attempt to purge from cache and store in parallel if cache is enabled
-            Task cacheDel = _cache is not null 
+            Task cacheDel = _cache is not null
                 ? _cache.RemoveAsync(userId, cancellation)
                 : Task.CompletedTask;
 
@@ -127,7 +127,7 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores
 
             return Task.WhenAll(cacheDel, storeRemove);
         }
-     
+
         ///<inheritdoc/>
         public Task<UserRecordData?> GetRecordAsync(string userId, string recordKey, RecordOpFlags flags, CancellationToken cancellation)
         {
@@ -141,7 +141,7 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores
 
             return _cache.FetchAsync(
                 request: adr,
-                resultFactory: _backingStore.GetAsync, 
+                resultFactory: _backingStore.GetAsync,
                 cancellation
             );
         }
@@ -226,7 +226,7 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores
             }
         }
 
-        sealed class CacheConfig
+        private sealed class CacheConfig
         {
             [JsonPropertyName("enabled")]
             public bool Enabled { get; set; } = true;

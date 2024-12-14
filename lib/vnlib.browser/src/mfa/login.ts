@@ -20,7 +20,14 @@
 import { decodeJwt, type JWTPayload } from "jose";
 import { map, mapKeys, without } from 'lodash-es';
 import { debugLog } from "../util"
-import { useAccountRpc, useAccount, type ExtendedLoginResponse } from "../account";
+import { 
+    useAccountRpc,
+    useAccount
+} from "../account";
+import type { 
+    ExtendedLoginResponse,
+    UserLoginCredential
+} from "../account/types";
 import type { ITokenResponse } from "../session";
 import type { WebMessage } from "../types";
 
@@ -122,10 +129,9 @@ export interface IMfaLoginManager {
     /**
      * Logs a user in with the given username and password, and returns a login result
      * or a mfa flow continuation depending on the login flow
-     * @param userName The username of the user to login
-     * @param password The password of the user to login
+     * @param credential The login credential to for the user (username and password)
      */
-    login(userName: string, password: string): Promise<WebMessage | IMfaContinuation>;
+    login(credential: UserLoginCredential): Promise<WebMessage | IMfaContinuation>;
 }
 
 const getMfaProcessor = (handlers: IMfaTypeProcessor[]) =>{
@@ -221,10 +227,10 @@ export const useMfaLogin = (handlers: IMfaTypeProcessor[]): IMfaLoginManager => 
     const { processMfa, isSupported } = getMfaProcessor(handlers);
 
     //Login that passes through logins with mfa
-    const login = async <T>(userName: string, password: string): Promise<ExtendedLoginResponse<T> | IMfaContinuation> => {
+    const login = async <T>(credential: UserLoginCredential): Promise<ExtendedLoginResponse<T> | IMfaContinuation> => {
 
         //User-login with mfa response
-        const response = await userLogin<T | IMfaUpgradeResponse>(userName, password);
+        const response = await userLogin<T | IMfaUpgradeResponse>(credential);
 
         const { mfa, upgrade } = response.getResultOrThrow() as IMfaUpgradeResponse;
 

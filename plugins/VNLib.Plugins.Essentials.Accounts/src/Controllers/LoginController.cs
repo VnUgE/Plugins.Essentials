@@ -78,7 +78,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
                     //Enable mfa methods
                     new MfaGetDataMethod(mfa, users),
                     new MfaLoginMethod(plugin, mfa, lockout, users),
-                    new MfaRpcMethod(mfa, users)    
+                    new MfaRpcMethod(mfa, users)
                ];
             }
             else
@@ -177,12 +177,12 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
                     return RpcCommandResult.Error(HttpStatusCode.Conflict, webm);
                 }
 
-                if(args.ValueKind != JsonValueKind.Object)
+                if (args.ValueKind != JsonValueKind.Object)
                 {
                     webm.Result = "Method arugments malformatted";
                     return RpcCommandResult.Error(HttpStatusCode.Conflict, webm);
                 }
-                
+
                 try
                 {
                     //Make sure the id is regenerated (or upgraded if successful login)
@@ -203,7 +203,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
                     }
 
                     using IUser? user = await Users.GetUserFromUsernameAsync(
-                        loginMessage.UserName, 
+                        loginMessage.UserName,
                         entity.EventCancellation
                     );
 
@@ -216,7 +216,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
                     bool locked = Lockout.CheckOrClear(user, entity.RequestedTimeUtc);
 
                     //Make sure the account has not been locked out
-                    if (webm.Assert(locked == false, LOCKED_ACCOUNT_MESSAGE))
+                    if (webm.Assert(!locked, LOCKED_ACCOUNT_MESSAGE))
                     {
                         //No need to re-increment the count
                         goto Cleanup;
@@ -242,7 +242,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
                     }
 
                     //Validate password
-                    if (await ValidatePasswordAsync(user, loginMessage, entity.EventCancellation) == false)
+                    if (!await ValidatePasswordAsync(user, loginMessage, entity.EventCancellation))
                     {
                         goto Failed;
                     }
@@ -281,7 +281,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
 
                         webm.Result = new AccountData() { EmailAddress = user.EmailAddress };
                         webm.Success = true;
-                     
+
                         Log.Verbose("Successful login for user {uid}...", user.UserID[..8]);
 
                         goto Cleanup;
@@ -326,9 +326,9 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
             {
                 //Validate password against store
                 ERRNO valResult = await Users.ValidatePasswordAsync(
-                    user, 
-                    password: login.Password!, 
-                    flags: PassValidateFlags.None, 
+                    user,
+                    password: login.Password!,
+                    flags: PassValidateFlags.None,
                     cancellation
                 );
 
@@ -353,7 +353,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
                 public required bool MultiFactorUpgrade { get; set; }
             }
         }
-        
+
         private sealed class MfaLoginMethod(
             PluginBase plugin,
             MfaAuthManager MultiFactor,
@@ -405,7 +405,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
 
                 bool locked = Lockout.CheckOrClear(user, entity.RequestedTimeUtc);
 
-                if (webm.Assert(locked == false, LOCKED_ACCOUNT_MESSAGE))
+                if (webm.Assert(!locked, LOCKED_ACCOUNT_MESSAGE))
                 {
                     //Locked, so clear stored signature
                     MultiFactor.InvalidateUpgrade(entity);
@@ -451,7 +451,6 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
 
                 return RpcCommandResult.Okay(webm);
             }
-           
         }
 
         private sealed class MfaGetDataMethod(MfaAuthManager MultiFactor, UserManager Users) : IAccountRpcMethod
@@ -492,8 +491,8 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
                         funcs.Methods.Add(new MfaMethodResponse
                         {
                             Enabled = true,
-                            Type = method.Type,
-                            Data = data
+                            Type    = method.Type,
+                            Data    = data
                         });
                     }
                 }
@@ -535,7 +534,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
         {
             private readonly FrozenDictionary<string, IMfaProcessor> _processors = MultiFactor.Processors
                 .ToFrozenDictionary(
-                    static p => p.Type, 
+                    static p => p.Type,
                     static p => p
                 );
 

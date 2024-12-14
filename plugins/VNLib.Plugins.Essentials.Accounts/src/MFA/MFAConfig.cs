@@ -69,6 +69,5 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
 
             val.ValidateAndThrow(this);
         }
-       
     }
 }

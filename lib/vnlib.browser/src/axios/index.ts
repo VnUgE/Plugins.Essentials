@@ -96,15 +96,21 @@ export const useAxios = (() => {
     return (config?: AxiosRequestConfig | undefined | null): Axios => {
 
         const getInstance = () => {
-            const getMergedConfig = () => {
+            const getMergedConfig = (): GlobalAxiosConfig => {
                 const global = _axiosConfig.get();
                 const local = defaultTo(config, {});
 
                 return merge(cloneDeep(global), local);
             }
 
-            const instance = axios.create(getMergedConfig());
+            const merged = getMergedConfig();
+            let instance = axios.create(merged);
 
+            //Exec user configuration callback if it's defined
+            if(merged.configureAxios) {
+                instance = merged.configureAxios(instance);
+            }
+           
             //Assign cached interceptors
             instance.interceptors.request.use(
                 request.onFufilled,

@@ -425,7 +425,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social
              * If a user is not found, we can optionally create a new user account
              * if the configuration allows it.
              */
-            if(user == null)
+            if (user == null)
             {
                 //make sure registration is enabled
                 if (webm.Assert(Config.AllowRegistration, AUTH_ERROR_MESSAGE))
@@ -544,7 +544,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social
                 Log.Debug("Out of buffer space for token data encryption, for user {usr}, from ip {ip}", user.UserID, entity.TrustedRemoteIp);
                 webm.Result = AUTH_ERROR_MESSAGE;
             }
-            catch(UserUpdateException uue)
+            catch (UserUpdateException uue)
             {
                 webm.Token = null;
                 webm.Result = AUTH_ERROR_MESSAGE;

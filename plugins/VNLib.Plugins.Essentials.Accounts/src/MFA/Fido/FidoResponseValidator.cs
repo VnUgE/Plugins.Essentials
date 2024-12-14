@@ -44,7 +44,8 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
 
             RuleFor(c => c.Base64PublicKey)
                 .NotEmpty()
-                .WithMessage("Fido 'public_key' must be provided");
+                .WithMessage("Fido 'public_key' must be provided")
+                .Matches(@"^[a-zA-Z0-9\-/=]+$");
 
             RuleFor(c => c.CoseAlgorithmNumber)
                 .NotNull()
@@ -53,17 +54,20 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
             RuleFor(c => c.Base64ClientData)
                 .NotEmpty()
                 .WithMessage("Fido 'client_data' must be provided")
-                .MaximumLength(4096);
+                .MaximumLength(4096)
+                .Matches(@"^[a-zA-Z0-9\-/=]+$");
 
             RuleFor(c => c.Base64AuthenticatorData)
                 .NotEmpty()
                 .WithMessage("Fido 'authenticator_data' must be provided")
-                .MaximumLength(4096);
+                .MaximumLength(4096)
+                .Matches(@"^[a-zA-Z0-9\-/=]+$");
 
             RuleFor(c => c.Base64Attestation)
                 .NotEmpty()
                 .WithMessage("Fido 'attestation' must be provided")
-                .MaximumLength(4096);
+                .MaximumLength(4096)
+                .Matches(@"^[a-zA-Z0-9\-/=]+$");
 
         }
 

@@ -103,7 +103,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                 if (OnMwCheckSessionExpired(entity, in session))
                 {
                     //Expired
-                    ExpireCookies(entity, true);
+                    ExpireCookies(entity, force: true);
 
                     //Verbose because this is a normal occurance
                     if (_logger.IsEnabled(LogLevel.Verbose))
@@ -114,7 +114,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                 else if (session.IsNew)
                 {
                     //explicitly expire cookies on new sessions
-                    ExpireCookies(entity, false);
+                    ExpireCookies(entity, force: false);
                 }
                 //See if the session might be elevated
                 else if (ClientWebAuthManager.IsSessionElevated(in session))
@@ -135,7 +135,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                      * Cookies are only sent if the client also sent login cookies to avoid 
                      * sending cookies on every request
                      */
-                    ExpireCookies(entity, false);
+                    ExpireCookies(entity, force: false);
                 }
 
             }

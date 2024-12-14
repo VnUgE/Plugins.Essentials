@@ -51,11 +51,10 @@ namespace VNLib.Plugins.Essentials.Auth.Discord
                 new SocialOAuthPortal(
                     ConfigKey,
                     _loginEndpoint,
-                    null,
+                    LogoutEndpoint: null,
                     base64IconData
                 )
             ];
-            
         }
     }
 }

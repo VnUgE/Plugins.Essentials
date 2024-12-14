@@ -20,6 +20,7 @@
 import { useAccountRpc } from '../account';
 import { includes } from 'lodash-es';
 import type { MfaMethod } from "./login"
+import { AccountRpcResponse } from '../account/types';
 
 export type UserArg = object;
 
@@ -40,6 +41,7 @@ export interface MfaRequestJson extends Record<string, any>{
     readonly password?: string;
 }
 
+
 /**
  * Represents the server api for interacting with the user's 
  * mfa configuration
@@ -59,7 +61,7 @@ export interface MfaApi{
      * @param request The rpc request to send
      * @returns A promise that resolves to the server response
      */
-    sendRequest<T>(request: MfaRequestJson): Promise<T>;
+    sendRequest<T>(request: MfaRequestJson): Promise<AccountRpcResponse<T>>;
 }
 
 type MfaRpcMethod = 'mfa.rpc' | 'mfa.get';
@@ -83,9 +85,10 @@ export const useMfaApi = (): MfaApi =>{
         return data.getResultOrThrow();
     }
 
-    const sendRequest = async <T>(request: MfaRequestJson): Promise<T> => {
+    const sendRequest = async <T>(request: MfaRequestJson): Promise<AccountRpcResponse<T>> => {
         const data = await exec<T>('mfa.rpc' , request);
-        return data.getResultOrThrow();
+        data.getResultOrThrow();
+        return data;
     }
   
     return {

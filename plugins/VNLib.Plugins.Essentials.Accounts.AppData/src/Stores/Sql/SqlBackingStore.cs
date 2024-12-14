@@ -122,7 +122,7 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores.Sql
                 existing.Created = newRecord.Created;
             }
 
-            sealed class DbQueries : IDbQueryLookup<DataRecord>
+            private sealed class DbQueries : IDbQueryLookup<DataRecord>
             {
                 public IQueryable<DataRecord> GetCollectionQueryBuilder(IDbContextHandle context, params string[] constraints)
                 {

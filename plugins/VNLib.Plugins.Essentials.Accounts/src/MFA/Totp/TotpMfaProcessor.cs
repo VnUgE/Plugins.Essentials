@@ -314,9 +314,9 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Totp
 
             //Verify password against the user
             ERRNO result = await _users.ValidatePasswordAsync(
-                user, 
-                req.Password, 
-                PassValidateFlags.None, 
+                user,
+                req.Password,
+                PassValidateFlags.None,
                 cancellation
             );
 

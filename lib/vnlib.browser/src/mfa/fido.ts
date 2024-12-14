@@ -36,6 +36,7 @@ import type {
 } from "@simplewebauthn/types";
 import type { WebMessage } from "../types";
 import { type MfaApi } from "./config";
+import type { AccountRpcResponse } from "../account/types";
 
 export type IFidoServerOptions = PublicKeyCredentialCreationOptionsJSON
 
@@ -76,13 +77,13 @@ export interface IFidoApi {
      * @param credential The credential to create
      * @returns A promise that resolves to a web message
      */
-    registerCredential: (credential: RegistrationResponseJSON, commonName: string) => Promise<string>;
+    registerCredential: (credential: RegistrationResponseJSON, commonName: string) => Promise<AccountRpcResponse<string>>;
     
     /**
      * Registers the default device for the currently logged-in user
      * @returns A promise that resolves to a web message status of the operation
      */
-    registerDefaultDevice: (commonName: string, options?: Partial<IFidoRequestOptions>) => Promise<string>;
+    registerDefaultDevice: (commonName: string, options?: Partial<IFidoRequestOptions>) => Promise<AccountRpcResponse<string>>;
 
     /**
      * Disables a device for the currently logged-in user.
@@ -91,7 +92,7 @@ export interface IFidoApi {
      * @param options The options to pass to the server
      * @returns A promise that resolves to a web message status of the operation
      */
-    disableDevice: (device: IFidoDevice, options?: Partial<IFidoRequestOptions>) => Promise<string>;
+    disableDevice: (device: IFidoDevice, options?: Partial<IFidoRequestOptions>) => Promise<AccountRpcResponse<string>>;
 
     /**
      * Disables all devices for the currently logged-in user.
@@ -99,7 +100,7 @@ export interface IFidoApi {
      * @param options The options to pass to the server
      * @returns A promise that resolves to a web message status of the operation
      */
-    disableAllDevices: (options?: Partial<IFidoRequestOptions>) => Promise<string>;
+    disableAllDevices: (options?: Partial<IFidoRequestOptions>) => Promise<AccountRpcResponse<string>>;
 }
 
 /**
@@ -108,17 +109,18 @@ export interface IFidoApi {
  * @param axiosConfig The optional axios configuration to use
  * @returns An object containing the fido api
  */
-export const useFidoApi = ({ sendRequest }: MfaApi): IFidoApi =>{
+export const useFidoApi = ({ sendRequest }: Pick<MfaApi, 'sendRequest'>): IFidoApi =>{
 
     const beginRegistration = async (options?: Partial<IFidoRequestOptions>) : Promise<IFidoServerOptions> => {
-        return sendRequest<IFidoServerOptions>({ 
+        const data = await sendRequest<IFidoServerOptions>({ 
              ...options,
             type: 'fido',
             action: 'prepare_device'
         });
+        return data.getResultOrThrow();
     }
 
-    const registerCredential = (reg: RegistrationResponseJSON, commonName: string, options?: Partial<IFidoRequestOptions>): Promise<string> => {
+    const registerCredential = (reg: RegistrationResponseJSON, commonName: string, options?: Partial<IFidoRequestOptions>): Promise<AccountRpcResponse<string>> => {
 
         const registration: FidoRegistration = {
             id: reg.id,
@@ -138,7 +140,7 @@ export const useFidoApi = ({ sendRequest }: MfaApi): IFidoApi =>{
         })
     }
 
-    const registerDefaultDevice = async (commonName: string, options?: Partial<IFidoRequestOptions>): Promise<string> => {
+    const registerDefaultDevice = async (commonName: string, options?: Partial<IFidoRequestOptions>): Promise<AccountRpcResponse<string>> => {
         //begin registration
         const serverOptions = await beginRegistration(options);
 
@@ -147,7 +149,7 @@ export const useFidoApi = ({ sendRequest }: MfaApi): IFidoApi =>{
         return await registerCredential(reg, commonName, options);
     }
 
-    const disableDevice = async (device: IFidoDevice, options?: Partial<IFidoRequestOptions>): Promise<string> => {
+    const disableDevice = async (device: IFidoDevice, options?: Partial<IFidoRequestOptions>): Promise<AccountRpcResponse<string>> => {
         return sendRequest<string>({
             ...options,
             type: 'fido',
@@ -156,7 +158,7 @@ export const useFidoApi = ({ sendRequest }: MfaApi): IFidoApi =>{
         })
     }
 
-    const disableAllDevices = async (options?: Partial<IFidoRequestOptions>): Promise<string> => {
+    const disableAllDevices = async (options?: Partial<IFidoRequestOptions>): Promise<AccountRpcResponse<string>> => {
         return sendRequest<string>({
             ...options,
             type: 'fido',

@@ -25,6 +25,7 @@ import type {
 } from "./login";
 
 import { type MfaApi } from "./config";
+import type { AccountRpcResponse } from "../account/types";
 
 export interface TotpRequestOptions {
     readonly password: string;
@@ -41,8 +42,8 @@ export interface TotpUpdateResponse {
 
 export interface ITotpApi {
     enable(options?: Partial<TotpRequestOptions>): Promise<TotpUpdateResponse>;
-    disable(options?: Partial<TotpRequestOptions>): Promise<string>;
-    verify(code: number, options?: Partial<TotpRequestOptions>): Promise<void>;
+    disable(options?: Partial<TotpRequestOptions>): Promise<AccountRpcResponse<string>>;
+    verify(code: number, options?: Partial<TotpRequestOptions>): Promise<AccountRpcResponse<void>>;
     updateSecret(options?: Partial<TotpRequestOptions>): Promise<TotpUpdateResponse>;
 }
 
@@ -52,17 +53,19 @@ export interface ITotpApi {
  * @param axiosConfig The optional axios configuration to use
  * @returns An object containing the fido api
  */
-export const useTotpApi = ({ sendRequest }: MfaApi): ITotpApi => {
+export const useTotpApi = ({ sendRequest }: Pick<MfaApi, 'sendRequest'>): ITotpApi => {
 
-    const enable = (options?: Partial<TotpRequestOptions>): Promise<TotpUpdateResponse> => {
-        return sendRequest<TotpUpdateResponse>({
+    const enable = async (options?: Partial<TotpRequestOptions>): Promise<TotpUpdateResponse> => {
+        const data = await sendRequest<TotpUpdateResponse>({
             ...options,
             type: 'totp',
             action: 'enable'
         });
+
+        return data.getResultOrThrow();
     }
 
-    const disable = (options?: Partial<TotpRequestOptions>): Promise<string> => {
+    const disable = (options?: Partial<TotpRequestOptions>): Promise<AccountRpcResponse<string>> => {
         return sendRequest<string>({
             ...options,
             type: 'totp',
@@ -70,7 +73,7 @@ export const useTotpApi = ({ sendRequest }: MfaApi): ITotpApi => {
         });
     }
 
-    const verify = (code: number, options?: Partial<TotpRequestOptions>): Promise<void> => {
+    const verify = (code: number, options?: Partial<TotpRequestOptions>): Promise<AccountRpcResponse<void>> => {
         return sendRequest<void>({
             ...options,
             type: 'totp',
@@ -79,12 +82,14 @@ export const useTotpApi = ({ sendRequest }: MfaApi): ITotpApi => {
         });
     }
 
-    const updateSecret = (options?: Partial<TotpRequestOptions>): Promise<TotpUpdateResponse> => {
-        return sendRequest<TotpUpdateResponse>({
+    const updateSecret = async (options?: Partial<TotpRequestOptions>): Promise<TotpUpdateResponse> => {
+        const data = await sendRequest<TotpUpdateResponse>({
             ...options,
             type: 'totp',
             action: 'update'
         });
+        
+        return data.getResultOrThrow();
     }
 
     return {

@@ -33,8 +33,8 @@
     ]
   },
 
-  //If mfa is defined, configures mfa enpoints and enables mfa logins
   "mfa": {
+    "enabled": true, //if false, mfa is disabled and all mfa rpc methods are disabled
     "nonce_size": 64,
     "upgrade_expires_secs": 180,
 

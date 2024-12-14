@@ -20,8 +20,8 @@
 import { merge } from "lodash-es";
 import { type StorageLikeAsync } from "@vueuse/core";
 import type { SessionConfig } from "../session";
-import type { AccountRpcApiConfig } from "../account";
-import type { AxiosRequestConfig } from "axios";
+import type { AccountRpcApiConfig } from "../account/types";
+import type { AxiosInstance, AxiosRequestConfig } from "axios";
 import { manualComputed, ReadonlyManualRef } from "../storage";
 
 export interface GlobalSessionConfig extends SessionConfig  {
@@ -29,6 +29,7 @@ export interface GlobalSessionConfig extends SessionConfig  {
 
 export interface GlobalAxiosConfig extends AxiosRequestConfig {
     tokenHeader: string;
+    configureAxios?: (axios: AxiosInstance) => AxiosInstance;
 }
 
 export interface GlobalApiConfig {
@@ -53,7 +54,6 @@ export type StorageKey = '_vn-session' | '_vn-keys';
  */
 const getDefaultAxiosConfig = (): GlobalAxiosConfig => {
     return {
-        baseURL: '/',
         timeout: 60 * 1000,
         withCredentials: false,
         tokenHeader: 'X-Web-Token'

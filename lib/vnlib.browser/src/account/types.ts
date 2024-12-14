@@ -21,6 +21,14 @@ import type { WebMessage } from "../types"
 import type { ITokenResponse } from "../session"
 
 /**
+ * Represents a user login credential
+ */
+export interface UserLoginCredential{
+    readonly userName: string;
+    readonly password: string;
+}
+
+/**
  * Represents the user/account server api
  */
 export interface AccountApi {
@@ -38,7 +46,7 @@ export interface AccountApi {
      * @param password The password to login with
      * @returns A promise that resolves to the login result
      */
-    login<T>(userName: string, password: string): Promise<ExtendedLoginResponse<T>>
+    login<T>(credential: UserLoginCredential): Promise<ExtendedLoginResponse<T>>
     /**
      * Gets the user profile from the server
      */
@@ -71,4 +79,30 @@ export interface ExtendedLoginResponse<T> extends WebMessage<T> {
 
 export interface UserProfile {
     readonly email: string | undefined;
+}
+
+export interface AccountRpcMethod {
+    readonly method: string;
+    readonly options: string[];
+}
+
+export interface AccountRpcResponse<T> extends WebMessage<T> {
+    readonly id: string;
+    readonly code: number;
+    readonly method?: string;
+}
+
+export interface AccountRpcRequest{
+    readonly id: string;
+    readonly method: string;
+    readonly args: object;
+}
+
+export interface AccountRpcApi<TMethod>{
+    getMethods(): Promise<AccountRpcMethod[]>;
+    exec<T = any>(method: AccountRpcMethod | TMethod, args?: object): Promise<AccountRpcResponse<T>>;
+}
+
+export interface AccountRpcApiConfig{
+    readonly endpointUrl: string;
 }

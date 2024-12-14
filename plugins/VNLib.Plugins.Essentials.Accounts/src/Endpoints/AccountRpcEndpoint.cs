@@ -160,7 +160,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             }
 
             //Ensure account security is enabled
-            if(response.Assert(entity.RequestedRoot.AccountSecurity != null, "Account security is not enabled"))
+            if (response.Assert(entity.RequestedRoot.AccountSecurity != null, "Account security is not enabled"))
             {
                 return Error(entity, HttpStatusCode.Forbidden, response);
             }
@@ -275,7 +275,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 .NotEmpty()
                 //must match version number
                 .Matches(@"^\d+\.\d+\.\d+$");
-            
+
             val.RuleFor(r => r.Id)
                 .NotEmpty()
                 .Matches(@"^[\w\-.]+$")

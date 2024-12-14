@@ -47,7 +47,7 @@ export * from './app-data'
 export { useAxios } from './axios'
 
 //User exports
-export type * from './account'
+export type * from './account/types'
 export { useAccount, useAccountRpc } from './account'
 
 //Export toast apis directly

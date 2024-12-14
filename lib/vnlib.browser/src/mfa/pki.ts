@@ -22,7 +22,7 @@ import { trim } from "lodash-es";
 import { useAccount, useAccountRpc } from "../account"
 import { debugLog } from "../util"
 import type { WebMessage } from '../types'
-import type { IUserLoginRequest } from "../account/types"
+import type { IUserLoginRequest, AccountRpcResponse } from "../account/types"
 import type { ITokenResponse } from "../session"
 import type { MfaApi } from "./config";
 
@@ -60,15 +60,15 @@ export interface OtpApi {
     * @param publicKey The user's public key to initialize or update the pki method
     * @param options Optional extended configuration for the pki method. Gets passed to the server
     */
-    addOrUpdate(publicKey: PkiPublicKey, options?: Partial<IOtpRequestOptions>): Promise<string>;
+    addOrUpdate(publicKey: PkiPublicKey, options?: Partial<IOtpRequestOptions>): Promise<AccountRpcResponse<string>>;
     /**
      * Disables the pki method for the current user and passes the given options to the server
      */
-    disable(options?: Partial<IOtpRequestOptions>): Promise<string>;
+    disable(options?: Partial<IOtpRequestOptions>): Promise<AccountRpcResponse<string>>;
     /**
      * Removes a single public key by it's id for the current user
      */
-    removeKey(key: PkiPublicKey, options?: Partial<IOtpRequestOptions>): Promise<string>;
+    removeKey(key: PkiPublicKey, options?: Partial<IOtpRequestOptions>): Promise<AccountRpcResponse<string>>;
 }
 
 interface PkiLoginRequest extends IUserLoginRequest{
@@ -118,9 +118,9 @@ export const useOtpAuth = (): PkiLogin =>{
  * @param pkiEndpoint The server pki endpoint relative to the base url
  * @returns An object containing the pki api
  */
-export const useOtpApi = ({ sendRequest }: MfaApi): OtpApi => {
+export const useOtpApi = ({ sendRequest }: Pick<MfaApi, 'sendRequest'>): OtpApi => {
 
-    const addOrUpdate = async (publicKey: PkiPublicKey, options?: Partial<IOtpRequestOptions>): Promise<string> => {
+    const addOrUpdate = async (publicKey: PkiPublicKey, options?: Partial<IOtpRequestOptions>): Promise<AccountRpcResponse<string>> => {
         return sendRequest<string>({
             ...options,
             type: 'pkotp',
@@ -129,7 +129,7 @@ export const useOtpApi = ({ sendRequest }: MfaApi): OtpApi => {
         })
     }
 
-    const disable = (options?: Partial<IOtpRequestOptions>): Promise<string> => {
+    const disable = (options?: Partial<IOtpRequestOptions>): Promise<AccountRpcResponse<string>> => {
         return sendRequest<string>({
             ...options,
             type: 'pkotp',
@@ -137,7 +137,7 @@ export const useOtpApi = ({ sendRequest }: MfaApi): OtpApi => {
         })
     }
 
-    const removeKey = (key: PkiPublicKey, options?: Partial<IOtpRequestOptions>): Promise<string> => {
+    const removeKey = (key: PkiPublicKey, options?: Partial<IOtpRequestOptions>): Promise<AccountRpcResponse<string>> => {
         return sendRequest<string>({
             ...options,
             type: 'pkotp',
