@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vaughn Nugent
+// Copyright (c) 2024 Vaughn Nugent
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -17,13 +17,30 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import { get } from "@vueuse/core";
-import { type MaybeRef } from "vue";
-import { useAxiosInternal } from "../axios"
+import { useAccountRpc } from '../account';
+import { includes } from 'lodash-es';
 import type { MfaMethod } from "./login"
-import type { WebMessage } from '../types'
+import { AccountRpcResponse } from '../account/types';
 
 export type UserArg = object;
+
+export interface MfaMethodResponse{
+    readonly type: MfaMethod;
+    readonly enabled: boolean;
+    readonly data: any;
+}
+
+export interface MfaGetResponse{
+    readonly supported_methods: MfaMethod[];
+    readonly methods: MfaMethodResponse[];
+}
+
+export interface MfaRequestJson extends Record<string, any>{
+    readonly type: MfaMethod;
+    readonly action: string;
+    readonly password?: string;
+}
+
 
 /**
  * Represents the server api for interacting with the user's 
@@ -31,59 +48,53 @@ export type UserArg = object;
  */
 export interface MfaApi{
     /**
-     * disables the given mfa method
-     * @param type The mfa method to disable
-     * @param password The user's password
+     * Determines if the mfa rpc api is available
+     * and enabled on the server
      */
-    disableMethod(type : MfaMethod, password: string) : Promise<WebMessage>;
-    
+    isEnabled(): Promise<boolean>;
     /**
-     * Initializes or updates the given mfa method configuration
-     * @param type The mfa method to initialize or update
-     * @param password The user's password
-     * @param userConfig Optional extended configuration for the mfa method. Gets passed to the server
+     * Gets the mfa data for the current user
      */
-    initOrUpdateMethod<T>(type: MfaMethod, password: string, userConfig?: UserArg) : Promise<WebMessage<T>>;
-
+    getData(): Promise<MfaGetResponse>;
     /**
-     * Refreshes the enabled mfa methods
+     * Sends an mfa rpc request to the server
+     * @param request The rpc request to send
+     * @returns A promise that resolves to the server response
      */
-    getMethods(): Promise<MfaMethod[]>;
+    sendRequest<T>(request: MfaRequestJson): Promise<AccountRpcResponse<T>>;
 }
+
+type MfaRpcMethod = 'mfa.rpc' | 'mfa.get';
 
 /**
  * Gets the api for interacting with the the user's mfa configuration
  * @param mfaEndpoint The server mfa endpoint relative to the base url
  * @returns An object containing the mfa api
  */
-export const useMfaConfig = (mfaEndpoint: MaybeRef<string>): MfaApi =>{
+export const useMfaApi = (): MfaApi =>{
 
-    const axios = useAxiosInternal(null)
+    const { getMethods, exec } = useAccountRpc<MfaRpcMethod>();
 
-    const getMethods = async () => {
-        //Get the mfa methods
-        const { data } = await axios.value.get<MfaMethod[]>(get(mfaEndpoint));
-        return data
+    const isEnabled = async (): Promise<boolean> => {
+        const methods = await getMethods();
+        return includes(methods.map(m => m.method), 'mfa.rpc');
     }
 
-    const disableMethod = async (type: MfaMethod, password: string) : Promise<WebMessage> => {
-        const { post } = get(axios);
-        //Disable the mfa using the post method
-        const { data } = await post<WebMessage>(get(mfaEndpoint), { type, password });
+    const getData = async (): Promise<MfaGetResponse> => {
+        const data = await exec<MfaGetResponse>('mfa.get');
+        return data.getResultOrThrow();
+    }
+
+    const sendRequest = async <T>(request: MfaRequestJson): Promise<AccountRpcResponse<T>> => {
+        const data = await exec<T>('mfa.rpc' , request);
+        data.getResultOrThrow();
         return data;
     }
-
-    const initOrUpdateMethod = async <T>(type: MfaMethod, password: string, userConfig?: UserArg) : Promise<WebMessage<T>> => {
-        const { put } = get(axios);
-        //enable or update the mfa using the put method
-        const { data } = await put<WebMessage<T>>(get(mfaEndpoint), { type, password, ...userConfig });
-        return data;
-    }
-
+  
     return {
-        disableMethod,
-        initOrUpdateMethod,
-        getMethods
+        isEnabled,
+        getData,
+        sendRequest
     }
 }
 

@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2023 Vaughn Nugent
+* Copyright (c) 2024 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
@@ -31,7 +31,7 @@ using VNLib.Plugins.Extensions.Validation;
 namespace VNLib.Plugins.Essentials.Accounts.Validators
 {
 
-    internal class LoginMessageValidation : ClientSecurityMessageValidator<LoginMessage>
+    internal sealed class LoginMessageValidation : ClientSecurityMessageValidator<LoginMessage>
     {
         public LoginMessageValidation() :base()
         {
@@ -42,6 +42,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Validators
             
             //Username/email address
             RuleFor(static t => t.UserName)
+                .NotEmpty()
                 .Length(min: 1, max: 64)
                 .WithName(overridePropertyName: "Email")
                 .EmailAddress()
@@ -49,32 +50,15 @@ namespace VNLib.Plugins.Essentials.Accounts.Validators
                 .IllegalCharacters()
                 .WithName(overridePropertyName: "Email");               
 
-            RuleFor(static t => t.LocalLanguage)
+            RuleFor(static t => t.LocalLanguage!)
                 .NotEmpty()
                 .IllegalCharacters()
-                .WithMessage(errorMessage: "Your language is not supported");   
+                .WithMessage(errorMessage: "Your language is not supported");
 
             RuleFor(static t => t.LocalTime.ToUniversalTime())
                 .Must(static time => time > DateTime.UtcNow.AddSeconds(-60) && time < DateTime.UtcNow.AddSeconds(60))
-                .WithMessage(errorMessage: "Please check your system clock");
-        }
-    }
-
-    internal class ClientSecurityMessageValidator<T> : AbstractValidator<T> where T: IClientSecInfo
-    {
-        public ClientSecurityMessageValidator()
-        {
-            RuleFor(static t => t.ClientId)
-              .NotEmpty()
-              .WithMessage(errorMessage: "Your browser is not sending required security information")
-              .Length(min: 10, max: 100)
-              .WithMessage(errorMessage: "Your browser is not sending required security information");
-
-            RuleFor(static t => t.PublicKey)
-             .NotEmpty()
-             .WithMessage(errorMessage: "Your browser is not sending required security information")
-             .Length(min: 50, max: 1000)
-             .WithMessage(errorMessage: "Your browser is not sending required security information");
+                .WithMessage(errorMessage: "Please check your system clock")
+                .WithName("localtime");
         }
     }
 }

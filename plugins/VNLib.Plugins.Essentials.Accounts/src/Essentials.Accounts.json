@@ -1,73 +1,99 @@
 {
   "debug": false,
 
-  //endpoints (any or all can be commented out if not needed)
+  "rpc": {
+    "path": "/account",
 
-  "login_endpoint": {
-    "path": "/account/login",
+    "methods": [
+      {
+        "type": "login",
+        "enabled": true
+      },
+      {
+        "type": "otp-auth",
+        "enabled": true
+      },
+      {
+        "type": "profile",
+        "enabled": true
+      },
+      {
+        "type": "password-reset",
+        "enabled": true
+      },
+      {
+        "type": "heartbeat",
+        "enabled": true
+      },
+      {
+        "type": "external",
+        "enabled": false,
+        "assembly_path": "external_rpc.dll"
+      }
+    ]
+  },
+
+  "mfa": {
+    "enabled": true, //if false, mfa is disabled and all mfa rpc methods are disabled
+    "nonce_size": 64,
+    "upgrade_expires_secs": 180,
+
+    "processors": [
+      {
+        "type": "totp",
+        "enabled": true
+      },
+      {
+        "type": "fido",
+        "enabled": true
+      },
+      {
+        "type": "pkotp",
+        "enabled": true
+      },
+      {
+        "type": "external",
+        "enabled": false,
+        "assembly_path": "external_mfa.dll"
+      }
+    ]
+  },
+
+  "login": {
+    "token_refresh_sec": 600, //10 minute refresh
     "max_login_attempts": 10, //10 failed attempts in 10 minutes
     "failed_attempt_timeout_sec": 600 //10 minutes
   },
 
-  "keepalive_endpoint": {
-    "path": "/account/keepalive",
-    //Regen token every 15 mins along with cookies
-    "token_refresh_sec": 600 //15 minutes
-  },
-
-  "profile_endpoint": {
-    "path": "/account/profile"
-  },
-
-  "password_endpoint": {
-    "path": "/account/reset"
-  },
-
-  "mfa_endpoint": {
-    "path": "/account/mfa"
-  },
-
-  "logout_endpoint": {
-    "path": "/account/logout"
-  },
-
-  "pki_auth_endpoint": {
-    "path": "/account/pki",
-    "jwt_time_dif_sec": 30,
-
+  "otp_auth": {
+    "jwt_time_diff_sec": 30,
     "max_login_attempts": 10,
     "failed_attempt_timeout_sec": 600,
-
-    //Configures the PATCH and DELETE methods to update the user's stored key when logged in
-    "enable_key_update": true
+    "strict_origin_check": false
   },
 
-  //If mfa is defined, configures mfa enpoints and enables mfa logins
-  "mfa": {
-    "upgrade_expires_secs": 180,
-    "nonce_size": 64,
+  //Defines totp specific arguments
+  "totp_settings": {
+    "digits": 6,
+    "issuer": "vaughnnugent.com",
+    "period_secs": 30,
+    "algorithm": "sha1",
+    "secret_size": 32,
+    "window_size": 2
+  },
 
-    //Defines totp specific arguments
-    "totp": {
-      "digits": 6,
-      "issuer": "vaughnnugent.com",
-      "period_secs": 30,
-      "algorithm": "sha1",
-      "secret_size": 32,
-      "window_size": 2
-    },
+  "fido_settings": {
+    "challenge_size": 32,
+    "timeout": 60000,
+    "attestation_type": "none",
+    "site_name": "localhost",
+    "strict_origin": false,       //Require the origin to match the site name
+    "allow_disable_all": true,    //Allow user to disable all authenticators with a single rpc call
 
-    "fido": {
-      "challenge_size": 64,
-      "attestation": "none",
-      "timeout": 60000,
-      "site_name": "vaughnnugent.com",
-
-      "authenticatorSelection": {
-        "authenticatorAttachment": "cross-platform",
-        "requireResidentKey": false,
-        "userVerification": "required"
-      }
+    "authenticator_selection": {
+      "authenticatorAttachment": "cross-platform",
+      "requireResidentKey": false,
+      "userVerification": "preferred"
     }
   },
 
@@ -83,15 +109,16 @@
     "status_cookie_name": "li",
 
     "otp_header_name": "X-Web-Token",
-    "otp_time_diff_sec": 30,
-    "otp_key_size": 64,
+    "otp_time_diff_sec": 30,    //Time difference allowed between server and client
+    "otp_key_size": 64,         //Size of the OTP security key (bytes)
 
     "pubkey_cookie_name": "client-id",
     "pubkey_signing_key_size": 32,
 
-    "strict_origin": false,
-    "strict_path": false,
+    "strict_origin": false,     //requires the client's OTP signature origin to match the server address
+    "strict_path": false,       //requires the client's OTP signature path to match the server path
 
+    //An optional list of allowed origins for the client's OTP signature
     //"allowed_origins": [ ]
   }
 }

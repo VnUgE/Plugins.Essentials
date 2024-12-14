@@ -27,7 +27,6 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Collections.Generic;
 
 using RestSharp;
 
@@ -56,7 +55,7 @@ namespace VNLib.Plugins.Essentials.Auth.Auth0.Endpoints
 
         public LoginEndpoint(PluginBase plugin, IConfigScope config) : base(plugin, config)
         {
-            string keyUrl = config["key_url"].GetString() ?? throw new KeyNotFoundException("Missing Auth0 'key_url' from config");
+            string keyUrl = config.GetRequiredProperty("key_url", p => p.GetString()!);
 
             //Define the key endpoint
             SiteAdapter.DefineSingleEndpoint()
@@ -88,7 +87,7 @@ namespace VNLib.Plugins.Essentials.Auth.Auth0.Endpoints
                 //Create a new jwk from each key element in the response
                 ReadOnlyJsonWebKey[] keys = doc.RootElement.GetProperty("keys")
                                             .EnumerateArray()
-                                            .Select(static k => new ReadOnlyJsonWebKey(k))
+                                            .Select(static k => new ReadOnlyJsonWebKey(in k))
                                             .ToArray();
 
                 Log.Debug("Found {count} Auth0 signing keys", keys.Length);

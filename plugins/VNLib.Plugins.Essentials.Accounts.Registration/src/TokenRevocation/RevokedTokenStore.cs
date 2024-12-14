@@ -78,7 +78,8 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.TokenRevocation
             await using RegistrationContext context = new (options.Value);
 
             //Select any that match tokens
-            RevokedToken[] expired = await context.RevokedRegistrationTokens.Where(t => t.Created < expiredBefore)
+            RevokedToken[] expired = await context.RevokedRegistrationTokens
+                .Where(t => t.Created < expiredBefore)
                 .Select(static t => t)
                 .ToArrayAsync(cancellation);
 

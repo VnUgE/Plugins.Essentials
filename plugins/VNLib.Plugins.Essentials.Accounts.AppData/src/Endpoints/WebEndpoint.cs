@@ -22,81 +22,57 @@
 * along with this program.  If not, see https://www.gnu.org/licenses/.
 */
 
+using System;
 using System.Net;
 using System.Linq;
-using System.Collections.Generic;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 
 using VNLib.Net.Http;
-using VNLib.Utils.Logging;
 using VNLib.Hashing.Checksums;
 using VNLib.Plugins.Essentials.Endpoints;
 using VNLib.Plugins.Essentials.Extensions;
-using VNLib.Plugins.Extensions.VNCache;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Validation;
+using VNLib.Plugins.Extensions.Loading.Routing;
+using VNLib.Plugins.Extensions.Loading.Routing.Mvc;
 
 using VNLib.Plugins.Essentials.Accounts.AppData.Model;
 using VNLib.Plugins.Essentials.Accounts.AppData.Stores;
+using static VNLib.Plugins.Essentials.Endpoints.ResourceEndpointBase;
+using static VNLib.Plugins.Essentials.Accounts.AppData.Model.HttpExtensions;
 
 namespace VNLib.Plugins.Essentials.Accounts.AppData.Endpoints
 {
+
+    [EndpointLogName("Endpoint")]
     [ConfigurationName("web_endpoint")]
-    internal sealed class WebEndpoint : ProtectedWebEndpoint
+    internal sealed class WebEndpoint(PluginBase plugin, IConfigScope config) : IHttpController
     {
-        const int DefaultMaxDataSize = 8 * 1024;
+        private const int DefaultMaxDataSize = 8 * 1024;
 
-        private readonly IAppDataStore _store;
-        private readonly int MaxDataSize;
-        private readonly string[] AllowedScopes;
+        private readonly StorageManager _store = plugin.GetOrCreateSingleton<StorageManager>();
+        private readonly int MaxDataSize = config.GetValueOrDefault("max_data_size", DefaultMaxDataSize);
+        private readonly string[] AllowedScopes = config.GetRequiredProperty<string[]>("allowed_scopes");
 
-        public WebEndpoint(PluginBase plugin, IConfigScope config)
-        {
-            string path = config.GetRequiredProperty("path", p => p.GetString())!;
-            InitPathAndLog(path, plugin.Log.CreateScope("Endpoint"));
+        ///<inheritdoc/>
+        public ProtectionSettings GetProtectionSettings() => default;
 
-            MaxDataSize = config.GetValueOrDefault("max_data_size", p => p.GetInt32(), DefaultMaxDataSize);
-            AllowedScopes = config.GetRequiredProperty("allowed_scopes", p => p.EnumerateArray().Select(p => p.GetString()!)).ToArray();
-
-            bool useCache = false;
-
-            //Cache loading is optional
-            if (plugin.HasConfigForType<CacheStore>())
-            {
-                //See if caching is enabled
-                IConfigScope cacheConfig = plugin.GetConfigForType<CacheStore>();
-                useCache = cacheConfig.GetValueOrDefault("enabled", e => e.GetBoolean(), false);
-
-                if (useCache && plugin.GetDefaultGlobalCache() is null)
-                {
-                    plugin.Log.Error("Cache was enabled but no caching library was loaded. Continuing without cache");
-                    useCache = false;
-                }
-            }
-
-            _store = LoadStore(plugin, useCache);
-        }
-
-        private static IAppDataStore LoadStore(PluginBase plugin, bool withCache)
-        {
-            return withCache 
-                ? plugin.GetOrCreateSingleton<CacheStore>() 
-                : plugin.GetOrCreateSingleton<PersistentStorageManager>();
-        }
-
-        protected async override ValueTask<VfReturnType> GetAsync(HttpEntity entity)
+        [HttpStaticRoute("{{path}}", HttpMethod.GET)]
+        [HttpRouteProtection(AuthorzationCheckLevel.Critical)]
+        public async ValueTask<VfReturnType> GetDataAsync(HttpEntity entity)
         {
             WebMessage webm = new();
 
-            string? scopeId = entity.QueryArgs.GetValueOrDefault("scope");
-            bool noCache = entity.QueryArgs.ContainsKey("no_cache");
+            string? scopeId = GetScopeId(entity);
+            bool noCache = NoCacheQuery(entity);
 
-            if (webm.Assert(scopeId != null, "Missing scope"))
+            if (webm.AssertError(scopeId != null, "Missing scope"))
             {
                 return VirtualClose(entity, webm, HttpStatusCode.BadRequest);
             }
 
-            if (webm.Assert(AllowedScopes.Contains(scopeId), "Invalid scope"))
+            if (webm.AssertError(IsScopeAllowed(scopeId), "Invalid scope"))
             {
                 return VirtualClose(entity, webm, HttpStatusCode.BadRequest);
             }
@@ -104,65 +80,67 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Endpoints
             //If the connection has the no-cache header set, also bypass the cache
             noCache |= entity.Server.NoCache();
 
-            //optionally bypass cache if the user requests it
-            RecordOpFlags flags = noCache ? RecordOpFlags.NoCache : RecordOpFlags.None;
-
-            UserRecordData? record = await _store.GetRecordAsync(entity.Session.UserID, scopeId, flags, entity.EventCancellation);
-
-            if (record is null)
-            {
-                return VirtualClose(entity, webm, HttpStatusCode.NotFound);
-            }
+            UserRecordData? record = await _store.GetRecordAsync(
+                entity.Session.UserID,
+                recordKey: scopeId,
+                flags: noCache ? RecordOpFlags.NoCache : RecordOpFlags.None,   //optionally bypass cache if the user requests it
+                entity.EventCancellation
+            );
 
             //return the raw data with the checksum header
-            entity.SetRecordResponse(record, HttpStatusCode.OK);
-            return VfReturnType.VirtualSkip;
+
+            return record is null
+                ? VirtualClose(entity, webm, HttpStatusCode.NotFound)
+                : CloseWithRecord(entity, record, HttpStatusCode.OK);
         }
 
-        protected override async ValueTask<VfReturnType> PutAsync(HttpEntity entity)
+
+        [HttpStaticRoute("{{path}}", HttpMethod.PUT)]
+        [HttpRouteProtection(AuthorzationCheckLevel.Critical)]
+        public async ValueTask<VfReturnType> UpdateDataAsync(HttpEntity entity)
         {
             WebMessage webm = new();
-            string? scopeId = entity.QueryArgs.GetValueOrDefault("scope");
-            bool flush = entity.QueryArgs.ContainsKey("flush");
+            string? scopeId = GetScopeId(entity);
+            bool flush = NoCacheQuery(entity);
 
-            if (webm.Assert(entity.Files.Count == 1, "Invalid file count"))
+            if (webm.AssertError(entity.Files.Count == 1, ["Invalid file count"]))
             {
                 return VirtualClose(entity, webm, HttpStatusCode.BadRequest);
             }
 
-            if (webm.Assert(scopeId != null, "Missing scope"))
+            if (webm.AssertError(scopeId != null, ["Missing scope"]))
             {
                 return VirtualClose(entity, webm, HttpStatusCode.BadRequest);
             }
 
-            if (webm.Assert(AllowedScopes.Contains(scopeId), "Invalid scope"))
+            if (webm.AssertError(IsScopeAllowed(scopeId), ["Invalid scope"]))
             {
                 return VirtualClose(entity, webm, HttpStatusCode.BadRequest);
             }
 
             FileUpload data = entity.Files[0];
 
-            if (webm.Assert(data.Length <= MaxDataSize, "Data too large"))
+            if (webm.AssertError(data.Length <= MaxDataSize, ["Data too large"]))
             {
                 return VirtualClose(entity, webm, HttpStatusCode.RequestEntityTooLarge);
             }
 
-            byte[] recordData = new byte[data.Length];
+            byte[] recordData = GC.AllocateUninitializedArray<byte>((int)data.Length, pinned: false);
             int read = await data.FileData.ReadAsync(recordData, entity.EventCancellation);
 
-            if (webm.Assert(read == recordData.Length, "Failed to read data"))
+            if (webm.AssertError(read == recordData.Length, ["Failed to read data"]))
             {
                 return VirtualClose(entity, webm, HttpStatusCode.InternalServerError);
             }
 
             //Compute checksum on sent data and compare to the header if it exists
             ulong checksum = FNV1a.Compute64(recordData);
-            ulong? userChecksum = entity.Server.GetUserDataChecksum();
+            ulong? userChecksum = GetUserDataChecksum(entity.Server);
 
             if (userChecksum.HasValue)
             {
                 //compare the checksums
-                if (webm.Assert(checksum == userChecksum.Value, "Checksum mismatch"))
+                if (webm.AssertError(checksum == userChecksum.Value, ["Checksum mismatch"]))
                 {
                     return VirtualClose(entity, webm, HttpStatusCode.UnprocessableEntity);
                 }
@@ -176,28 +154,54 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Endpoints
             RecordOpFlags flags = flush ? RecordOpFlags.WriteThrough : RecordOpFlags.None;
 
             //Write the record to the store
-            await _store.SetRecordAsync(entity.Session.UserID, scopeId, recordData, checksum, flags, entity.EventCancellation);
+            await _store.SetRecordAsync(
+                userId: entity.Session.UserID,
+                recordKey: scopeId,
+                recordData,
+                checksum,
+                flags,
+                entity.EventCancellation
+            );
+
             return VirtualClose(entity, HttpStatusCode.Accepted);
         }
 
-        protected override async ValueTask<VfReturnType> DeleteAsync(HttpEntity entity)
+        [HttpStaticRoute("{{path}}", HttpMethod.DELETE)]
+        [HttpRouteProtection(AuthorzationCheckLevel.Critical)]
+        public async ValueTask<VfReturnType> DeleteDataAsync(HttpEntity entity)
         {
             WebMessage webm = new();
-            string? scopeId = entity.QueryArgs.GetValueOrDefault("scope");
+            string? scopeId = GetScopeId(entity);
 
-            if (webm.Assert(scopeId != null, "Missing scope"))
+            if (webm.AssertError(scopeId != null, ["Missing scope"]))
             {
                 return VirtualClose(entity, webm, HttpStatusCode.BadRequest);
             }
 
-            if (webm.Assert(AllowedScopes.Contains(scopeId), "Invalid scope"))
+            if (webm.AssertError(IsScopeAllowed(scopeId), ["Invalid scope"]))
             {
                 return VirtualClose(entity, webm, HttpStatusCode.BadRequest);
             }
 
             //Write the record to the store
-            await _store.DeleteRecordAsync(entity.Session.UserID, scopeId, entity.EventCancellation);
+            await _store.DeleteRecordAsync(
+                userId: entity.Session.UserID,
+                recordKey: scopeId,
+                entity.EventCancellation
+            );
+
             return VirtualClose(entity, HttpStatusCode.Accepted);
         }
+
+        private bool IsScopeAllowed(string scopeId)
+        {
+            return AllowedScopes.Contains(scopeId, StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static string? GetScopeId(HttpEntity entity)
+            => entity.QueryArgs.GetValueOrDefault("scope");
+
+        private static bool NoCacheQuery(HttpEntity entity)
+            => entity.QueryArgs.ContainsKey("no_cache");
     }
 }

@@ -216,7 +216,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                 clientToken = Convert.ToBase64String(outputBuffer[..(int)bytesEncrypted]);
 
                 //Encode base64 url safe
-                serverToken = VnEncoding.ToBase64UrlSafeString(secretBuffer, false);
+                serverToken = VnEncoding.Base64UrlEncode(secretBuffer, includePadding: false);
             }
             finally
             {

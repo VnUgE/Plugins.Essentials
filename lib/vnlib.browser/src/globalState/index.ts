@@ -18,42 +18,35 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import { merge } from "lodash-es";
-import { ref, type ToRefs, type Ref } from "vue";
-import { toRefs, type StorageLike, set } from "@vueuse/core";
-import { toReactive, createStorageRef } from "./storage";
+import { type StorageLikeAsync } from "@vueuse/core";
 import type { SessionConfig } from "../session";
-import type { UserConfig } from "../user";
-import type { AxiosRequestConfig } from "axios";
+import type { AccountRpcApiConfig } from "../account/types";
+import type { AxiosInstance, AxiosRequestConfig } from "axios";
+import { manualComputed, ReadonlyManualRef } from "../storage";
 
 export interface GlobalSessionConfig extends SessionConfig  {
-    readonly cookiesEnabled: boolean;
-    readonly loginCookieName: string;
 }
 
 export interface GlobalAxiosConfig extends AxiosRequestConfig {
     tokenHeader: string;
+    configureAxios?: (axios: AxiosInstance) => AxiosInstance;
 }
 
 export interface GlobalApiConfig {
     readonly session: GlobalSessionConfig;
     readonly axios: GlobalAxiosConfig;
-    readonly user: UserConfig;
-    readonly storage: StorageLike;
+    readonly account: AccountRpcApiConfig;
+    readonly storage: StorageLikeAsync;
 }
 
 export interface GlobalConfigUpdate {
     readonly session?: Partial<GlobalSessionConfig>;
     readonly axios?: Partial<GlobalAxiosConfig>;
-    readonly user?: Partial<UserConfig>;
-    readonly storage?: StorageLike;
+    readonly account?: Partial<AccountRpcApiConfig>;
+    readonly storage?: StorageLikeAsync;
 } 
 
-export enum StorageKey {
-    Session = '_vn-session',
-    Keys = "_vn-keys",
-    User = '_vn-user'
-}
-
+export type StorageKey = '_vn-session' | '_vn-keys';
 
 /**
  * Gets the default/fallback axios configuration
@@ -61,7 +54,6 @@ export enum StorageKey {
  */
 const getDefaultAxiosConfig = (): GlobalAxiosConfig => {
     return {
-        baseURL: '/',
         timeout: 60 * 1000,
         withCredentials: false,
         tokenHeader: 'X-Web-Token'
@@ -93,32 +85,22 @@ const getDefaultSessionConfig = (): GlobalSessionConfig & SessionConfig => {
  * Get the default/fallback user configuration
  * @returns The default user configuration
  */
-const getDefaultUserConfig = (): UserConfig => {
+const getDefaultUserConfig = (): AccountRpcApiConfig => {
     return {
-        accountBasePath: '/account',
+        endpointUrl: '/account'
     }
 };
 
-const _globalState = ref<GlobalApiConfig>({
+const _globalState: GlobalApiConfig = {
     axios: getDefaultAxiosConfig(),
     session: getDefaultSessionConfig(),
-    user: getDefaultUserConfig(),
+    account: getDefaultUserConfig(),
     storage: localStorage
-});
+};
 
-//Get refs to the state
-const _refs = toRefs(_globalState);
-
-//Store reactive storage
-const rStorage = toReactive(_refs.storage);
-
-export const getGlobalStateInternal = (): Readonly<ToRefs<GlobalApiConfig>> => _refs
-
-/**
- * Gets a reactive storage slot that will work from the 
- * global configuration storage
- */
-export const createStorageSlot = <T>(key: StorageKey, defaultValue: T): Ref<T> => createStorageRef(rStorage, key, defaultValue);
+export const getGlobalStateInternal = (): ReadonlyManualRef<GlobalApiConfig> => {
+    return manualComputed(() =>_globalState);
+}
 
 /**
  * Sets the global api configuration
@@ -126,14 +108,14 @@ export const createStorageSlot = <T>(key: StorageKey, defaultValue: T): Ref<T> =
  */
 export const setApiConfigInternal = (config: GlobalConfigUpdate): void => {
 
-    //merge with defaults
+    //merge with current configuration
     const newConfig = {
-        axios: merge(getDefaultAxiosConfig(), config.axios),
-        session: merge(getDefaultSessionConfig(), config.session),
-        user: merge(getDefaultUserConfig(), config.user),
+        axios: merge(_globalState.axios, config.axios),
+        session: merge(_globalState.session, config.session),
+        user: merge(_globalState.account, config.account),
         storage: config.storage
     }
 
     //Update the global state
-    set(_globalState, newConfig)
+    merge(_globalState, newConfig)
 }

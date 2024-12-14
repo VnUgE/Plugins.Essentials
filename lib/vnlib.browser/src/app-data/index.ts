@@ -22,22 +22,37 @@ import { MaybeRef, get, type StorageLikeAsync } from '@vueuse/core'
 import { useAxios } from '../axios'
 import { defaultTo, first } from 'lodash-es'
 import type { Axios } from 'axios'
+import { WebMessage } from '../types'
+
+export interface AppDataGetOptions{
+    /**
+     * A value indicating if the request should not use the cache
+     */
+    readonly noCache?: boolean
+}
+
+export interface AppDataSetOptions{
+    /**
+     * A value indicating if the request should wait for the data to be written to the store
+     */
+    readonly wait?: boolean
+}
 
 export interface UserAppDataApi {
     /**
      * Gets data from the app-data server
      * @param scope The scope of the data to get from the store
-     * @param noCache A value indicating if the cache should be bypassed
+     * @param options The options to use when getting the data
      * @returns A promise that resolves to the data or undefined if the data does not exist
      */
-    get<T>(scope: string, noCache: boolean): Promise<T | undefined>
+    get<T>(scope: string, options?: AppDataGetOptions): Promise<T | undefined>
     /**
      * Sets arbitrary data in the app-data server
      * @param scope The scope of the data to set in the store
      * @param data The data to set in the store
-     * @param wait A value indicating if the request should wait for the data to be written to the store
+     * @param options The options to use when setting the data 
      */
-    set<T>(scope: string, data: T, wait: boolean): Promise<void>
+    set<T>(scope: string, data: T, options?: AppDataSetOptions): Promise<void>
     /**
      * Completely removes data from the app-data server
      * @param scope The scope of the data to remove from the store
@@ -48,17 +63,17 @@ export interface UserAppDataApi {
 export interface ScopedUserAppDataApi {
     /**
      * Gets data from the app-data server for the configured scope
-     * @param noCache A value indicating if the cache should be bypassed
+     * @param options The options to use when getting the data 
      * @returns A promise that resolves to the data or undefined if the data does not exist
      */
-    get<T>(noCache: boolean): Promise<T | undefined>
+    get<T>(options: AppDataGetOptions): Promise<T | undefined>
     /**
      * Sets arbitrary data in the app-data server for the configured scope
      * @param data The data to set in the store
-     * @param wait A value indicating if the request should wait for the data to be written to the store
+     * @param options The options to use when setting the data
      * @returns A promise that resolves when the data has been written to the store
      */
-    set<T>(data: T, wait: boolean): Promise<void>
+    set<T>(data: T, options: AppDataSetOptions): Promise<void>
     /**
      * Completely removes data from the app-data server for the configured scope
      * @returns A promise that resolves when the data has been removed from the store
@@ -66,7 +81,12 @@ export interface ScopedUserAppDataApi {
     remove(): Promise<void>
 }
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+
+interface GetUrl{
+    readonly noCache: boolean
+    readonly flush: boolean
+    readonly scope: string
+}
 
 /**
  * Creates an AppData API for the given endpoint
@@ -78,32 +98,76 @@ export const useAppDataApi = (endpoint: MaybeRef<string>, axios?: Axios): UserAp
 
     axios = defaultTo(axios, useAxios(null));
 
-    const getUrl = (scope: string, noCache: boolean, flush: boolean) => {
+    const getUrl = ({ flush, noCache, scope }: GetUrl) => {
         const fl = flush ? '&flush=true' : ''
-        const nc = noCache ? '&noCache=true' : ''
+        const nc = noCache ? '&no_cache=true' : ''
         return `${get(endpoint)}?scope=${scope}${nc}${fl}`
     }
 
     return {
-        get: async <T>(scope: string, noCache: boolean): Promise<T | undefined> => {
-            try {
-                const { data } = await axios!.get<T>(getUrl(scope, noCache, false))
-                return data;
-            }
-            catch (err: any) {
-                //Handle 404 errors as null
-                if ('response' in err && err.response.status === 404) {
+        get: async <T>(scope: string, { noCache }: AppDataGetOptions = {}): Promise<T | undefined> => {
+            const url = getUrl({
+                scope,
+                noCache: (noCache || false), 
+                flush: false 
+            })
+
+            //Handle status code errors manually
+            const response = await axios!.get<T>(url, {
+                validateStatus: (status) => status >= 200 && status < 500
+            })
+
+            switch (response.status) {
+                case 200:
+                    break;
+                case 404:
                     return undefined;
-                }
+                default:
+                    (response.data as WebMessage)?.getResultOrThrow();
+                    throw { response };
             }
+
+            if('getResultOrThrow' in (response.data as any)) {
+                let d = { ...response.data } as any;
+                delete d.getResultOrThrow;
+                return d;
+            }
+
+            return response.data;
         },
 
-        set: async <T>(scope: string, data: T, wait: boolean) => {
-            return axios!.put(getUrl(scope, false, wait), data)
+        set: async <T>(scope: string, data: T, { wait }: AppDataSetOptions = {}) => {
+           
+            const url = getUrl({ 
+                scope,
+                noCache: false,
+                flush: (wait || false)
+            })
+           
+            //Handle status code errors manually
+            const { status, data: responseData } = await axios!.put<WebMessage>(url, data)
+            switch (status) {
+                case 200:
+                case 202:
+                    break;
+                default:
+                   (responseData as WebMessage)?.getResultOrThrow();
+                   break;
+            }
         },
        
         remove: async (scope: string) => {
-            return axios!.delete(getUrl(scope, false, false))
+             //Handle status code errors manually
+            const response = await axios.delete<WebMessage>(getUrl({ scope, noCache: false, flush: false }))
+
+            switch (response.status) {
+                case 200:
+                case 202:
+                    break;
+                default:
+                    (response.data as WebMessage)?.getResultOrThrow();
+                    throw { response };
+            }
         }
     }
 }
@@ -118,8 +182,8 @@ export const useScopedAppDataApi = (endpoint: MaybeRef<string>, scope: MaybeRef<
     const api = useAppDataApi(endpoint, axios);
 
     return {
-        get: <T>(noCache: boolean) => api.get<T>(get(scope), noCache),
-        set: <T>(data: T, wait: boolean) => api.set(get(scope), data, wait),
+        get: <T>(options: AppDataGetOptions) => api.get<T>(get(scope), options),
+        set: <T>(data: T, options: AppDataSetOptions) => api.set(get(scope), data, options),
         remove: () => api.remove(get(scope))
     }
 }
@@ -132,13 +196,13 @@ export const useScopedAppDataApi = (endpoint: MaybeRef<string>, scope: MaybeRef<
 export const useAppDataAsyncStorage = (api: UserAppDataApi): StorageLikeAsync => {
     return{
         getItem: async (key: string) => {
-            const result = await api.get<string[]>(key, false)
+            const result = await api.get<string[]>(key)
             return first(result) || null
         },
         setItem: (key: string, value: string) => {
             //NOTE: An array is used to force axios to serialize the
             //value and send the data to the server a file
-            return api.set(key, [value], false)
+            return api.set(key, [value])
         },
         removeItem: async (key: string) => {
             return api.remove(key)

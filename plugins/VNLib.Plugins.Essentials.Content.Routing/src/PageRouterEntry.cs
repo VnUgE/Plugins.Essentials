@@ -56,6 +56,6 @@ namespace VNLib.Plugins.Essentials.Content.Routing
                 Router?.ResetRoutes();
                 Log.Information("Routing table reset");
             }
-        }       
+        }
     }
 }

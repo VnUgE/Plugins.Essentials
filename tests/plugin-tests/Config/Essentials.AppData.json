@@ -1,0 +1,23 @@
+{
+  "debug": true,
+
+  "web_endpoint": {
+    "path": "/app-data",
+
+    //Allwowed client scopes. If empty will deny all requests
+    "allowed_scopes": [ ]
+  },
+
+  //required storage configuration
+  "storage": {
+    "type": "sql", //sql | file
+
+	//Cache is enabled in the test environment (memory only)
+    "cache": {
+      "enabled": true,            //enables global cache if the server loaded a cache plugin
+      "prefix": "appdata",        //a static security prefix
+      "ttl": 3600,                //cache time to live in seconds
+      "force_write_back": false   //force write back to storage
+    }
+  }
+}

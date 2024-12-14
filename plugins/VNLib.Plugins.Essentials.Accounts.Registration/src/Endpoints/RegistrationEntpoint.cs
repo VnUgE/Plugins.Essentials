@@ -49,6 +49,7 @@ using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Sql;
 using VNLib.Plugins.Extensions.Loading.Events;
 using VNLib.Plugins.Extensions.Loading.Users;
+using VNLib.Plugins.Extensions.Loading.Routing;
 using VNLib.Plugins.Extensions.Validation;
 using VNLib.Plugins.Essentials.Accounts.Registration.TokenRevocation;
 using static VNLib.Plugins.Essentials.Accounts.AccountUtil;
@@ -56,8 +57,14 @@ using static VNLib.Plugins.Essentials.Accounts.AccountUtil;
 namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
 {
 
+    /// <summary>
+    /// Creates back-end functionality for a "registration" or "sign-up" page that integrates with the <see cref="AccountUtil"/> plugin
+    /// </summary>
+    /// <param name="Path">The path identifier</param>
+    /// <exception cref="ArgumentException"></exception>
+    [EndpointPath("{{path}}")]
     [ConfigurationName("registration")]
-    internal sealed class RegistrationEntpoint : UnprotectedWebEndpoint
+    internal sealed class RegistrationEntpoint(PluginBase plugin, IConfigScope config) : UnprotectedWebEndpoint
     {
         /// <summary>
         /// Generates a CNG random buffer to use as a nonce
@@ -69,33 +76,14 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
 
         private static readonly IValidator<RegCompletionRequest> RegCompletionValidator = RegCompletionRequest.GetValidator();
 
-        private readonly IUserManager Users;
-        private readonly RevokedTokenStore RevokedTokens;
-        private readonly TransactionalEmailConfig Emails;
-        private readonly IAsyncLazy<ReadOnlyJsonWebKey> RegSignatureKey;
-        private readonly TimeSpan RegExpiresSec;
 
-        /// <summary>
-        /// Creates back-end functionality for a "registration" or "sign-up" page that integrates with the <see cref="AccountUtil"/> plugin
-        /// </summary>
-        /// <param name="Path">The path identifier</param>
-        /// <exception cref="ArgumentException"></exception>
-        public RegistrationEntpoint(PluginBase plugin, IConfigScope config)
-        {
-            string? path = config["path"].GetString();
+        private readonly TimeSpan RegExpiresSec = config.GetRequiredProperty("reg_expires_sec", p => p.GetTimeSpan(TimeParseType.Seconds));
+        private readonly IUserManager Users = plugin.GetOrCreateSingleton<UserManager>();
+        private readonly RevokedTokenStore RevokedTokens = new(plugin.GetContextOptionsAsync());
+        private readonly TransactionalEmailConfig Emails = plugin.GetOrCreateSingleton<TEmailConfig>();
 
-            InitPathAndLog(path, plugin.Log);
-
-            RegExpiresSec = config["reg_expires_sec"].GetTimeSpan(TimeParseType.Seconds);
-           
-            Users = plugin.GetOrCreateSingleton<UserManager>();           
-            Emails = plugin.GetOrCreateSingleton<TEmailConfig>();
-            RevokedTokens = new(plugin.GetContextOptionsAsync());
-
-            //Begin the async op to get the signature key from the vault
-            RegSignatureKey = plugin.GetSecretAsync("reg_sig_key")
+        private readonly IAsyncLazy<ReadOnlyJsonWebKey> RegSignatureKey = plugin.GetSecretAsync("reg_sig_key")
                                 .ToLazy(static sr => sr.GetJsonWebKey());
-        }
 
         //Schedule cleanup interval
         [AsyncInterval(Minutes = 5)]
@@ -108,17 +96,17 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
 
         protected override async ValueTask<VfReturnType> PostAsync(HttpEntity entity)
         {
-            ValErrWebMessage webm = new();
+            WebMessage webm = new();
 
             //Get the json request data from client
             using RegCompletionRequest? request = await entity.GetJsonFromFileAsync<RegCompletionRequest>();
 
-            if(webm.Assert(request != null, "No request data present"))
+            if (webm.Assert(request != null, "No request data present"))
             {
                 return VirtualClose(entity, webm, HttpStatusCode.BadRequest);
             }
 
-            if(!RegCompletionValidator.Validate(request, webm))
+            if (!RegCompletionValidator.Validate(request, webm))
             {
                 return VirtualClose(entity, webm, HttpStatusCode.UnprocessableEntity);
             }
@@ -172,11 +160,16 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
                 };
 
                 //Create the new user with random user-id
-                using IUser user = await Users.CreateUserAsync(creation, null, entity.EventCancellation);
-                
+                using IUser user = await Users.CreateUserAsync(
+                    creation,
+                    userId: null,
+                    hashProvider: Users.GetHashProvider(),
+                    entity.EventCancellation
+                );
+
                 //set local account origin
                 user.SetAccountOrigin(LOCAL_ACCOUNT_ORIGIN);
-                
+
                 //set user verification 
                 await user.ReleaseAsync();
 
@@ -192,18 +185,18 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
             catch (UserExistsException)
             {
             }
-            catch(UserCreationFailedException)
+            catch (UserCreationFailedException)
             {
             }
 
             webm.Result = FAILED_AUTH_ERR;
             return VirtualOk(entity, webm);
-        } 
+        }
 
         protected override async ValueTask<VfReturnType> PutAsync(HttpEntity entity)
         {
-            ValErrWebMessage webm = new();
-            
+            WebMessage webm = new();
+
             //Get the request
             RegRequestMessage? request = await entity.GetJsonFromFileAsync<RegRequestMessage>();
             if (webm.Assert(request != null, "Request is invalid"))
@@ -230,7 +223,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
                     goto Exit;
                 }
             }
-          
+
             //Get exact timestamp
             DateTimeOffset timeStamp = entity.RequestedTimeUtc;
 
@@ -272,7 +265,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
             entity.CloseResponse(webm);
             return VfReturnType.VirtualSkip;
         }
-      
+
 
         private async Task SendRegEmailAsync(string emailAddress, string url, DateTimeOffset current)
         {
@@ -287,10 +280,10 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
                     //Set the security code variable string
                     .AddVariable("reg_url", url)
                     .AddVariable("date", current.ToString("f"));
-              
+
                 //Send the email
                 TransactionResult result = await Emails.SendEmailAsync(emailTemplate);
-                
+
                 if (!result.Success)
                 {
                     Log.Debug("Registration email failed to send, SMTP status code: {smtp}", result.SmtpStatus);

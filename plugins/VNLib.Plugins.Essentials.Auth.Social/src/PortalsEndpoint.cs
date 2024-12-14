@@ -23,6 +23,7 @@
 */
 
 using System;
+using System.IO;
 using System.Net;
 using System.Linq;
 using System.Text.Json;
@@ -32,35 +33,32 @@ using VNLib.Utils.IO;
 using VNLib.Net.Http;
 using VNLib.Plugins.Essentials.Endpoints;
 using VNLib.Plugins.Extensions.Loading;
+using VNLib.Plugins.Extensions.Loading.Routing;
 
 namespace VNLib.Plugins.Essentials.Auth.Social
 {
+
+    [EndpointPath("{{path}}")]
     [ConfigurationName("portals")]
-    internal sealed class PortalsEndpoint : UnprotectedWebEndpoint, IDisposable
+    internal sealed class PortalsEndpoint() : UnprotectedWebEndpoint, IDisposable
     {
-        private readonly VnMemoryStream _portals;
-
-        public PortalsEndpoint(PluginBase plugin, IConfigScope config)
-        {
-            string path = config.GetRequiredProperty("path", p => p.GetString()!);
-            InitPathAndLog(path, plugin.Log);
-
-            _portals = new VnMemoryStream();
-        }
+        private readonly VnMemoryStream _portals = new();
 
         public void SetPortals(IEnumerable<SocialOAuthPortal> portals)
         {
             //Convert to json
             PortalDefJson[] jsn = portals.Select(p => new PortalDefJson
             {
-                id = p.PortalId,
-                login = p.LoginEndpoint.Path,
-                logout = p.LogoutEndpoint?.Path,
-                icon = p.Base64Icon
+                id      = p.PortalId,
+                login   = p.LoginEndpoint.Path,
+                logout  = p.LogoutEndpoint?.Path,
+                icon    = p.Base64Icon
             }).ToArray();
 
             //Serialize portals array to memory stream
             JsonSerializer.Serialize(_portals, jsn);
+
+            _portals.Seek(0, SeekOrigin.Begin);
 
             //Set memory stream to readonly so shallow copy can be returned
             _ = VnMemoryStream.CreateReadonly(_portals);

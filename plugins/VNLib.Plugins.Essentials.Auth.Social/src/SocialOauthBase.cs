@@ -63,13 +63,17 @@ namespace VNLib.Plugins.Essentials.Auth.Social
         const string AUTH_GRANT_SESSION_NAME = "auth";
         const string SESSION_TOKEN_KEY_NAME = "soa.tkn";
         const string CLAIM_COOKIE_NAME = "extern-claim";
-       
+
+        private static readonly IValidator<LoginClaim> ClaimValidator = GetClaimValidator();
+        private static readonly IValidator<string> NonceValidator = GetNonceValidator();
+        private static readonly AccountDataValidator AccountDataValidator = new ();
+
 
         /// <summary>
         /// The client configuration struct passed during base class construction
         /// </summary>
         protected virtual OauthClientConfig Config { get; }
-        
+
         ///<inheritdoc/>
         protected override ProtectionSettings EndpointProtectionSettings { get; } 
 
@@ -83,17 +87,11 @@ namespace VNLib.Plugins.Essentials.Auth.Social
         /// </summary>
         protected IUserManager Users { get; }
 
-        private readonly IValidator<LoginClaim> ClaimValidator;
-        private readonly IValidator<string> NonceValidator;
-        private readonly IValidator<AccountData> AccountDataValidator;
+
         private readonly ClientClaimManager _claims;
 
         protected SocialOauthBase(PluginBase plugin, IConfigScope config)
         {
-            ClaimValidator = GetClaimValidator();
-            NonceValidator = GetNonceValidator();
-            AccountDataValidator = new AccountDataValidator();
-         
             //Get the configuration element for the derrived type
             Config = plugin.CreateService<OauthClientConfig>(config);
 
@@ -167,7 +165,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social
             {
                 return false;
             }
-            
+
             /*
              * Cross site checking is disabled because we need to allow cross site
              * for OAuth2 redirect flows
@@ -176,7 +174,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social
             {
                 return false;
             }
-            
+
             //Make sure the user is not logged in
             return !entity.IsClientAuthorized(AuthorzationCheckLevel.Any);
         }
@@ -200,12 +198,12 @@ namespace VNLib.Plugins.Essentials.Auth.Social
             //Execute request and attempt to recover the authorization response
             Oauth2TokenResult? response = await SiteAdapter.ExecuteAsync(req, cancellationToken).AsJson<Oauth2TokenResult>();
 
-            if(response?.Error != null)
+            if (response?.Error != null)
             {
                 Log.Debug("Error result from {conf} code {code} description: {err}", Config.AccountOrigin, response.Error, response.ErrorDescription);
                 return null;
             }
-         
+
             return response;
         }
 
@@ -226,7 +224,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social
         /// <returns></returns>
         protected abstract Task<UserLoginData?> GetLoginDataAsync(IOAuthAccessState clientAccess, CancellationToken cancellation);
 
-       
+
 
         /*
          * Claims are considered indempodent because they require no previous state
@@ -237,7 +235,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social
         ///<inheritdoc/>
         protected override async ValueTask<VfReturnType> PutAsync(HttpEntity entity)
         {
-            ValErrWebMessage webm = new();
+            WebMessage webm = new();
 
             //Get the login message
             LoginClaim? claim = await entity.GetJsonFromFileAsync<LoginClaim>();
@@ -295,7 +293,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social
             {
                 //Disable refer headers when nonce is set
                 entity.Server.Headers["Referrer-Policy"] = "no-referrer";
-               
+
                 //Check for security navigation headers. This should be a browser redirect,
                 if (!entity.Server.IsNavigation() || !entity.Server.IsUserInvoked())
                 {
@@ -340,12 +338,12 @@ namespace VNLib.Plugins.Essentials.Auth.Social
 
                 //Sign and set cookie
                 _claims.SignAndSetCookie(entity, claim);
-                  
+
                 //Prepare redirect
                 entity.Redirect(RedirectType.Temporary, $"{Path}?result=authorized&nonce={claim.Nonce}");
                 return VfReturnType.VirtualSkip;
             }
-            
+
             //Check to see if there was an error code set
             if (entity.QueryArgs.TryGetNonEmptyValue("error", out string? errorCode))
             {
@@ -354,7 +352,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social
                 entity.Redirect(RedirectType.Temporary, $"{Path}?result=error");
                 return VfReturnType.VirtualSkip;
             }
-            
+
             return VfReturnType.ProcessAsFile;
         }
 
@@ -365,16 +363,16 @@ namespace VNLib.Plugins.Essentials.Auth.Social
         ///<inheritdoc/>
         protected override async ValueTask<VfReturnType> PostAsync(HttpEntity entity)
         {
-            ValErrWebMessage webm = new();
+            WebMessage webm = new();
 
             //Get the finalization message
             using JsonDocument? request = await entity.GetJsonFromFileAsync();
-            
+
             if (webm.Assert(request != null, "Request message is required"))
             {
                 return VirtualClose(entity, webm, HttpStatusCode.BadRequest);
             }
-            
+
             //Recover the nonce
             string? base32Nonce = request.RootElement.GetPropString("nonce");
 
@@ -382,7 +380,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social
             {
                 return VirtualClose(entity, webm, HttpStatusCode.UnprocessableEntity);
             }
-            
+
             //Validate nonce
             if (!NonceValidator.Validate(base32Nonce, webm))
             {
@@ -408,10 +406,10 @@ namespace VNLib.Plugins.Essentials.Auth.Social
 
             //Safe to recover the access token
             IOAuthAccessState token = entity.Session.GetObject<OAuthAccessState>(SESSION_TOKEN_KEY_NAME);
-            
+
             //get the user's login information (ie userid)
             UserLoginData? userLogin = await GetLoginDataAsync(token, entity.EventCancellation);
-            
+
             if(webm.Assert(userLogin?.UserId != null, AUTH_ERROR_MESSAGE))
             {
                 return VirtualOk(entity, webm);
@@ -419,15 +417,15 @@ namespace VNLib.Plugins.Essentials.Auth.Social
 
             //Convert the platform user-id to a database-safe user-id
             string computedId = Users.ComputeSafeUserId(userLogin.UserId!);
-            
+
             //Fetch the user from the database
             IUser? user = await Users.GetUserFromIDAsync(computedId, entity.EventCancellation);
-            
+
             /*
              * If a user is not found, we can optionally create a new user account
              * if the configuration allows it.
              */
-            if(user == null)
+            if (user == null)
             {
                 //make sure registration is enabled
                 if (webm.Assert(Config.AllowRegistration, AUTH_ERROR_MESSAGE))
@@ -465,7 +463,12 @@ namespace VNLib.Plugins.Essentials.Auth.Social
                     try
                     {
                         //Create the user with the specified email address, minimum privilage level, and an empty password
-                        user = await Users.CreateUserAsync(creation, computedId, entity.EventCancellation);
+                        user = await Users.CreateUserAsync(
+                            creation,
+                            userId: computedId,
+                            hashProvider: Users.GetHashProvider(),
+                            entity.EventCancellation
+                        );
 
                         //Store the new profile and origin
                         user.SetProfile(userAccount);
@@ -481,7 +484,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social
                     //Skip check since we just created the user
                     goto Authorize;
                 }
-                
+
                 /*
                 * User account already exists via email address but not 
                 * user-id
@@ -541,15 +544,15 @@ namespace VNLib.Plugins.Essentials.Auth.Social
                 Log.Debug("Out of buffer space for token data encryption, for user {usr}, from ip {ip}", user.UserID, entity.TrustedRemoteIp);
                 webm.Result = AUTH_ERROR_MESSAGE;
             }
-            catch(UserUpdateException uue)
+            catch (UserUpdateException uue)
             {
                 webm.Token = null;
                 webm.Result = AUTH_ERROR_MESSAGE;
                 webm.Success = false;
-                
+
                 //destroy any login data on failure
                 entity.InvalidateLogin();
-                
+
                 Log.Error("Failed to update the user's account cause:\n{err}",uue);
             }
             finally
@@ -558,9 +561,8 @@ namespace VNLib.Plugins.Essentials.Auth.Social
             }
             return VirtualOk(entity, webm);
         }
-     
-      
-        sealed class Oauth2TokenResult: OAuthAccessState
+
+        private sealed class Oauth2TokenResult: OAuthAccessState
         {
             [JsonPropertyName("error")]
             public string? Error { get; set; }

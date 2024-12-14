@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vaughn Nugent
+// Copyright (c) 2024 Vaughn Nugent
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -17,13 +17,13 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import { type MaybeRef, type Ref } from 'vue' 
-import { AxiosError, type Axios } from 'axios';
+import { type MaybeRef } from 'vue' 
+import { AxiosError, type AxiosRequestConfig, type Axios } from 'axios';
 import { defaultTo, isArray, isNil, isEqual } from 'lodash-es';
 import { get, useConfirmDialog } from '@vueuse/core';
 import { useFormToaster, useToaster } from '../toast';
 import { useWait } from './wait';
-import { useAxiosInternal } from '../axios';
+import { useAxios } from '../axios';
 import type { IErrorNotifier, CombinedToaster } from '../toast';
 
 export interface IApiHandle<T> {
@@ -55,8 +55,6 @@ export interface IElevatedCallPassThrough extends IApiPassThrough {
 export interface ApiCall<T> {
     <TR>(callback: (data: T) => Promise<TR | undefined>): Promise<TR | undefined>;
 }
-
-export type CustomMessageHandler = (message: string) => void;
 
 const useApiCallInternal = <T>(args: IApiHandle<T>): ApiCall<T> => {
 
@@ -152,15 +150,31 @@ const useApiCallInternal = <T>(args: IApiHandle<T>): ApiCall<T> => {
     }
 }
 
-const creatApiHandle = (notifier: MaybeRef<IErrorNotifier>, axios: Ref<Axios>): IApiHandle<IApiPassThrough> => {
-
+/**
+ * Provides a wrapper method for making remote api calls to a server
+ * while capturing context and errors and common api arguments.
+ * @returns {Object} The api call function object {apiCall: Promise }
+ */
+export const useApiCall = (
+    notifier: MaybeRef<IErrorNotifier>,
+    axConfig?: AxiosRequestConfig | undefined | null
+): { apiCall: ApiCall<IApiPassThrough> } => {
+    
+    const axios = useAxios(axConfig);
     const toaster = useToaster();
     const { setWaiting } = useWait();
 
-    const getCallbackObject = (): IApiPassThrough =>  ({ axios: get(axios), toaster })
+    const getCallbackObject = (): IApiPassThrough => ({ axios, toaster })
     const getNotifier = (): IErrorNotifier => get(notifier);
 
-    return { getCallbackObject, getNotifier, setWaiting }
+    //Confiugre the api call to use global configuration
+    return { 
+        apiCall: useApiCallInternal({ 
+            getCallbackObject, 
+            getNotifier, 
+            setWaiting 
+        })
+    }
 }
 
 /**
@@ -169,46 +183,14 @@ const creatApiHandle = (notifier: MaybeRef<IErrorNotifier>, axios: Ref<Axios>): 
  * @param {*} asyncFunc The method to call within api request context
  * @returns A promise that resolves to the result of the async function
  */
-export const apiCall = (() =>{
+export const apiCall = (() => {
 
-    const axios = useAxiosInternal(null);
-    const errorNotifier = useFormToaster();
+    const { apiCall } = useApiCall(
+        useFormToaster()
+    );
 
-    //Create the api call handle
-    const handle = creatApiHandle(errorNotifier, axios);
-    //Confiugre the api call to use global configuration
-    return useApiCallInternal(handle);
+    return apiCall;
 })();
-
-/**
- * Customizes the api call to use a custom error message
- * @param msg The message to display when an error occurs
- * @returns {Object} The api call object {apiCall: Promise }
- */
-export const configureApiCall = (msg: CustomMessageHandler): { apiCall: ApiCall<IApiPassThrough> } =>{
-    
-    const notifier = ((): IErrorNotifier => {
-        return{
-            notifyError: (t: string, m?: string) => {
-                msg(t);
-                return m;
-            },
-            close(id: string) {
-                msg('')
-                return id;
-            },
-        }
-    })()
-
-    const axios = useAxiosInternal(null);
-
-    //Create custom api handle
-    const handle = creatApiHandle(notifier, axios);
-
-    //Confiugre the api call to use global configuration
-    const apiCall = useApiCallInternal(handle);
-    return { apiCall }
-}
 
 /**
  * Gets the shared password prompt object and the elevated api call method handler 

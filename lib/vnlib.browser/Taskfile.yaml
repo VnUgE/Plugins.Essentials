@@ -8,29 +8,43 @@
 
 version: '3'
 
+vars:
+  BINARY_DIR: '{{ .BINARY_DIR | default "bin" }}'
+
 tasks:
 
 #called by build pipeline to build module
   build:
     cmds:
-     - echo "building module {{.MODULE_NAME}}" 
+     - echo "building module {{ .PROJECT_NAME  }}" 
+
+    #update internal package version
+     - cmd: npm version {{ .BUILD_VERSION }}
+       ignore_error: true
 
     #install dependencies and build
-     - npm install
-     - npm run build
+     - cmd: npm install
+     - cmd: npm run build
 
   postbuild_success:
-    cmds:
-    - powershell -Command "mkdir bin -Force"
-    #tgz the dist folder
-    - tar --exclude="./node_modules" --exclude="./src" --exclude="./.git" --exclude="./bin" --exclude=".gitignore" --exclude="*.yaml" --exclude="*.yml" -czf bin/release.tgz .
+    vars:
+      TAR_FILES:
+        dist
+        LICENSE.txt
+        README.md
+        package.json
+        package-lock.json
+        tsconfig.json
 
+    cmds:
+    - cmd: powershell mkdir {{ .BINARY_DIR }} -Force
+    #tgz the dist folder
+    - cmd: tar -czf {{ .BINARY_DIR }}/release.tgz {{ .TAR_FILES }}
 
 #called by build pipeline to clean module
   clean:
     ignore_error: true
     cmds:
      #delete dist folder
-    - cmd: powershell -Command "Remove-Item -Recurse node_modules"
-    - cmd: powershell -Command "Remove-Item -Recurse dist"
-    - cmd: powershell -Command "Remove-Item -Recurse -Force bin"
+    - for: ['bin/', 'dist/', 'node_modules/']
+      cmd: powershell rm -Recurse -Force "{{ .ITEM_NAME }}"

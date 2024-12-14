@@ -96,7 +96,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social
             ForwardOnlyWriter<char> writer = new(charBuffer);
 
             //Append the config redirect path
-            writer.Append(Config.AccessCodeUrl.OriginalString);
+            writer.Append(Config.AuthorizationUrl.OriginalString);
             //begin query arguments
             writer.AppendSmall("&client_id=");
             writer.Append(Config.ClientID.Value);

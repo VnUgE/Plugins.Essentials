@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vaughn Nugent
+// Copyright (c) 2024 Vaughn Nugent
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -17,13 +17,14 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import type { Ref } from "vue";
 import type { WebMessage } from "../types";
 
 export interface SessionConfig {
     readonly browserIdSize: number;
     readonly signatureAlgorithm: string;
     readonly keyAlgorithm: AlgorithmIdentifier;
+    readonly cookiesEnabled: boolean;
+    readonly loginCookieName: string;
 }
 
 
@@ -50,22 +51,29 @@ export interface ISessionKeyStore {
  * Represents the current server/client session state
  */
 export interface ISession {
-    /**
-     * A readonly reactive reference to the login status
-     * of the session.
-     */
-    readonly loggedIn: Readonly<Ref<boolean>>;
-    
-    /**
-     * A readonly reactive reference indicating if the client 
-     * is using a local account or a remote/oauth account
-     */
-    readonly isLocalAccount: Readonly<Ref<boolean>>;
 
     /**
     * The internal session key store
     */
     readonly KeyStore: ISessionKeyStore;
+
+    /**
+     * Checks if the current session is a local account. This value 
+     * may change as the app loads
+     */
+    isLocalAccount(): Promise<boolean>;
+
+    /**
+     * Creates a reactive ref that reflects changes
+     * to the login status
+     */
+    isLoggedIn(): Promise<boolean>; 
+
+    /**
+     * Adds a change listener to the session
+     * @param callback The callback to fire when the session state changes
+     */
+    addChangeListener(callback: () => void): void;
 
     /**
      * Updates session credentials from the server response
@@ -89,6 +97,12 @@ export interface ISession {
      * Gets the client's security info
      */
     getClientSecInfo(): Promise<ClientCredential>;
+
+    /**
+     * Attempts to reconcile internal state typically fired
+     * when library configuration changes
+     */
+    reconcileState(): void; 
 }
 
 export interface ITokenResponse<T = unknown> extends WebMessage<T> {

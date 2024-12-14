@@ -30,12 +30,15 @@ export type { WebMessage, ServerValidationError } from './types'
 export * from './mfa/login'
 export * from './mfa/pki'
 export * from './mfa/config'
+export * from './mfa/fido'
+export * from './mfa/totp'
 
 //Social exports
 export * from './social'
 
 //Forward session public exports
-export * from './session'
+export type * from './session'
+export { useSession } from './session'
 
 //App-data
 export * from './app-data'
@@ -44,7 +47,8 @@ export * from './app-data'
 export { useAxios } from './axios'
 
 //User exports
-export * from './user'
+export type * from './account/types'
+export { useAccount, useAccountRpc } from './account'
 
 //Export toast apis directly
 export * from './toast'
@@ -58,6 +62,7 @@ export * from './helpers/message'
 export * from './helpers/serverObjectBuffer'
 export * from './helpers/validation'
 export * from './helpers/wait'
+export * from './helpers/jrpc'
 
 /*************************
     SETUP/LOCALS

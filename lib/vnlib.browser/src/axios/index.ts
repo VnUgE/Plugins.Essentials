@@ -17,68 +17,68 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import { computed, MaybeRef, type Ref } from 'vue'
-import { cloneDeep, merge, isObjectLike, defaultTo } from 'lodash-es'
+import { cloneDeep, merge, isObjectLike, defaultTo, get } from 'lodash-es'
 import axios, { type Axios, type AxiosRequestConfig, type AxiosResponse } from 'axios'
-import { get, toReactive } from '@vueuse/core';
-import { useSession, type ISession } from '../session'
-import { getGlobalStateInternal } from '../globalState';
+import { useSession } from '../session'
+import { getGlobalStateInternal, type GlobalAxiosConfig } from '../globalState';
+import { manualComputed, type ReadonlyManualRef } from '../storage';
 
-const configureAxiosInternal = (instance: Axios, session: ISession, tokenHeader: Ref<string | undefined>) => {
+const getInterceptors = (_config: ReadonlyManualRef<GlobalAxiosConfig>) =>{
 
-    const { loggedIn, generateOneTimeToken } = session;
+    const { generateOneTimeToken } = useSession();
 
-    //Add request interceptor to add the token to the request
-    instance.interceptors.request.use(async (config) => {
+    return {
+        request:{
+            onFufilled: async (config: any) => {
+                //Get the current global config/token header value
+                const { tokenHeader } = _config.get()
 
-        //Get the current global config/token header value
-        const tokenHeaderValue = get(tokenHeader);
+                // See if the current session is logged in
+                if (tokenHeader) {
 
-        // See if the current session is logged in
-        if (tokenHeaderValue && loggedIn.value) {
-            
-            const path = `${config.baseURL}${config.url}`
+                    const path = `${config.baseURL}${config.url}`
+                    let pathName = path;
 
-            //see if absolute url or relative
-            if(path.match(/https?:\/\//)){
-                //Is absolute
-                const { pathname } = new URL(path);
-                
-                // Get an otp for the request
-                config.headers[tokenHeaderValue] = await generateOneTimeToken(pathname);
-            }
-            else{
-                //Is relative
+                    //see if absolute url or relative
+                    if (path.match(/https?:\/\//)) {
+                        //Is absolute
+                        pathName = new URL(path).pathname
+                    }
 
-                // Get an otp for the request
-                config.headers[tokenHeaderValue] = await generateOneTimeToken(path);
-            }
-        }
-        // Return the config
-        return config
-    }, function (error) {
-        // Do something with request error
-        return Promise.reject(error)
-    })
+                    // Get an otp for the request (may be null if not logged in)
+                    const token = await generateOneTimeToken(pathName);
 
-    //Add response interceptor to add a function to the response to get the result or throw an error to match the WebMessage server message
-    instance.interceptors.response.use((response: AxiosResponse) => {
-
-        //Add a function to the response to get the result or throw an error
-        if (isObjectLike(response.data)) {
-            response.data.getResultOrThrow = () => {
-                if (response.data.success) {
-                    return response.data.result;
-                } else {
-                    //Throw in apicall format to catch in the catch block
-                    throw { response };
+                    if(token){
+                        config.headers[tokenHeader] = token;
+                    }
                 }
+
+                // Return the config
+                return config
+            },
+            onError: (error: unknown) =>{
+                // Do something with request error
+                return Promise.reject(error)
+            }
+        },
+        response: {
+            //Add response interceptor to add a function to the response to get the result or throw an error to match the WebMessage server message
+            onFulfilled: (response: AxiosResponse) => {
+                //Add a function to the response to get the result or throw an error
+                if (isObjectLike(response.data)) {
+                    response.data.getResultOrThrow = () => {
+                        if (response.data.success) {
+                            return response.data.result;
+                        } else {
+                            //Throw in apicall format to catch in the catch block
+                            throw { response };
+                        }
+                    }
+                }
+                return response;
             }
         }
-        return response;
-    })
-
-    return instance;
+    }
 }
 
 /**
@@ -86,48 +86,57 @@ const configureAxiosInternal = (instance: Axios, session: ISession, tokenHeader:
  * @param config Optional Axios instance configuration to apply, will be merged with the default config
  * @returns A reactive ref to an axios instance
  */
-export const useAxiosInternal = (() => {
+export const useAxios = (() => {
 
     //Get the session and utils
-    const { axios: _axiosConfig } = getGlobalStateInternal();
+    const config = getGlobalStateInternal();
+    const _axiosConfig = manualComputed(() => config.get('axios'));
+    const { request, response } = getInterceptors(_axiosConfig);
 
-    const tokenHeader = computed(() => defaultTo(_axiosConfig.value.tokenHeader, ''));
-    const session = useSession();
+    return (config?: AxiosRequestConfig | undefined | null): Axios => {
 
-    return (config?: MaybeRef<AxiosRequestConfig | undefined | null>): Readonly<Ref<Axios>> => {
+        const getInstance = () => {
+            const getMergedConfig = (): GlobalAxiosConfig => {
+                const global = _axiosConfig.get();
+                const local = defaultTo(config, {});
 
-        /**
-         * Computed config, merges the default config with the passed config. When 
-         * the fallback config is updated, it will compute the merged config
-         */
-        const mergedConfig = config ?
-            computed(() => merge(cloneDeep(_axiosConfig.value), get(config)))
-            : _axiosConfig
+                return merge(cloneDeep(global), local);
+            }
 
-        /**
-         * Computes a new axios insance when the config changes
-         */
-        const computedAxios = computed(() => {
-            const instance = axios.create(mergedConfig.value);
-            return configureAxiosInternal(instance, session, tokenHeader);
-        });
+            const merged = getMergedConfig();
+            let instance = axios.create(merged);
 
-        return computedAxios;
+            //Exec user configuration callback if it's defined
+            if(merged.configureAxios) {
+                instance = merged.configureAxios(instance);
+            }
+           
+            //Assign cached interceptors
+            instance.interceptors.request.use(
+                request.onFufilled,
+                request.onError
+            );
+
+            instance.interceptors.response.use(
+                response.onFulfilled
+            );
+
+            return instance
+        }
+
+        let ax = getInstance();
+
+        //Use a proxy for axios to get the configuration
+        return new Proxy(ax, {
+            get: (target, prop) => {
+
+                //If the config has changed, get a new instance
+                if (_axiosConfig.changed()){
+                    ax = getInstance();
+                }
+
+                return get(ax, prop);
+            },
+        })
     }
 })();
-
-/**
- * Gets a reactive axios instance that merges the supplied config with the global config
- * @param config Optional Axios instance configuration to apply, will be merged with the default config
- * @returns The axios instance
- */
-export const useAxios = (config: MaybeRef<AxiosRequestConfig | undefined | null>): Axios => {
-
-    const axiosRef = useAxiosInternal(config);
-
-    /**
-     * Return a reactive axios instance. When updates are made to the config, 
-     * the instance will be updated without the caller needing to re-request it.
-     */
-    return toReactive(axiosRef);
-}

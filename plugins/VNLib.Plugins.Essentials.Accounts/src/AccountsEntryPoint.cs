@@ -31,58 +31,31 @@ using VNLib.Utils;
 using VNLib.Utils.Memory;
 using VNLib.Utils.Logging;
 using VNLib.Plugins.Essentials.Users;
-using VNLib.Plugins.Essentials.Middleware;
-using VNLib.Plugins.Essentials.Accounts.MFA;
 using VNLib.Plugins.Essentials.Accounts.Endpoints;
 using VNLib.Plugins.Essentials.Accounts.SecurityProvider;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Users;
 using VNLib.Plugins.Extensions.Loading.Routing;
+using VNLib.Plugins.Extensions.Loading.Routing.Mvc;
+using VNLib.Plugins.Essentials.Accounts.MFA.Otp;
+using VNLib.Plugins.Essentials.Accounts.MFA.Totp;
+using VNLib.Plugins.Essentials.Accounts.MFA.Fido;
 
 namespace VNLib.Plugins.Essentials.Accounts
 {
-
     public sealed class AccountsEntryPoint : PluginBase
     {
 
+        ///<inheritdoc/>
         public override string PluginName => "Essentials.Accounts";
 
         private bool SetupMode => HostArgs.HasArgument("--account-setup");
 
+        /// <inheritdoc/>
         protected override void OnLoad()
         {
-            //Add optional endpoint routing
 
-            if (this.HasConfigForType<LoginEndpoint>())
-            {
-                this.Route<LoginEndpoint>();
-                this.Route<LogoutEndpoint>();
-            }
-
-            if (this.HasConfigForType<KeepAliveEndpoint>())
-            {
-                this.Route<KeepAliveEndpoint>();
-            }
-
-            if (this.HasConfigForType<ProfileEndpoint>())
-            {
-                this.Route<ProfileEndpoint>();
-            }
-
-            if (this.HasConfigForType<PasswordChangeEndpoint>())
-            {
-                this.Route<PasswordChangeEndpoint>();
-            }
-
-            if (this.HasConfigForType<MFAEndpoint>())
-            {
-                this.Route<MFAEndpoint>();
-            }
-
-            if (this.HasConfigForType<PkiLoginEndpoint>())
-            {
-                this.Route<PkiLoginEndpoint>();
-            }
+            this.Route<AccountRpcEndpoint>();           
 
             //Only export the account security service if the configuration element is defined
             if (this.HasConfigForType<AccountSecProvider>())
@@ -91,8 +64,9 @@ namespace VNLib.Plugins.Essentials.Accounts
                 AccountSecProvider securityProvider = this.GetOrCreateSingleton<AccountSecProvider>();
                 this.ExportService<IAccountSecurityProvider>(securityProvider);
 
-                //Also add the middleware array
-                this.ExportService<IHttpMiddleware[]>([ securityProvider ]);
+                //Also add the provider as a middlware processor
+                this.Middleware()
+                    .Add(securityProvider);
 
                 Log.Information("Configuring the account security provider service");
             }
@@ -106,14 +80,13 @@ namespace VNLib.Plugins.Essentials.Accounts
             Log.Information("Plugin loaded");
         }
 
-     
-
+        ///<inheritdoc/>
         protected override void OnUnLoad()
         {
-            //Write closing messsage and dispose the log
             Log.Information("Plugin unloaded");
         }
       
+        ///<inheritdoc/>
         protected override async void ProcessHostCommand(string cmd)
         {
             //Only process commands if the plugin is in setup mode
@@ -182,7 +155,7 @@ Commands:
                             };
 
                             //Create the user
-                            using IUser user = await Users.CreateUserAsync(creation, null); 
+                            using IUser user = await Users.CreateUserAsync(creation, userId: null, hashProvider: Users.GetHashProvider());
                            
                             //Set local account
                             user.SetAccountOrigin(AccountUtil.LOCAL_ACCOUNT_ORIGIN);
@@ -203,21 +176,21 @@ Commands:
                             //Get the user
                             using IUser? user = await Users.GetUserFromUsernameAsync(username);
 
-                            if(user == null)
+                            if (user == null)
                             {
                                 Log.Warn("The specified user does not exist");
                                 break;
                             }
                                 
                             //Set the password
-                            await Users.UpdatePasswordAsync(user, password);
+                            await Users.UpdatePasswordAsync(user, password, Users.GetHashProvider());
                             
                             Log.Information("Successfully reset password for {id}", username);
                         }
                         break;
                     case "delete":
                         {
-                            if(username == null)
+                            if (username == null)
                             {
                                 Log.Warn("You are missing required argument values. Format 'delete -u <username>'");
                                 break;
@@ -257,7 +230,11 @@ Commands:
                                 break;
                             }
 
-                            user.MFADisable();
+                            //Disable all mfa methods
+                            user.TotpDisable();
+                            //user.OtpDisable();
+                            user.FidoDisable();
+
                             await user.ReleaseAsync();
 
                             Log.Information("Successfully disabled MFA for {id}", username);
@@ -293,7 +270,7 @@ Commands:
                             }
 
                             //Update the totp secret and flush changes
-                            user.MFASetTOTPSecret(secret);
+                            user.TotpSetSecret(secret);
                             await user.ReleaseAsync();
 
                             Log.Information("Successfully set TOTP secret for {id}", username);
@@ -328,7 +305,7 @@ Commands:
                                 break;
                             }
 
-                            PkiAuthPublicKey? pubkey = JsonSerializer.Deserialize<PkiAuthPublicKey>(pubkeyJwk);
+                            OtpAuthPublicKey? pubkey = JsonSerializer.Deserialize<OtpAuthPublicKey>(pubkeyJwk);
                             if (pubkey == null)
                             {
                                 Log.Error("You public key is not a JSON object");
@@ -336,7 +313,7 @@ Commands:
                             }
 
                             //Validate
-                            ValidationResult res = PkiLoginEndpoint.UserJwkValidator.Validate(pubkey);
+                            ValidationResult res = OtpMfaProcessor.OtpKeyValidator.Validate(pubkey);
                             if (!res.IsValid)
                             {
                                 Log.Error("The public key JWK is not valid:\n{errors}", res.ToDictionary());
@@ -345,7 +322,7 @@ Commands:
 
 
                             //Add/update the public key and flush changes
-                            user.PKIAddPublicKey(pubkey);
+                            user.OtpAddPublicKey(pubkey);
                             await user.ReleaseAsync();
 
                             Log.Information("Successfully set TOTP secret for {id}", username);

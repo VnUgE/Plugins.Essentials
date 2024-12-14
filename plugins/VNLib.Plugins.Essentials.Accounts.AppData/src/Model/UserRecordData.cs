@@ -22,7 +22,17 @@
 * along with this program.  If not, see https://www.gnu.org/licenses/.
 */
 
+using MemoryPack;
+
 namespace VNLib.Plugins.Essentials.Accounts.AppData.Model
 {
-    internal record class UserRecordData(string UserId, byte[] Data, long LastModifed, ulong? Checksum);
+    [MemoryPackable]
+    internal sealed partial record class UserRecordData
+    {
+        public required byte[] Data { get; init; }
+
+        public required ulong? Checksum { get; init; }
+
+        internal long CacheTimestamp { get; set; }
+    }
 }

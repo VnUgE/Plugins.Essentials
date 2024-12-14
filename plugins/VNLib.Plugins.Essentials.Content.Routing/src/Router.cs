@@ -45,7 +45,7 @@ namespace VNLib.Plugins.Essentials.Content.Routing
     {
         private static readonly RouteComparer Comparer = new();
 
-        private readonly IRouteStore Store = plugin.GetOrCreateSingleton<ManagedRouteStore>();
+        private readonly ManagedRouteStore Store = plugin.GetOrCreateSingleton<ManagedRouteStore>();
         private readonly ILogProvider Logger = plugin.Log;
 
         private readonly ConcurrentDictionary<IWebProcessor, Task<ReadOnlyCollection<Route>>> RouteTable = new();

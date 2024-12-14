@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2023 Vaughn Nugent
+* Copyright (c) 2024 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Content.Routing
@@ -26,16 +26,24 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 
+using VNLib.Utils.Logging;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Sql;
 using VNLib.Plugins.Essentials.Content.Routing.Model;
+using VNLib.Plugins.Essentials.Content.Routing.stores;
 
 namespace VNLib.Plugins.Essentials.Content.Routing
 {
-    [ConfigurationName("store")]
+    [ConfigurationName("store", Required = false)]
     internal sealed class ManagedRouteStore : IRouteStore
     {
-        private readonly IRouteStore _routeStore;
+        private readonly IRouteStore _routeStore = new DummyRouteStore();
+
+        //empty constructor for 
+        public ManagedRouteStore(PluginBase plugin) 
+        {
+            plugin.Log.Warn("Page router loaded but no route store was loaded. Routing funtionality is disabled.");
+        }
 
         public ManagedRouteStore(PluginBase plugin, IConfigScope config)
         {
@@ -58,6 +66,12 @@ namespace VNLib.Plugins.Essentials.Content.Routing
         public Task GetAllRoutesAsync(ICollection<Route> routes, CancellationToken cancellation)
         {
             return _routeStore.GetAllRoutesAsync(routes, cancellation);
+        }
+
+        private sealed class DummyRouteStore : IRouteStore
+        {
+            public Task GetAllRoutesAsync(ICollection<Route> routes, CancellationToken cancellation) 
+                => Task.CompletedTask;
         }
     }
 }

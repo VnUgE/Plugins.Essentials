@@ -38,6 +38,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.TokenRevocation
         /// The token that was revoked.
         /// </summary>
         [Key]
+        [MaxLength(200)]
         public string? Token { get; set; }
     }
 }
