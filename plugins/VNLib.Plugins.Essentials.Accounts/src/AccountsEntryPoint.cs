@@ -155,7 +155,7 @@ Commands:
                             };
 
                             //Create the user
-                            using IUser user = await Users.CreateUserAsync(creation, userId: null, hashProvider: null);
+                            using IUser user = await Users.CreateUserAsync(creation, userId: null, hashProvider: Users.GetHashProvider());
                            
                             //Set local account
                             user.SetAccountOrigin(AccountUtil.LOCAL_ACCOUNT_ORIGIN);
@@ -176,21 +176,21 @@ Commands:
                             //Get the user
                             using IUser? user = await Users.GetUserFromUsernameAsync(username);
 
-                            if(user == null)
+                            if (user == null)
                             {
                                 Log.Warn("The specified user does not exist");
                                 break;
                             }
                                 
                             //Set the password
-                            await Users.UpdatePasswordAsync(user, password);
+                            await Users.UpdatePasswordAsync(user, password, Users.GetHashProvider());
                             
                             Log.Information("Successfully reset password for {id}", username);
                         }
                         break;
                     case "delete":
                         {
-                            if(username == null)
+                            if (username == null)
                             {
                                 Log.Warn("You are missing required argument values. Format 'delete -u <username>'");
                                 break;
