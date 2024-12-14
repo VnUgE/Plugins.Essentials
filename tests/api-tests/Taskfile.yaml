@@ -5,6 +5,9 @@
 
 version: '3'
 
+vars:
+  BINARY_DIR: '{{ .BINARY_DIR | default "bin" }}'
+
 tasks:
 
   build:
@@ -14,6 +17,21 @@ tasks:
   test:
     cmds:
       - cmd: echo "TODO"
+
+  postbuild_success:
+    vars:
+      TAR_FILES:
+        tests
+        setup.ts
+        package.json
+        package-lock.json
+        tsconfig.json
+        vitest.config.ts
+
+    cmds:
+    - cmd: powershell mkdir {{ .BINARY_DIR }} -Force
+    #tgz the source files
+    - cmd: tar -czf {{ .BINARY_DIR }}/release.tgz {{ .TAR_FILES }}
 
 #Remove the output dirs on clean
   clean:
