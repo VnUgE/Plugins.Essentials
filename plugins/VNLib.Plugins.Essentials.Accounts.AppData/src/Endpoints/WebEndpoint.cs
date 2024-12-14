@@ -67,12 +67,12 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Endpoints
             string? scopeId = GetScopeId(entity);
             bool noCache = NoCacheQuery(entity);
 
-            if (webm.Assert(scopeId != null, "Missing scope"))
+            if (webm.AssertError(scopeId != null, "Missing scope"))
             {
                 return VirtualClose(entity, webm, HttpStatusCode.BadRequest);
             }
 
-            if (webm.Assert(IsScopeAllowed(scopeId), "Invalid scope"))
+            if (webm.AssertError(IsScopeAllowed(scopeId), "Invalid scope"))
             {
                 return VirtualClose(entity, webm, HttpStatusCode.BadRequest);
             }
@@ -103,24 +103,24 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Endpoints
             string? scopeId = GetScopeId(entity);
             bool flush = NoCacheQuery(entity);
 
-            if (webm.Assert(entity.Files.Count == 1, "Invalid file count"))
+            if (webm.AssertError(entity.Files.Count == 1, ["Invalid file count"]))
             {
                 return VirtualClose(entity, webm, HttpStatusCode.BadRequest);
             }
 
-            if (webm.Assert(scopeId != null, "Missing scope"))
+            if (webm.AssertError(scopeId != null, ["Missing scope"]))
             {
                 return VirtualClose(entity, webm, HttpStatusCode.BadRequest);
             }
 
-            if (webm.Assert(IsScopeAllowed(scopeId), "Invalid scope"))
+            if (webm.AssertError(IsScopeAllowed(scopeId), ["Invalid scope"]))
             {
                 return VirtualClose(entity, webm, HttpStatusCode.BadRequest);
             }
 
             FileUpload data = entity.Files[0];
 
-            if (webm.Assert(data.Length <= MaxDataSize, "Data too large"))
+            if (webm.AssertError(data.Length <= MaxDataSize, ["Data too large"]))
             {
                 return VirtualClose(entity, webm, HttpStatusCode.RequestEntityTooLarge);
             }
@@ -128,7 +128,7 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Endpoints
             byte[] recordData = GC.AllocateUninitializedArray<byte>((int)data.Length, pinned: false);
             int read = await data.FileData.ReadAsync(recordData, entity.EventCancellation);
 
-            if (webm.Assert(read == recordData.Length, "Failed to read data"))
+            if (webm.AssertError(read == recordData.Length, ["Failed to read data"]))
             {
                 return VirtualClose(entity, webm, HttpStatusCode.InternalServerError);
             }
@@ -140,7 +140,7 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Endpoints
             if (userChecksum.HasValue)
             {
                 //compare the checksums
-                if (webm.Assert(checksum == userChecksum.Value, "Checksum mismatch"))
+                if (webm.AssertError(checksum == userChecksum.Value, ["Checksum mismatch"]))
                 {
                     return VirtualClose(entity, webm, HttpStatusCode.UnprocessableEntity);
                 }
@@ -173,12 +173,12 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Endpoints
             WebMessage webm = new();
             string? scopeId = GetScopeId(entity);
 
-            if (webm.Assert(scopeId != null, "Missing scope"))
+            if (webm.AssertError(scopeId != null, ["Missing scope"]))
             {
                 return VirtualClose(entity, webm, HttpStatusCode.BadRequest);
             }
 
-            if (webm.Assert(IsScopeAllowed(scopeId), "Invalid scope"))
+            if (webm.AssertError(IsScopeAllowed(scopeId), ["Invalid scope"]))
             {
                 return VirtualClose(entity, webm, HttpStatusCode.BadRequest);
             }

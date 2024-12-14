@@ -1,0 +1,24 @@
+# https://taskfile.dev
+
+#Called by the vnbuild system to produce builds for my website
+#https://www.vaughnnugent.com/resources/software
+
+version: '3'
+
+tasks:
+
+  build:
+    cmds:
+      - cmd: echo "building project {{ .PROJECT_NAME  }}"
+
+  test:
+    cmds:
+      - cmd: echo "TODO"
+
+#Remove the output dirs on clean
+  clean:
+    dir: '{{ .USER_WORKING_DIR }}'
+    ignore_error: true
+    cmds:
+     - for: ['bin/', 'node_modules/']
+       cmd: powershell rm -Recurse '{{ .ITEM }}'

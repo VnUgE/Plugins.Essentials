@@ -32,7 +32,7 @@ tasks:
 
      #run post in release mode
      - task: postbuild
-       vars: { BUILD_MODE: release }    
+       vars: { BUILD_MODE: release }
 
 
   postbuild_failed:
@@ -41,7 +41,7 @@ tasks:
 
 
   postbuild:
-    dir: '{{ .USER_WORKING_DIR }}'      
+    dir: '{{ .USER_WORKING_DIR }}'
     internal: true
     vars:
       #the build output directory

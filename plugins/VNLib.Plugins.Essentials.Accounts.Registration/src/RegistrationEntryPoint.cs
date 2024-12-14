@@ -53,7 +53,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration
             //Ensure the database is created
             await this.EnsureDbCreatedAsync<RegistrationContext>(this);
         }
-        
+
         protected override void OnUnLoad()
         {
             Log.Information("Plugin unloaded");

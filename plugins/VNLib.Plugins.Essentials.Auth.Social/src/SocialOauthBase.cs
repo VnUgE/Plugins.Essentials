@@ -235,7 +235,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social
         ///<inheritdoc/>
         protected override async ValueTask<VfReturnType> PutAsync(HttpEntity entity)
         {
-            ValErrWebMessage webm = new();
+            WebMessage webm = new();
 
             //Get the login message
             LoginClaim? claim = await entity.GetJsonFromFileAsync<LoginClaim>();
@@ -363,7 +363,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social
         ///<inheritdoc/>
         protected override async ValueTask<VfReturnType> PostAsync(HttpEntity entity)
         {
-            ValErrWebMessage webm = new();
+            WebMessage webm = new();
 
             //Get the finalization message
             using JsonDocument? request = await entity.GetJsonFromFileAsync();

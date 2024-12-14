@@ -96,7 +96,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
 
         protected override async ValueTask<VfReturnType> PostAsync(HttpEntity entity)
         {
-            ValErrWebMessage webm = new();
+            WebMessage webm = new();
 
             //Get the json request data from client
             using RegCompletionRequest? request = await entity.GetJsonFromFileAsync<RegCompletionRequest>();
@@ -195,7 +195,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Registration.Endpoints
 
         protected override async ValueTask<VfReturnType> PutAsync(HttpEntity entity)
         {
-            ValErrWebMessage webm = new();
+            WebMessage webm = new();
 
             //Get the request
             RegRequestMessage? request = await entity.GetJsonFromFileAsync<RegRequestMessage>();
