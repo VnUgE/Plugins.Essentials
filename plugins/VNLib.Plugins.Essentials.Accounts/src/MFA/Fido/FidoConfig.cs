@@ -70,6 +70,13 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
         [JsonPropertyName("strict_origin")]
         public bool StrictOrigin { get; set; } = true;
 
+        /// <summary>
+        /// Allows the user to call the 'disable_all' RPC method for 
+        /// fido devices
+        /// </summary>
+        [JsonPropertyName("allow_disable_all")]
+        public bool AllowDisableAllRpcCall { get; set; } = false;
+
         ///<inheritdoc/>
         public void OnValidate()
         {

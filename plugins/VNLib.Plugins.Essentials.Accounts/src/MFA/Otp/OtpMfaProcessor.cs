@@ -94,7 +94,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Otp
         ///<inheritdoc/>
         public async ValueTask<object?> OnHandleMessageAsync(HttpEntity entity, JsonElement request, IUser user)
         {
-            ValErrWebMessage webm = new();
+            WebMessage webm = new();
 
             using OtpRequestMessage? req = request.Deserialize<OtpRequestMessage>();
 
@@ -167,7 +167,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Otp
         {
             //Currently all actions are password protected
             return req.Action switch
-            {               
+            {
                 _ => true
             };
         }
@@ -191,8 +191,8 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Otp
 
             return !webm.Assert(result > 0, CheckPassword);
         }
-       
-        private void AddPublicKey(IUser user, ValErrWebMessage webm, OtpAuthPublicKey pubkey)
+
+        private void AddPublicKey(IUser user, WebMessage webm, OtpAuthPublicKey pubkey)
         {
             //The public key object is already validated by the request validator
 

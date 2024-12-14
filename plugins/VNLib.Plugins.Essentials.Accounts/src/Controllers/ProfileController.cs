@@ -103,7 +103,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
             ///<inheritdoc/>
             public async ValueTask<RpcCommandResult> InvokeAsync(HttpEntity entity, AccountJRpcRequest _, JsonElement args)
             {
-                ValErrWebMessage webm = new();
+                WebMessage webm = new();
                 try
                 {
                     if (args.ValueKind != JsonValueKind.Object)

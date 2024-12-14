@@ -32,8 +32,8 @@ using VNLib.Plugins.Extensions.Loading;
 
 namespace VNLib.Plugins.Essentials.Accounts.MFA.Totp
 {
-    internal sealed class TOTPConfig: IOnConfigValidation
-    {        
+    internal sealed class TOTPConfig : IOnConfigValidation
+    {
         [JsonPropertyName("issuer")]
         public string? IssuerName { get; set; }
 
@@ -109,6 +109,6 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Totp
                 .WithMessage("You should configure a larger TOTP secret size for better security");
 
             return val;
-        }       
+        }
     }
 }

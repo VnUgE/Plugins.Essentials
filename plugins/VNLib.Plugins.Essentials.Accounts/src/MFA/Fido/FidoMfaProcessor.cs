@@ -172,7 +172,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
         ///<inheritdoc/>
         public async ValueTask<object?> OnHandleMessageAsync(HttpEntity entity, JsonElement request, IUser user)
         {
-            ValErrWebMessage webm = new();
+            WebMessage webm = new();
 
             using FidoRequestMessage? req = request.Deserialize<FidoRequestMessage>();
             if (webm.Assert(req != null, "Empty request message"))
@@ -204,13 +204,12 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
                     break;
 
                 case "disable_all":
-                    user.FidoDisable();
+
+                    DisableAllDevices(user, webm);
 
                     //Push changes to the database
                     await user.ReleaseAsync(entity.EventCancellation);
 
-                    webm.Result = "Successfully disabled your TOTP authenticator";
-                    webm.Success = true;
                     break;
 
                 case "register_device":
@@ -276,7 +275,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
             return !webm.Assert(result > 0, CheckPassword);
         }
 
-        private static void PrepareDevice(FidoConfig config, HttpEntity entity, IUser user, ValErrWebMessage webm)
+        private static void PrepareDevice(FidoConfig config, HttpEntity entity, IUser user, WebMessage webm)
         {
             if (webm.Assert(user.FidoCanAddKey(), "You cannot add another key to this account. You must delete an existing one first"))
             {
@@ -314,7 +313,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
             };
         }
 
-        private static void RegisterFidoDevice(IUser user, ValErrWebMessage webm, FidoAuthenticatorResponse response)
+        private static void RegisterFidoDevice(IUser user, WebMessage webm, FidoAuthenticatorResponse response)
         {
             if (!ResponseValidator.Validate(response, webm))
             {
@@ -357,6 +356,18 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
             user.FidoAddCredential(cred);
 
             webm.Result = "Your fido device was successfully added to your account";
+            webm.Success = true;
+        }
+
+        private void DisableAllDevices(IUser user, WebMessage webm)
+        {
+            if (webm.Assert(_config.AllowDisableAllRpcCall, "'disable_all' function call is not allowed on this server"))
+            {
+                return;
+            }
+
+            user.FidoDisable();
+            webm.Result = "Successfully disabled all fido devices";
             webm.Success = true;
         }
 
@@ -418,7 +429,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
                 //Issuer is set during upgrade, we can use it to verify the origin the device signed
                 string? origin = chalDoc.RootElement.GetPropString("iss");
 
-                if(string.Equals(origin, clientData.Origin, StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(origin, clientData.Origin, StringComparison.OrdinalIgnoreCase))
                 {
                     return false;
                 }

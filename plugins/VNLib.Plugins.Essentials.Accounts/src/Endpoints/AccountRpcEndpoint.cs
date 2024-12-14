@@ -220,12 +220,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 response.Success    = webm.Success;
                 response.Result     = webm.Result;
                 response.Token      = webm.Token;
-
-                //Mirror validation errors
-                if (webm is ValErrWebMessage vle && vle.Errors != null)
-                {
-                    response.Errors = vle.Errors;
-                }
+                response.Errors     = webm.Errors;
             }
             else
             {
@@ -284,7 +279,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             return val;
         }
 
-        private sealed class RpcResponseMessage : ValErrWebMessage
+        private sealed class RpcResponseMessage : WebMessage
         {
             [JsonPropertyName("id")]
             public string? Id { get; set; }

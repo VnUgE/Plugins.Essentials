@@ -66,7 +66,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
             ///<inheritdoc/>
             public async ValueTask<RpcCommandResult> InvokeAsync(HttpEntity entity, AccountJRpcRequest message, JsonElement request)
             {
-                ValErrWebMessage webm = new();
+                WebMessage webm = new();
 
                 using PasswordResetMesage? pwReset = request.Deserialize<PasswordResetMesage>();
 

@@ -66,7 +66,7 @@
   },
 
   "otp_auth": {
-    "jwt_time_dif_sec": 30,
+    "jwt_time_diff_sec": 30,
     "max_login_attempts": 10,
     "failed_attempt_timeout_sec": 600,
     "strict_origin_check": false
@@ -87,7 +87,8 @@
     "timeout": 60000,
     "attestation_type": "none",
     "site_name": "localhost",
-    "strict_origin": false,
+    "strict_origin": false,       //Require the origin to match the site name
+    "allow_disable_all": true,    //Allow user to disable all authenticators with a single rpc call
 
     "authenticator_selection": {
       "authenticatorAttachment": "cross-platform",
@@ -108,15 +109,16 @@
     "status_cookie_name": "li",
 
     "otp_header_name": "X-Web-Token",
-    "otp_time_diff_sec": 30,
-    "otp_key_size": 64,
+    "otp_time_diff_sec": 30,    //Time difference allowed between server and client
+    "otp_key_size": 64,         //Size of the OTP security key (bytes)
 
     "pubkey_cookie_name": "client-id",
     "pubkey_signing_key_size": 32,
 
-    "strict_origin": false,
-    "strict_path": false
+    "strict_origin": false,     //requires the client's OTP signature origin to match the server address
+    "strict_path": false,       //requires the client's OTP signature path to match the server path
 
+    //An optional list of allowed origins for the client's OTP signature
     //"allowed_origins": [ ]
   }
 }

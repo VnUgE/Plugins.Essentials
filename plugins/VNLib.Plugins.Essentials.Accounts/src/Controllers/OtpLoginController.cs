@@ -90,12 +90,12 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
                     return RpcCommandResult.Error(HttpStatusCode.Conflict);
                 }
 
-                if(args.ValueKind != JsonValueKind.Object)
+                if (args.ValueKind != JsonValueKind.Object)
                 {
                     return RpcCommandResult.Error(HttpStatusCode.BadRequest);
                 }
 
-                ValErrWebMessage webm = new()
+                WebMessage webm = new()
                 {
                     Result = INVALID_MESSAGE,
                 };
@@ -343,7 +343,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
             [JsonIgnore]
             public TimeSpan MaxJwtTimeDifference { get; set; } = TimeSpan.FromSeconds(30);
 
-            [JsonPropertyName("jwt_time_dif_sec")]
+            [JsonPropertyName("jwt_time_diff_sec")]
             public uint TimeDiffSeconds
             {
                 get => (uint)MaxJwtTimeDifference.TotalSeconds;

@@ -80,7 +80,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Totp
         ///<inheritdoc/>
         public async ValueTask<object?> OnHandleMessageAsync(HttpEntity entity, JsonElement request, IUser user)
         {
-            ValErrWebMessage webm = new();
+            WebMessage webm = new();
 
             using TotpRequestMessage? req = request.Deserialize<TotpRequestMessage>();
             if (webm.Assert(req != null, "Empty request message"))
