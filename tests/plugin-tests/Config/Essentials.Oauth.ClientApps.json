@@ -1,0 +1,18 @@
+{
+  "debug": true,
+
+  "applications": {
+    "path": "/oauth/apps",
+    "max_apps_per_user": 10
+  },
+
+  "scopes": {
+    "path": "/oauth/scopes",
+    "scopes": [
+      "account:read",
+      "account:write",
+      "email:send",
+      "email:read"
+    ]
+  }
+}
