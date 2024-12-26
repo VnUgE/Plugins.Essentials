@@ -1,0 +1,56 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <AssemblyName>VNLib.Plugins.Essentials.OAuth</AssemblyName>
+    <RootNamespace>VNLib.Plugins.Essentials.Oauth</RootNamespace>
+    <NeutralLanguage>en-US</NeutralLanguage>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
+    <!-- This library isn't meant to load dynamically, there are no entrypoints -->
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PackageId>VNLib.Plugins.Essentials.OAuth</PackageId>
+    <Authors>Vaughn Nugent</Authors>
+    <Company>Vaughn Nugent</Company>
+    <Product>Essentials OAuth2 data structures library</Product>
+    <Description>A library containing common data-structures for client application driven OAuth2 implementations</Description>
+    <Copyright>Copyright © 2024 Vaughn Nugent</Copyright>
+    <PackageProjectUrl>https://www.vaughnnugent.com/resources/software/modules/Plugins.Essentials</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/VnUgE/Plugins.Essentials/tree/master/lib/VNLib.Plugins.Essentials.Oauth</RepositoryUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\..\LICENSE">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="..\README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ErrorProne.NET.CoreAnalyzers" Version="0.1.2">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="ErrorProne.NET.Structs" Version="0.1.2">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\core\lib\Plugins.Essentials\src\VNLib.Plugins.Essentials.csproj" />
+    <ProjectReference Include="..\..\..\..\core\lib\Utils\src\VNLib.Utils.csproj" />
+    <ProjectReference Include="..\..\..\..\VNLib.Plugins.Extensions\lib\VNLib.Plugins.Extensions.Data\src\VNLib.Plugins.Extensions.Data.csproj" />
+  </ItemGroup>
+
+</Project>
