@@ -29,7 +29,7 @@ import type { MfaApi } from "./config";
 /**
  * Represents the server api for loging in with a signed OTP
  */
-export interface PkiLogin{
+export interface PkOtpLogin{
     /**
      * Authenticates a user with a signed JWT one time password
      * @param pkiJwt The user input JWT signed one time password for authentication
@@ -37,6 +37,7 @@ export interface PkiLogin{
      */
     login<T>(pkiJwt: string): Promise<WebMessage<T>>
 }
+export type PkiLogin = PkOtpLogin
 
 export interface PkiPublicKey {
     readonly kid: string;
@@ -78,7 +79,7 @@ interface PkiLoginRequest extends IUserLoginRequest{
 /**
  * Creates a pki login api that allows for authentication with a signed JWT
  */
-export const useOtpAuth = (): PkiLogin =>{
+export const useOtpAuth = (): PkOtpLogin =>{
 
     const { prepareLogin } = useAccount()
     const { exec } = useAccountRpc()
