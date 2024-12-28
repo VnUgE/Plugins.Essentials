@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { MfaGetResponse, useAccount, useFidoApi, useMfaApi, useOtpApi, useSession, useTotpApi } from '@vnuge/vnlib.browser'
+import { useAccount, useFidoApi, useMfaApi, useOtpApi, useSession, useTotpApi } from '@vnuge/vnlib.browser'
 const { isLoggedIn } = useSession();
 const { login, logout } = useAccount()
 const { isEnabled, sendRequest, getData } = useMfaApi()
@@ -33,10 +33,7 @@ describe('When a user wants to add a totp key', () => {
     it('Ensures the server supports totp', async () => {
       await expect(getData())
             .resolves
-            .satisfies(
-                ({ supported_methods }: MfaGetResponse) => supported_methods.includes('totp'), 
-                "Server supports totp"
-            )
+            .toMatchObject({ supported_methods: expect.arrayContaining(['totp']) })
     })
 
     it('Requires a password to enable totp', async () => {``
@@ -103,10 +100,7 @@ describe('When a user wants to add a PKOTP public key' , () => {
     it('Ensures the server supports pkotp', async () => {
       await expect(getData())
             .resolves
-            .satisfies(
-                ({ supported_methods }: MfaGetResponse) => supported_methods.includes('pkotp'), 
-                "Server supports totp"
-            )
+            .toMatchObject({ supported_methods: expect.arrayContaining(['pkotp']) })
     })
 
     it('Adds a public key to the account', async () => {
@@ -177,10 +171,7 @@ describe('When a user wants to enable WebAuthn' , () => {
     it('Ensures the server supports pkotp', async () => {
       await expect(getData())
             .resolves
-            .satisfies(
-                ({ supported_methods }: MfaGetResponse) => supported_methods.includes('fido'), 
-                "Server supports totp"
-            )
+            .toMatchObject({ supported_methods: expect.arrayContaining(['fido']) })
     })
 
    //TODO - Support webauthn registration for automatic browser testing

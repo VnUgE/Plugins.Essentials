@@ -30,26 +30,27 @@ using VNLib.Plugins.Essentials.Oauth.Applications;
 
 namespace VNLib.Plugins.Essentials.Oauth.ClientApps.Endpoints
 {
-    internal class UserAppValidator : AbstractValidator<UserApplication>
+    internal sealed class UserAppValidator : AbstractValidator<UserApplication>
     {
         public UserAppValidator()
-        {
-            //Name rules
+        {            
             RuleFor(p => p.AppName)
                 .Length(1, 50)
                 .WithName("App name")
                 .SpecialCharacters()
                 .WithName("App name");
-            //Description rules
+
             RuleFor(app => app.AppDescription)
                 .SpecialCharacters()
                 .WithName("Description")
                 .MaximumLength(100)
                 .WithName("Description");
+
             RuleFor(app => app.Permissions)
                 .MaximumLength(100)
                 .SpecialCharacters()
-                .WithMessage("Invalid permissions");
+                //Must be comma separated aplha numeric values and colons colons allowed no longer than 32 characters between each comma
+                .Matches(@"^([a-zA-Z0-9:]{1,32},)*[a-zA-Z0-9:]{1,32}$");
         }
 
         public override ValidationResult Validate(ValidationContext<UserApplication> context)

@@ -291,10 +291,7 @@ namespace VNLib.Plugins.Essentials.Oauth.ClientApps.Endpoints
             {
                 return VirtualOk(entity, webm);
             }
-
-            //Parse permission string an re-build it to clean it up
-            newApp.Permissions = ParsePermissions(newApp.Permissions);
-
+           
             //Set user-id
             newApp.UserId = entity.Session.UserID;
 
@@ -316,6 +313,7 @@ namespace VNLib.Plugins.Essentials.Oauth.ClientApps.Endpoints
                 RawSecret       = (string)secret,
                 ClientID        = newApp.ClientId,
                 Description     = newApp.AppDescription,
+                Permissions     = newApp.Permissions,
                 CreatedTime     = newApp.Created.ToString("O"),
                 LastUpdatedTime = newApp.LastModified.ToString("O")
             };
@@ -347,22 +345,6 @@ namespace VNLib.Plugins.Essentials.Oauth.ClientApps.Endpoints
             bool isPasswordValid = await Users.ValidatePasswordAsync(user, rawPassword, PassValidateFlags.None, entity.EventCancellation) == UserPassValResult.Success;
 
             return !webm.Assert(isPasswordValid, "Please check your password");
-        }
-
-        private static string ParsePermissions(string permissions)
-        {
-            StringBuilder builder = new();
-            //Local function for splitting permissions
-            static void SplitCb(ReadOnlySpan<char> permission, StringBuilder builder)
-            {
-                _ = builder
-                    .Append(permission)
-                    .Append(',');
-            }
-            //Split permissions at comma and clean up the entires
-            permissions.AsSpan().Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries, SplitCb, builder);
-            //return the string
-            return builder.ToString();
         }
 
         private sealed class ApplicationMessage
