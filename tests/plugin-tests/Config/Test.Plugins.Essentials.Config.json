@@ -1,5 +1,6 @@
 {
   //Minimum configuration for testing
+  "debug": true,
 
   "plugins": {
     "enabled": true,
@@ -35,6 +36,6 @@
   },
 
   "secrets": {
-    "passwords": "aGVsbG8td29ybGQ=" //hello-world just a random pepper for password library
+    "passwords": "aGVsbG8td29ybGQ=" // 'hello-world' - just a random pepper for password library
   }
 }

@@ -30,11 +30,15 @@
     <ProjectReference Include="..\..\..\VNLib.Data.Caching\plugins\VNLib.Data.Caching.Providers.VNCache\src\VNLib.Data.Caching.Providers.VNCache.csproj" />
     <ProjectReference Include="..\..\..\VNLib.Plugins.Extensions\lib\sql-providers\sqlite\VNLib.Plugins.Extensions.Loading.Sql.SQLite\src\VNLib.Plugins.Extensions.Loading.Sql.SQLite.csproj" />
     <ProjectReference Include="..\..\lib\VNLib.Plugins.Essentials.Users\src\VNLib.Plugins.Essentials.Users.csproj" />
+    <ProjectReference Include="..\..\lib\VNLib.Plugins.Sessions.OAuth\src\VNLib.Plugins.Sessions.OAuth.csproj" />
+    <ProjectReference Include="..\..\lib\VNLib.Plugins.Sessions.VNCache\src\VNLib.Plugins.Sessions.VNCache.csproj" />
     <ProjectReference Include="..\..\plugins\VNLib.Plugins.Essentials.Accounts.AppData\src\VNLib.Plugins.Essentials.Accounts.AppData.csproj" />
     <ProjectReference Include="..\..\plugins\VNLib.Plugins.Essentials.Accounts.Registration\src\VNLib.Plugins.Essentials.Accounts.Registration.csproj" />
     <ProjectReference Include="..\..\plugins\VNLib.Plugins.Essentials.Accounts\src\VNLib.Plugins.Essentials.Accounts.csproj" />
     <ProjectReference Include="..\..\plugins\VNLib.Plugins.Essentials.Auth.Social\src\VNLib.Plugins.Essentials.Auth.Social.csproj" />
     <ProjectReference Include="..\..\plugins\VNLib.Plugins.Essentials.Content.Routing\src\VNLib.Plugins.Essentials.Content.Routing.csproj" />
+    <ProjectReference Include="..\..\plugins\VNLib.Plugins.Essentials.Oauth.ClientApps\src\VNLib.Plugins.Essentials.Oauth.ClientApps.csproj" />
+    <ProjectReference Include="..\..\plugins\VNLib.Plugins.Sessions.SessionProvider\src\SessionProvider.csproj" />
   </ItemGroup>
 
 

@@ -140,7 +140,7 @@ Commands:
 
                             string? privilege = args.GetArgument("-l");
 
-                            if(!ulong.TryParse(privilege, out ulong privLevel))
+                            if (!ulong.TryParse(privilege, out ulong privLevel))
                             {
                                 privLevel = AccountUtil.MINIMUM_LEVEL;
                             }
@@ -290,7 +290,7 @@ Commands:
                             //Wait for pubkey
                             string? pubkeyJwk = Console.ReadLine();
 
-                            if(string.IsNullOrWhiteSpace(pubkeyJwk))
+                            if (string.IsNullOrWhiteSpace(pubkeyJwk))
                             {
                                 Log.Warn("No public key supplied.");
                                 break;
@@ -365,7 +365,7 @@ Commands:
             {
                 Log.Error("User already exists");
             }
-            catch(UserCreationFailedException ucfe)
+            catch (UserCreationFailedException ucfe)
             {
                 Log.Error(ucfe, "Failed to create the new user");
             }
@@ -373,7 +373,7 @@ Commands:
             {
                 Log.Error("You are missing required command arguments");
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Log.Error(ex);    
             }

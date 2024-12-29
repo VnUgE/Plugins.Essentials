@@ -105,8 +105,7 @@ export interface IFidoApi {
 
 /**
  * Creates a fido api for configuration and management of fido client devices
- * @param endpoint The fido server endpoint
- * @param axiosConfig The optional axios configuration to use
+ * @param sendRequest The function to send a request to the server
  * @returns An object containing the fido api
  */
 export const useFidoApi = ({ sendRequest }: Pick<MfaApi, 'sendRequest'>): IFidoApi =>{
