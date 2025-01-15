@@ -29,7 +29,6 @@ jobs:
         git clone @server_url@/VNLib.Data.Caching --branch master
         git clone @server_url@/Emails.Transactional --branch master
         git clone @server_url@/VNLib.Plugins.Extensions --branch master
-        git clone @server_url@/VNLib.Plugins.Essentials.Oauth --branch master
     useTTY: true
     condition: ALL_PREVIOUS_STEPS_WERE_SUCCESSFUL
   - !CheckoutStep
@@ -75,7 +74,6 @@ jobs:
         git clone @server_url@/VNLib.Data.Caching --branch master
         git clone @server_url@/Emails.Transactional --branch master
         git clone @server_url@/VNLib.Plugins.Extensions --branch master
-        git clone @server_url@/VNLib.Plugins.Essentials.Oauth --branch master       
     useTTY: true
     condition: ALL_PREVIOUS_STEPS_WERE_SUCCESSFUL
   - !CheckoutStep
@@ -94,7 +92,6 @@ jobs:
         dotnet-gitversion.exe VNLib.Data.Caching /updateprojectfiles
         dotnet-gitversion.exe Emails.Transactional /updateprojectfiles
         dotnet-gitversion.exe VNLib.Plugins.Extensions /updateprojectfiles
-        dotnet-gitversion.exe VNLib.Plugins.Essentials.Oauth /updateprojectfiles
         vnbuild build -S --include @project_name@ --verbose
     useTTY: true
     condition: ALL_PREVIOUS_STEPS_WERE_SUCCESSFUL
@@ -127,7 +124,6 @@ jobs:
         git clone @server_url@/VNLib.Data.Caching --branch master
         git clone @server_url@/Emails.Transactional --branch master
         git clone @server_url@/VNLib.Plugins.Extensions --branch master
-        git clone @server_url@/VNLib.Plugins.Essentials.Oauth --branch master
     useTTY: true
     condition: ALL_PREVIOUS_STEPS_WERE_SUCCESSFUL
   - !CheckoutStep
@@ -146,7 +142,6 @@ jobs:
         dotnet-gitversion.exe VNLib.Data.Caching /updateprojectfiles
         dotnet-gitversion.exe Emails.Transactional /updateprojectfiles
         dotnet-gitversion.exe VNLib.Plugins.Extensions /updateprojectfiles
-        dotnet-gitversion.exe VNLib.Plugins.Essentials.Oauth /updateprojectfiles
         vnbuild build -S --include @project_name@
     useTTY: true
     condition: ALL_PREVIOUS_STEPS_WERE_SUCCESSFUL
