@@ -29,8 +29,8 @@ using System.Collections.Generic;
 using VNLib.Utils.Logging;
 using VNLib.Utils.Extensions;
 using VNLib.Plugins.Extensions.Loading;
-using VNLib.Plugins.Essentials.Auth.Social.openid;
 using VNLib.Plugins.Extensions.Loading.Configuration;
+using VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect;
 
 namespace VNLib.Plugins.Essentials.Auth.Social
 {
@@ -46,17 +46,8 @@ namespace VNLib.Plugins.Essentials.Auth.Social
         {
             EndpointPath = config.GetRequiredProperty("path", p => p.GetString()!);
             AccountOrigin = config.GetRequiredProperty("account_origin", p => p.GetString()!);
-         
-            OpenIdPortalConfig portalConf = config.Deserialze<OpenIdPortalConfig>()!;
 
-            Validate.NotNull(portalConf.AuthorizationEndpoint, $"Missing authorization endpoint for {config.ScopeName}");
-            Validate.NotNull(portalConf.TokenEndpoint, $"Missing token endpoint for {config.ScopeName}");
-            Validate.NotNull(portalConf.UserDataEndpoint, $"Missing user-data endpoint for {config.ScopeName}");
-
-            //Create the uris 
-            AuthorizationUrl = new(portalConf.AuthorizationEndpoint);
-            AccessTokenUrl = new(portalConf.TokenEndpoint);
-            UserDataUrl = new(portalConf.UserDataEndpoint);
+            OidcConfigJson portalConf = config.Deserialze<OidcConfigJson>()!;
 
             AllowForLocalAccounts = config.GetValueOrDefault("allow_for_local", p => p.GetBoolean(), false);
             AllowRegistration = config.GetValueOrDefault("allow_registration", p => p.GetBoolean(), false);
@@ -70,16 +61,6 @@ namespace VNLib.Plugins.Essentials.Auth.Social
 
             ClientSecret = plugin.GetSecretAsync($"{config.ScopeName}_client_secret")
                                 .ToLazy(static r => r.Result.ToString());
-
-            //Log the token server ip address for the user to verify
-            if (plugin.Log.IsEnabled(LogLevel.Verbose))
-            {
-                _ = plugin.ObserveWork(async () =>
-                {
-                    IPAddress[] addresses = await Dns.GetHostAddressesAsync(AccessTokenUrl.DnsSafeHost);
-                    plugin.Log.Verbose("Token server {host} resolves to {ip}", AccessTokenUrl.DnsSafeHost, addresses);
-                });
-            }
         }
 
         /// <summary>

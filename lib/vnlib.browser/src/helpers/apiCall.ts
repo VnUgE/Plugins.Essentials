@@ -19,7 +19,7 @@
 
 import { type MaybeRef } from 'vue' 
 import { AxiosError, type AxiosRequestConfig, type Axios } from 'axios';
-import { defaultTo, isArray, isNil, isEqual } from 'lodash-es';
+import { defaultTo, isArray, isNil, isEqual, first, isString } from 'lodash-es';
 import { get, useConfirmDialog } from '@vueuse/core';
 import { useFormToaster, useToaster } from '../toast';
 import { useWait } from './wait';
@@ -55,6 +55,9 @@ export interface IElevatedCallPassThrough extends IApiPassThrough {
 export interface ApiCall<T> {
     <TR>(callback: (data: T) => Promise<TR | undefined>): Promise<TR | undefined>;
 }
+
+type ValidationError = { property: string, message: string } 
+type ErrorResponse = ValidationError | string
 
 const useApiCallInternal = <T>(args: IApiHandle<T>): ApiCall<T> => {
 
@@ -93,13 +96,24 @@ const useApiCallInternal = <T>(args: IApiHandle<T>): ApiCall<T> => {
             }
             // Axios error message
             const response = errMsg.response
-            const errors = response?.data?.errors
+            const errors = response?.data?.errors as ErrorResponse[]
             const hasErrors = isArray(errors) && errors.length > 0
 
             const SetMessageWithDefault = (message: string) => {
                 if (hasErrors) {
-                    const title = 'Please verify your ' + defaultTo(errors[0].property, 'form')
-                    notifier.notifyError(title, errors[0].message)
+                    const fe = first(errors)
+                    if(isString(fe)){
+                       notifier.notifyError(fe as string)
+                    }
+                    else{
+                        const { message, property } = fe as ValidationError
+                        
+                        notifier.notifyError(
+                            'Please verify your ' + defaultTo(property, 'form'), 
+                            message
+                        )
+                    }
+                  
                 } else {
                     notifier.notifyError(defaultTo(response?.data?.result, message))
                 }
