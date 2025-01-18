@@ -33,7 +33,6 @@
     <ProjectReference Include="..\..\lib\VNLib.Plugins.Sessions.OAuth\src\VNLib.Plugins.Sessions.OAuth.csproj" />
     <ProjectReference Include="..\..\lib\VNLib.Plugins.Sessions.VNCache\src\VNLib.Plugins.Sessions.VNCache.csproj" />
     <ProjectReference Include="..\..\plugins\VNLib.Plugins.Essentials.Accounts.AppData\src\VNLib.Plugins.Essentials.Accounts.AppData.csproj" />
-    <ProjectReference Include="..\..\plugins\VNLib.Plugins.Essentials.Accounts.Registration\src\VNLib.Plugins.Essentials.Accounts.Registration.csproj" />
     <ProjectReference Include="..\..\plugins\VNLib.Plugins.Essentials.Accounts\src\VNLib.Plugins.Essentials.Accounts.csproj" />
     <ProjectReference Include="..\..\plugins\VNLib.Plugins.Essentials.Auth.Social\src\VNLib.Plugins.Essentials.Auth.Social.csproj" />
     <ProjectReference Include="..\..\plugins\VNLib.Plugins.Essentials.Content.Routing\src\VNLib.Plugins.Essentials.Content.Routing.csproj" />
