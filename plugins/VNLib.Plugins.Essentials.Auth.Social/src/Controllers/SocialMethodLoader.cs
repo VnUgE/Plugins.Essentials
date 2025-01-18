@@ -78,7 +78,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
                     return plugin.CreateServiceExternal<ISocialOauthController>(methodConfig.ExernAssemblyPath!);
 
                 case "oidc":
-                    OpenIDConnectMethod oidc = new (plugin, conf);
+                    OpenIdConnectMethod oidc = new (plugin, conf);
 
                     //Oidc needs to be configured in the background
                     _ = plugin.ConfigureServiceAsync(oidc, 200);

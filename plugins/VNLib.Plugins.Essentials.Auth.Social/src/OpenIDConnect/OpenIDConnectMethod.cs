@@ -1,11 +1,11 @@
 ﻿/*
-* Copyright (c) 2024 Vaughn Nugent
+* Copyright (c) 2025 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Auth.Social
-* File: ClientClaimManager.cs 
+* File: OpenIdConnectMethod.cs 
 *
-* ClientClaimManager.cs is part of VNLib.Plugins.Essentials.Auth.Social which is part of the larger 
+* OpenIdConnectMethod.cs is part of VNLib.Plugins.Essentials.Auth.Social which is part of the larger 
 * VNLib collection of libraries and utilities.
 *
 * VNLib.Plugins.Essentials.Auth.Social is free software: you can redistribute it and/or modify 
@@ -47,7 +47,7 @@ using VNLib.Plugins.Essentials.Auth.Social.Controllers;
 namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
 {
   
-    internal sealed class OpenIDConnectMethod : ISocialOauthController, IAsyncConfigurable
+    internal sealed class OpenIdConnectMethod : ISocialOauthController, IAsyncConfigurable
     {
         const string AuthErrorString = "An error occurred during authentication";
 
@@ -58,7 +58,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
         private OpenIdDiscoveryResult? ServerInfo;
         private string? _error;
 
-        public OpenIDConnectMethod(PluginBase plugin, JsonElement config)
+        public OpenIdConnectMethod(PluginBase plugin, JsonElement config)
         {
             Config = config.Deserialize<OidcConfigJson>()!;
 
@@ -122,7 +122,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
             return [new OidcOauthMethod(this)];
         }
 
-        private sealed class OidcOauthMethod(OpenIDConnectMethod manager) : ISocialOauthMethod
+        private sealed class OidcOauthMethod(OpenIdConnectMethod manager) : ISocialOauthMethod
         {
             private readonly AuthRequestValidator _authReqValidator = new();
             private readonly IdTokenValidator _idTokenValidator = new(manager);
@@ -440,17 +440,12 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
 
             private sealed class IdTokenValidator: AbstractValidator<OpenIdIdentityTokenJson>
             {
-                public IdTokenValidator(OpenIDConnectMethod config)
+                public IdTokenValidator(OpenIdConnectMethod config)
                 {
                     //Audience tokem must match the client id
                     RuleFor(r => r.Audience)
                         .NotEmpty()
                         .Equal(config.Config.ClientId, StringComparer.OrdinalIgnoreCase);
-
-                    //Issure must matche the one we expected from discovery
-                    RuleFor(r => r.Issuer)
-                        .NotEmpty()
-                        .Equal(config.ServerInfo!.Issuer, StringComparer.OrdinalIgnoreCase);
 
                     RuleFor(r => r.Email)
                         .NotEmpty()
