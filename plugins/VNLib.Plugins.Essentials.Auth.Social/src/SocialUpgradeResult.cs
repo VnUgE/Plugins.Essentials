@@ -24,7 +24,7 @@
 
 using System.Text.Json;
 
-namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
+namespace VNLib.Plugins.Essentials.Auth.Social
 {
     /// <summary>
     /// The result of a call to <see cref="ISocialOauthMethod.OnUpgradeAsync(SocialMethodState, JsonElement)"/>

@@ -41,12 +41,11 @@ using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Validation;
 using VNLib.Plugins.Essentials.Users;
 using VNLib.Plugins.Essentials.Accounts;
-using VNLib.Plugins.Essentials.Auth.Social.Controllers;
 
 
 namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
 {
-  
+
     internal sealed class OpenIdConnectMethod : ISocialOauthController, IAsyncConfigurable
     {
         const string AuthErrorString = "An error occurred during authentication";
@@ -360,8 +359,8 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
                 }
             }
 
-
-            public ValueTask<object?> OnLogoutAsync(SocialMethodState state, JsonElement request)
+            ///<inheritdoc/>
+            public ValueTask<object?> OnLogoutAsync(SocialMethodState state, JsonElement args)
             {
                 throw new NotImplementedException();
             }

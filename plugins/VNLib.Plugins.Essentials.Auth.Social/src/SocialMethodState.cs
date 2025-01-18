@@ -23,7 +23,7 @@
 */
 using VNLib.Plugins.Essentials.Users;
 
-namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
+namespace VNLib.Plugins.Essentials.Auth.Social
 {
 
     /// <summary>
@@ -50,7 +50,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
         /// Gets the stored secret data for the current method
         /// </summary>
         /// <returns>The secret data string stored from a previouse call to SetSecretData</returns>
-        public string? GetPrivateData() 
+        public string? GetPrivateData()
             => Entity.Session[MethodId];
 
         /// <summary>
@@ -58,14 +58,14 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <returns>The deserialized object representing the stored data if it exists</returns>
-        public T? GetPrivateData<T>() where T : class 
+        public T? GetPrivateData<T>() where T : class
             => UserEncodedData.Decode<T>(GetPrivateData());
 
         /// <summary>
         /// Sets the secret data for the current method
         /// </summary>
         /// <param name="secretData">Secret data to store for this method</param>
-        public void SetSecretData(string? secretData) 
+        public void SetSecretData(string? secretData)
             => Entity.Session[MethodId] = secretData!;
 
         /// <summary>
@@ -73,7 +73,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <param name="secretData">The secret object to encode and store</param>
-        public void SetSecretData<T>(T? secretData) where T : class 
+        public void SetSecretData<T>(T? secretData) where T : class
             => SetSecretData(UserEncodedData.Encode(secretData));
     }
 }

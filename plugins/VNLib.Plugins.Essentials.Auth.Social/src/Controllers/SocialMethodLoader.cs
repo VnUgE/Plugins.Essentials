@@ -48,7 +48,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
         public ISocialOauthMethod[] LoadAllMethods()
         {
             IEnumerable<JsonElement> methods = config.GetRequiredProperty<IEnumerable<JsonElement>>(
-                property: "methods", 
+                property: "methods",
                 static p => p.EnumerateArray()
             );
 
@@ -66,7 +66,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
             {
                 return null;
             }
-            
+
             _methodValidator.ValidateAndThrow(methodConfig);
 
             switch (methodConfig.Type)
@@ -91,9 +91,9 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
             }
         }
 
-      
 
-        private sealed class MethodConfigValidator: AbstractValidator<OAuthMethodConfig>
+
+        private sealed class MethodConfigValidator : AbstractValidator<OAuthMethodConfig>
         {
             public MethodConfigValidator()
             {

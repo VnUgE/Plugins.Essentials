@@ -28,7 +28,7 @@ using FluentValidation;
 
 using VNLib.Plugins.Extensions.Loading;
 
-namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
+namespace VNLib.Plugins.Essentials.Auth.Social
 {
     internal sealed class SocialOauthConfigJson : IOnConfigValidation
     {
