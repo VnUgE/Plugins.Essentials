@@ -1,5 +1,5 @@
 
-// Copyright (c) 2024 Vaughn Nugent
+// Copyright (c) 2025 Vaughn Nugent
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -29,18 +29,11 @@ import type {
     ExtendedLoginResponse, 
     UserLoginCredential,
     AccountRpcApi,
-    AccountRpcMethod,
-    AccountRpcResponse
+    AccountRpcResponse,
+    AccountRpcGetResult
 } from './types'
 import { manualComputed } from '../storage'
 import { useJrpc } from '../helpers/jrpc'
-
-type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE'
-
-interface RpcGetResponse {
-    readonly httpMethods: HttpMethod[];
-    readonly rpc_methods: AccountRpcMethod[];
-}
 
 /**
  * Gets the rpc api for interacting with the user's account/profile 
@@ -57,18 +50,18 @@ export const useAccountRpc = <TMethod extends string>(): AccountRpcApi<TMethod> 
         version: '2.0.0'
     })
 
-    const getMethods = async (): Promise<AccountRpcMethod[]> => {
+    const getData = async (): Promise<AccountRpcGetResult> => {
         const ep = config.get('endpointUrl');
 
-        const { data } = await get<RpcGetResponse>(ep);
-        return data.rpc_methods;
+        const { data } = await get<AccountRpcGetResult>(ep);
+        return data;
     }
 
     const exec = async <T>(method: TMethod, args?: object): Promise<AccountRpcResponse<T>> => {
         return request(method, args);
     }
 
-    return { getMethods, exec }
+    return { getData, exec }
 }
 
 type UserAccountMethods = 'login' | 'logout' | 'profile.get' | 'password.reset' | 'heartbeat'

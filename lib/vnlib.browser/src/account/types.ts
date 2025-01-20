@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Vaughn Nugent
+// Copyright (c) 2025 Vaughn Nugent
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -98,8 +98,21 @@ export interface AccountRpcRequest{
     readonly args: object;
 }
 
+type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE'
+
+export interface AccountRpcGetResult{
+    readonly http_methods: HttpMethod[];
+    readonly rpc_methods: AccountRpcMethod[];
+    readonly accept_content_type: string;
+    readonly properties: object[];
+    readonly status: {
+        readonly authenticated: boolean;
+        readonly is_local_account: boolean;
+    }
+}
+
 export interface AccountRpcApi<TMethod>{
-    getMethods(): Promise<AccountRpcMethod[]>;
+    getData(): Promise<AccountRpcGetResult>;
     exec<T = any>(method: AccountRpcMethod | TMethod, args?: object): Promise<AccountRpcResponse<T>>;
 }
 
