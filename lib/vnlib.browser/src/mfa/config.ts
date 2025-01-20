@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Vaughn Nugent
+// Copyright (c) 2025 Vaughn Nugent
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -18,7 +18,7 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import { useAccountRpc } from '../account';
-import { includes } from 'lodash-es';
+import { includes, map } from 'lodash-es';
 import type { MfaMethod } from "./login"
 import { AccountRpcResponse } from '../account/types';
 
@@ -73,11 +73,11 @@ type MfaRpcMethod = 'mfa.rpc' | 'mfa.get';
  */
 export const useMfaApi = (): MfaApi =>{
 
-    const { getMethods, exec } = useAccountRpc<MfaRpcMethod>();
+    const { getData: getRpcData, exec } = useAccountRpc<MfaRpcMethod>();
 
     const isEnabled = async (): Promise<boolean> => {
-        const methods = await getMethods();
-        return includes(methods.map(m => m.method), 'mfa.rpc');
+        const { rpc_methods } = await getRpcData();
+        return includes(map(rpc_methods, m => m.method), 'mfa.rpc');
     }
 
     const getData = async (): Promise<MfaGetResponse> => {
