@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2024 Vaughn Nugent
+* Copyright (c) 2025 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
@@ -44,18 +44,6 @@ using static VNLib.Plugins.Essentials.Statics;
 using VNLib.Plugins.Essentials.Accounts.AccountRpc;
 using VNLib.Plugins.Extensions.Loading.Routing.Mvc;
 
-/*
-  * Password only log-ins should be immune to repeat attacks on the same backend, because sessions are 
-  * guarunteed to be mutally exclusive on the same system, therefor a successful login cannot be repeated
-  * without a logout with the proper authorization.
-  * 
-  * Since MFA upgrades are indempodent upgrades can be regenerated continually as long as the session 
-  * is not authorized, however login authorizations should be immune to repeats because session locking
-  * 
-  * Session id's are also regenerated per request, the only possible vector could be stale session cache
-  * that has a valid MFA key and an old, but valid session id.
-  */
-
 namespace VNLib.Plugins.Essentials.Accounts.Endpoints
 {
     [ConfigurationName("rpc")]
@@ -91,7 +79,6 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
             plugin.Log.CreateScope("RPC Endpoint")
                 .Verbose("RPC methods: {methods}", _methodTable.Select(static p => p.Key));
         }
-
         private static string[] GetOptionsForMethod(IAccountRpcMethod method)
         {
             return method.Flags == RpcMethodOptions.AuthRequired
@@ -111,6 +98,19 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
                 AllowedMethods      = [ "POST", "GET" ],
                 ContentType         = HttpHelpers.GetContentTypeString(ContentType.Json),
                 RpcMethods          = _getMethodJsonArray,
+                Status              = new AccountStatus
+                {                    
+                    /*
+                     * Getting data must be fast and authentication checks are not cirtial. 
+                     * It's just nice to know if it's likely the session has been authenticated
+                     * for UI purposes. 
+                     * 
+                     * WARNING: this is not a critical authentication check, it's just a hint
+                     * to the client that the session is likely authenticated.
+                     */
+                    Authenticated   = entity.Session.UserID?.Length > 0,
+                    IsLocalAccount  = entity.Session.HasLocalAccount()
+                }
             };
 
             //Fetch get results from all methods to extend the response
@@ -294,25 +294,37 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
         private sealed class RpcGetResponse
         {
             [JsonPropertyName("http_methods")]
-            public required string[] AllowedMethods { get; set; }
+            public required string[] AllowedMethods { get; init; }
 
             [JsonPropertyName("rpc_methods")]
-            public required RpcMethodGetJson[] RpcMethods { get; set; }
+            public required RpcMethodGetJson[] RpcMethods { get; init; }
 
             [JsonPropertyName("accept_content_type")]
-            public required string ContentType { get; set; }
+            public required string ContentType { get; init; }
 
             [JsonPropertyName("properties")]
-            public List<object> ExtendedProperties { get; set; } = [];
+            public List<object> ExtendedProperties { get; init; } = [];
+
+            [JsonPropertyName("status")]
+            public required AccountStatus Status { get; init; }
+        }
+
+        private readonly struct AccountStatus
+        {
+            [JsonPropertyName("authenticated")]
+            public readonly required bool Authenticated { get; init; }
+
+            [JsonPropertyName("is_local_account")]
+            public readonly required bool IsLocalAccount { get; init; }
         }
 
         private sealed class RpcMethodGetJson
         {
             [JsonPropertyName("method")]
-            public required string Method { get; set; }
+            public required string Method { get; init; }
 
             [JsonPropertyName("options")]
-            public required string[] Options { get; set; }
+            public required string[] Options { get; init; }
         }
     }
 }

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { useAccount, useSession } from '@vnuge/vnlib.browser'
+import { useAccount, useAccountRpc, useSession } from '@vnuge/vnlib.browser'
 const { isLoggedIn } = useSession()
 const { login, logout, getProfile, resetPassword } = useAccount()
+const { getData } = useAccountRpc()
 
 const testUser = { userName: 'test@test.com', password: 'Password12!' }
 
@@ -12,6 +13,15 @@ describe('When a user wants to log in', () => {
       await expect(login<any>(testUser))
             .resolves
             .toMatchObject({ code: 200, success: true })
+    })
+
+    it('Ensures the server returns an authenticated status result', async () => {
+      const { status } = await getData();
+      expect(status)
+          .toMatchObject({ 
+                  authenticated: true, 
+                  is_local_account: true 
+            });
     })
 
     it('Fails to log the user in again', async () => {
@@ -77,5 +87,11 @@ describe('When a user has completed account modifications', () => {
         await expect(logout())
               .resolves
               .toMatchObject({ code: 200, success: true })
+      })
+
+      it('Ensures the server returns a non-authenticated status result', async () => {
+          const { status } = await getData();
+
+          expect(status).toMatchObject({ authenticated: false });
       })
 })
