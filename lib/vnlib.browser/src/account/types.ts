@@ -101,7 +101,7 @@ export interface AccountRpcRequest{
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE'
 
 export interface AccountRpcGetResult{
-    readonly httpMethods: HttpMethod[];
+    readonly http_methods: HttpMethod[];
     readonly rpc_methods: AccountRpcMethod[];
     readonly accept_content_type: string;
     readonly properties: object[];
