@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2024 Vaughn Nugent
+* Copyright (c) 2025 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Auth.Social
@@ -26,6 +26,7 @@ using System.Text.Json.Serialization;
 
 using FluentValidation;
 
+using VNLib.Plugins.Essentials.Accounts;
 using VNLib.Plugins.Extensions.Loading;
 
 namespace VNLib.Plugins.Essentials.Auth.Social
@@ -63,6 +64,25 @@ namespace VNLib.Plugins.Essentials.Auth.Social
         public string UpgradeCookieName { get; init; } = null!;
 
         /// <summary>
+        /// A value that indicates whether new users can be created
+        /// if they don't exist
+        /// </summary>
+        [JsonPropertyName("create_new_users")]
+        public bool CanCreateUser { get; init; }
+
+        /// <summary>
+        /// The default size of a generated password
+        /// </summary>
+        [JsonPropertyName("default_password_size")]
+        public int PasswordSize { get; init; } = 64;
+
+        /// <summary>
+        /// The default privilages of a new user
+        /// </summary>
+        [JsonPropertyName("default_user_privilages")]
+        public ulong DefaultUserPrivilages { get; init; } = AccountUtil.MINIMUM_LEVEL;
+
+        /// <summary>
         /// Allowed origins when client is cors enabled
         /// </summary>
         [JsonPropertyName("allowed_cors_origins")]
@@ -93,6 +113,10 @@ namespace VNLib.Plugins.Essentials.Auth.Social
                 //May be an origin or a wildcard *
                 .ForEach(r => r.Matches(@"^https?://[\w\-.]+(:\d+)?$"))
                 .When(a => a.AllowedCorsOrigins?.Length > 0);
+
+            val.RuleFor(c => c.PasswordSize)
+                .InclusiveBetween(8, 128)
+                .When(c => c.CanCreateUser);
 
             val.ValidateAndThrow(this);
         }

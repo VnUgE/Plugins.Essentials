@@ -125,13 +125,11 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
                     };
                 }
 
-                return new OnGetPropertiesResponse
+                return new
                 {
-                    Data = new GetMethodsResponse
-                    {
-                        Data = mData,
-                        SupportedProcedures = ["upgrade", "authenticate", "logout"]
-                    }
+                    type = "social_oauth",
+                    methods = mData,
+                    supported_procedures = new string[] { "upgrade", "authenticate", "logout" }
                 };
             }
 
@@ -387,21 +385,6 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
 
                 [JsonPropertyName("token")]
                 public string? Token { get; set; }
-            }
-
-            private sealed class OnGetPropertiesResponse
-            {
-                [JsonPropertyName("social_oauth")]
-                public required GetMethodsResponse Data { get; init; }
-            }
-
-            private sealed class GetMethodsResponse
-            {
-                [JsonPropertyName("methods")]
-                public required MethodData[] Data { get; init; }
-
-                [JsonPropertyName("supported_procedures")]
-                public required string[] SupportedProcedures { get; init; }
             }
 
             private sealed class MethodData

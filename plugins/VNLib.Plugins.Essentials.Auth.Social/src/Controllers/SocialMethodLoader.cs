@@ -40,6 +40,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
     {
         private readonly MethodConfigValidator _methodValidator = new();
         private readonly ILogProvider _log = plugin.Log.CreateScope("SocialMethodLoader");
+        private readonly SocialOauthConfigJson _serviceConfig = config.Deserialze<SocialOauthConfigJson>();
 
         /// <summary>
         /// Retruns all the loaded Social OAuth login methods from the loaded controllers
@@ -78,7 +79,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
                     return plugin.CreateServiceExternal<ISocialOauthController>(methodConfig.ExernAssemblyPath!);
 
                 case "oidc":
-                    OpenIdConnectMethod oidc = new (plugin, conf);
+                    OpenIdConnectMethod oidc = new (plugin, _serviceConfig, conf);
 
                     //Oidc needs to be configured in the background
                     _ = plugin.ConfigureServiceAsync(oidc, 200);

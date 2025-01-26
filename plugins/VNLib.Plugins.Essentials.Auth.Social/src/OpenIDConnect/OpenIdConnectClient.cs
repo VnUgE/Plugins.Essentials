@@ -42,6 +42,8 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
     {
         private readonly OidcAdapter _adapter;
 
+        internal RestSiteAdapterBase Adapter => _adapter;
+
         public OpenIdConnectClient(OidcConfigJson config, IOnDemandSecret clientSecret)
         {
             _adapter = new(config);

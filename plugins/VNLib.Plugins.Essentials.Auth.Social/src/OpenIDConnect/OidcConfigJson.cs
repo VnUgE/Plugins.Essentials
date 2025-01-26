@@ -85,6 +85,13 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
         [JsonPropertyName("require_logout_redirect")]
         public bool RequireLogoutRedirect { get; init; }
 
+        /// <summary>
+        /// Defines a prefix to add to the user ID when searching for 
+        /// or creating a user in the database
+        /// </summary>
+        [JsonPropertyName("user_id_prefix")]
+        public string? UserIdPrefix { get; init; }
+
         public void Validate()
         {
             InlineValidator<OidcConfigJson> val = [];
@@ -131,6 +138,10 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
             val.RuleFor(c => c.RequiredScopes)
                 .NotEmpty()
                 .ForEach(static r => r.Matches(@"^[\w\-.]+$"));
+            
+            val.RuleFor(c => c.UserIdPrefix)
+                .NotEmpty()
+                .Matches(@"^[\w\-.]+$");
 
             val.ValidateAndThrow(this);
         }
