@@ -104,7 +104,9 @@ export interface AccountRpcGetResult{
     readonly http_methods: HttpMethod[];
     readonly rpc_methods: AccountRpcMethod[];
     readonly accept_content_type: string;
-    readonly properties: object[];
+    readonly properties: object & { 
+        readonly type: string 
+    }[];
     readonly status: {
         readonly authenticated: boolean;
         readonly is_local_account: boolean;

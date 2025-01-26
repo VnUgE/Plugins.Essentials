@@ -20,9 +20,6 @@ The vnlib.browser project is licensed under the MIT license. See the LICENSE fil
 
 Unless otherwise stated, all other software in this repository is licensed under the GNU Affero General Public License (or any later version). See the LICENSE files for more information.
 
-## License 
-The software in this repository is licensed under the GNU Affero General Public License (or any later version). See the LICENSE files for more information.  
-
 ## Donations
 If you like this project and want to support it or motivate me for faster development you can donate with fiat or on-chain BTC for now.  
 

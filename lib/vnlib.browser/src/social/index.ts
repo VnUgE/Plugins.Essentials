@@ -17,7 +17,7 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import { defaultTo } from "lodash-es";
+import { defaultTo, filter } from "lodash-es";
 import { useAccount } from "../account";
 import { useSession, type ITokenResponse } from "../session";
 import { useAccountRpc } from "../account"
@@ -86,7 +86,9 @@ export interface UseOauthLoginInterface {
 }
 
 export interface AccountRpcExtendedProps {
-    readonly properties: object[]
+    readonly properties: object & {
+        readonly type: string
+    } []
 }
 
 type UpgradeResponse = {
@@ -130,12 +132,8 @@ export const useOauthLogin : UseOauthLoginInterface = <T extends AccountRpcExten
         }
 
         const { properties } = await getData();
-        for (const prop of properties) {
-            if ('social_oauth' in prop) {
-                return defaultTo((prop.social_oauth as SocialLoginRpcResponse).methods, []);
-            }
-        }
-        return [];
+        const [social_properties] = filter(properties, { type: 'social_oauth' });
+        return defaultTo((social_properties as any as SocialLoginRpcResponse).methods, []);
     }
 
     const beginLoginFlow = async ({ method, autoRedirect }: BeginFlowArgs): Promise<{authUrl: string } | undefined> => {
