@@ -133,7 +133,7 @@ export const useOauthLogin : UseOauthLoginInterface = <T extends AccountRpcExten
 
         const { properties } = await getData();
         const [social_properties] = filter(properties, { type: 'social_oauth' });
-        return defaultTo((social_properties as any as SocialLoginRpcResponse).methods, []);
+        return defaultTo((social_properties as any as SocialLoginRpcResponse)?.methods, []);
     }
 
     const beginLoginFlow = async ({ method, autoRedirect }: BeginFlowArgs): Promise<{authUrl: string } | undefined> => {

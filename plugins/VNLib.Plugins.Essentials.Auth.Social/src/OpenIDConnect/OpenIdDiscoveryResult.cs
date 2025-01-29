@@ -22,6 +22,8 @@
 * along with this program.  If not, see https://www.gnu.org/licenses/.
 */
 
+using System;
+using System.Linq;
 using System.Text.Json.Serialization;
 
 using FluentValidation;
@@ -33,12 +35,6 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
         [JsonPropertyName("response_types_supported")]
         public string[] ResponseTypesSupported { get; set; } = [];
 
-        [JsonPropertyName("subject_types_supported")]
-        public string[] SubjectTypesSupported { get; set; } = [];
-
-        [JsonPropertyName("id_token_signing_alg_values_supported")]
-        public string[] IdTokenSigningAlgValuesSupported { get; set; } = [];
-
         [JsonPropertyName("scopes_supported")]
         public string[] ScopesSupported { get; set; } = [];
 
@@ -47,12 +43,12 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
             InlineValidator<OpenIdDiscoveryResult> val = [];
 
             _ = val.RuleFor(c => c)
-                .SetValidator(GetValidator());
+                .SetValidator(GetValidator(userInfoRequired: false));
 
             _ = val.RuleFor(c => c.ResponseTypesSupported)
                 .NotEmpty()
-                //Must contain code and token types
-                .ForEach(p => p.Matches(@"^code|token$"))
+                //Must contain 
+                .Must(p => p.Contains("code", StringComparer.OrdinalIgnoreCase) && p.Contains("token", StringComparer.OrdinalIgnoreCase))
                 .WithMessage("Response type must contain code and or token");
 
             _ = val.RuleFor(c => c.ScopesSupported)
@@ -62,5 +58,6 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
 
             val.ValidateAndThrow(this);
         }
+      
     }
 }

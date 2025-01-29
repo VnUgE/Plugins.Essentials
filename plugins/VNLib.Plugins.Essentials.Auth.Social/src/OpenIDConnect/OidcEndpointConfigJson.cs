@@ -30,7 +30,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
 {
     internal class OidcEndpointConfigJson
     {
-        public static IValidator<OidcEndpointConfigJson> GetValidator()
+        public static IValidator<OidcEndpointConfigJson> GetValidator(bool userInfoRequired)
         {
             InlineValidator<OidcEndpointConfigJson> val = [];
 
@@ -46,14 +46,10 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
                 .NotEmpty()
                 .Matches(@"^https?://[\w\-.]+(:\d+)?/.*$");
 
-            val.RuleFor(r => r.JwksUri)
-                .NotEmpty()
-                .Matches(@"^https?://[\w\-.]+(:\d+)?/.*$");
-
             val.RuleFor(c => c.UserInfoEndpoint)
                 .Matches(@"^https?://[\w\-.]+(:\d+)?/.*$")
                 .WithMessage("User info endpoint must be a valid URL")
-                .When(c => !string.IsNullOrEmpty(c.UserInfoEndpoint));
+                .When(c => !string.IsNullOrEmpty(c.UserInfoEndpoint) || userInfoRequired);
 
             val.RuleFor(c => c.JwksUri)
                 .Matches(@"^https?://[\w\-.]+(:\d+)?/.*$")
@@ -64,7 +60,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
         }
 
         [JsonPropertyName("issuer")]
-        public string Issuer { get; set; } = string.Empty;
+        public string Issuer { get; init; } = string.Empty;
 
         [JsonPropertyName("authorization_endpoint")]
         public string AuthorizationEndpoint { get; set; } = string.Empty;

@@ -36,6 +36,9 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
         [JsonPropertyName("client_id")]
         public string? ClientId { get; init; }
 
+        [JsonPropertyName("trust_cert")]
+        public bool TrustCert { get; init; }
+
         [JsonPropertyName("client_secret_name")]
         public string? SecretName { get; set; }
 
@@ -132,7 +135,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
 
             //If discovery url is not set, then the manual config is required
             val.RuleFor(c => c)
-                .SetValidator(GetValidator())
+                .SetValidator(GetValidator(userInfoRequired: true))
                 .When(c => string.IsNullOrEmpty(c.DiscoveryUrl));
 
             val.RuleFor(c => c.RequiredScopes)

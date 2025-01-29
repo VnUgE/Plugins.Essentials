@@ -162,7 +162,10 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
                     Encoding        = System.Text.Encoding.UTF8,
                     Timeout         = TimeSpan.FromMilliseconds(config.TimeoutMilliseconds),
                     UserAgent       = config.UserAgent,
-                    MaxRedirects    = config.MaxRedirects
+                    MaxRedirects    = config.MaxRedirects,
+
+                    //Allow self signed certs if the user wants
+                    RemoteCertificateValidationCallback = (_, _, _, errs) => config.TrustCert || errs == System.Net.Security.SslPolicyErrors.None
                 });
             }
 

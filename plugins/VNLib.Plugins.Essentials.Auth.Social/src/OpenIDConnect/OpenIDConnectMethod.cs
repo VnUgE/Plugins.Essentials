@@ -30,10 +30,12 @@ using System.Text.Json;
 using System.Security.Cryptography;
 using System.Text.Json.Serialization;
 
+using RestSharp;
+
 using FluentValidation;
+using FluentValidation.Results;
 
 using VNLib.Hashing;
-using VNLib.Hashing.IdentityUtility;
 using VNLib.Utils.Memory;
 using VNLib.Utils.Logging;
 using VNLib.Utils.Extensions;
@@ -53,65 +55,104 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
         private readonly OidcConfigJson Config;
         private readonly OpenIdConnectClient Client;
         private readonly ILogProvider Log;
+        private readonly SocialOauthConfigJson ServiceConfig;
+        private readonly IOidcIdenityAdapter IdentityAdapter;
 
-        private OpenIdDiscoveryResult? ServerInfo;
-        private string? _error;
+        private bool Loaded;
+        private string? Error;
 
-        public OpenIdConnectMethod(PluginBase plugin, JsonElement config)
+        public OpenIdConnectMethod(PluginBase plugin, SocialOauthConfigJson serviceConfig, JsonElement config)
         {
-            Config = config.Deserialize<OidcConfigJson>()!;
+            Config = config.Deserialize<OidcConfigJson>()!;           
+            ServiceConfig = serviceConfig ?? throw new ArgumentNullException(nameof(serviceConfig));
 
-            Log = plugin.Log.CreateScope($"OIDC Method {Config.FriendlyName}");
+            Log = plugin.Log.CreateScope($"OIDC-{Config.FriendlyName}");
 
             IOnDemandSecret clientSecret = plugin.Secrets()
                 .GetOnDemandSecret(Config.SecretName!);
 
             Client = new OpenIdConnectClient(Config, clientSecret);
-            _error = $"OIDC Method {Config.FriendlyName} is not available yet";
+            Error = $"OIDC Method {Config.FriendlyName} is not available yet";
+
+            IdentityAdapter = new GenericOidcIdentityAdapter(Config, Client);
         }
 
         public async Task ConfigureServiceAsync(PluginBase plugin)
         {
-            Uri discoveryUri = new(Config.DiscoveryUrl!);
-
-            /*
-             * Resolve the IP addressess of the discovery server and print them to the screen so 
-             * the sysadmin can verify the server's identity
-             */
-            IPAddress[] addresses = await Dns.GetHostAddressesAsync(discoveryUri.DnsSafeHost, plugin.UnloadToken);
-            Log.Verbose("Discovery server {host} resolves to {ip}", discoveryUri.DnsSafeHost, addresses);
-
-            try
+            //Run an OIDC discovery if the discovery url is set
+            if (!string.IsNullOrWhiteSpace(Config.DiscoveryUrl))
             {
-                //Fetch the discovery document
-                ServerInfo = await Client.DiscoverSourceAsync(Config.DiscoveryUrl!, plugin.UnloadToken);
-                _error = null;
 
-                if (plugin.IsDebug())
+                Uri discoveryUri = new(Config.DiscoveryUrl!);
+
+                /*
+                 * Resolve the IP addressess of the discovery server and print them to the screen so 
+                 * the sysadmin can verify the server's identity
+                 */
+                IPAddress[] addresses = await Dns.GetHostAddressesAsync(discoveryUri.DnsSafeHost, plugin.UnloadToken);
+                Log.Verbose("Discovery server {host} resolves to {ip}", discoveryUri.DnsSafeHost, addresses);
+
+                try
                 {
-                    Log.Debug("OIDC Discovery Document: {doc}", ServerInfo);
+                    //Fetch the discovery document
+                    OpenIdDiscoveryResult serverInfo = await Client.DiscoverSourceAsync(Config.DiscoveryUrl!, plugin.UnloadToken);
+
+                    //Update the server info with the fetched data
+                    Config.TokenEndpoint = serverInfo.TokenEndpoint ?? Config.TokenEndpoint;
+                    Config.AuthorizationEndpoint = serverInfo.AuthorizationEndpoint ?? Config.AuthorizationEndpoint;
+                    Config.UserInfoEndpoint = serverInfo.UserInfoEndpoint ?? Config.UserInfoEndpoint;
+                    Config.JwksUri = serverInfo.JwksUri ?? Config.JwksUri;
+
+                    Error = null;
+                    Loaded = true;
+
+                    if (plugin.IsDebug())
+                    {
+                        Log.Debug("OIDC Discovery Document: {doc}", serverInfo);
+                    }
+                    else
+                    {
+                        Log.Verbose("OIDC Discovery Document fetched successfully");
+                    }
+                }
+                catch (HttpRequestException ex)
+                {
+                    Log.Error("Failed to fetch OIDC discovery document: {error}", ex.Message);
+                    Error = "Failed to fetch OIDC discovery document";
+                    return;
+                }
+                catch (ValidationException ve)
+                {
+                    Log.Error(ve, "OIDC discovery document failed validation");
+                    Error = $"OIDC discovery document failed validation. {ve.Message}";
+                    return;
+                }
+                catch
+                {
+                    Error = "Failed to fetch OIDC discovery document for unkown reason";
+                    throw;
+                }
+            }
+            else
+            {
+                //If discovery is disabled, validate the config against required fields
+
+                IValidator<OidcEndpointConfigJson> endpointVal = OidcEndpointConfigJson.GetValidator(userInfoRequired: true);
+                ValidationResult res = endpointVal.Validate(Config);
+
+                //If config is valid, then load the adapter and clear error
+                if (res.IsValid)
+                {
+                    Error = null;
+                    Loaded = true;
+
+                    Log.Verbose("OIDC Endpoint is in manual mode and configured correctly. Loading identity provider");
                 }
                 else
                 {
-                    Log.Verbose("OIDC Discovery Document fetched successfully");
+                    Log.Error("ODIC Endpoint is in manual mode but misconfigured: {errors}", res.Errors);
+                    Error = "OIDC Endpoint is misconfigured";
                 }
-            }
-            catch (HttpRequestException ex)
-            {
-                Log.Error("Failed to fetch OIDC discovery document: {error}", ex.Message);
-                _error = "Failed to fetch OIDC discovery document";
-                return;
-            }
-            catch (ValidationException ve)
-            {
-                Log.Error(ve, "OIDC discovery document failed validation");
-                _error = $"OIDC discovery document failed validation. {ve.Message}";
-                return;
-            }
-            catch
-            {
-                _error = "Failed to fetch OIDC discovery document for unkown reason";
-                throw;
             }
         }
 
@@ -124,7 +165,6 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
         private sealed class OidcOauthMethod(OpenIdConnectMethod manager) : ISocialOauthMethod
         {
             private readonly AuthRequestValidator _authReqValidator = new();
-            private readonly IdTokenValidator _idTokenValidator = new(manager);
 
             /*
              * The method id must be unique and not contain special characters like 
@@ -139,25 +179,34 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
             /// <inheritdoc/>
             public ValueTask<object?> OnGetInfo(HttpEntity entity)
             {
-                //If the server info has not been loaded or failed to load, the method is unavailable
-                bool enabled = manager.ServerInfo is not null;
                 bool sendErrors = manager.Config.SendErrorsToClient;
 
-                return ValueTask.FromResult<object?>(new OnGetResult
+                return ValueTask.FromResult<object?>(new
                 {
-                    Enabled = enabled,
-                    Name    = manager.Config.FriendlyName,
-                    IconUrl = manager.Config.IconUrl,
-                    Error   = sendErrors ? manager._error : null
+                    enabled         = manager.Loaded,
+                    friendly_name   = manager.Config.FriendlyName,
+                    icon_url        = manager.Config.IconUrl,
+                    error           = sendErrors ? manager.Error : null
                 });
             }
 
             /// <inheritdoc/>
             public ValueTask<SocialUpgradeResult> OnUpgradeAsync(SocialMethodState state, JsonElement args)
             {
-                //Cannot upgrade if the server info is not loaded
-                if (manager.ServerInfo is null)
+                if (manager.Loaded)
                 {
+                    string nonce = GetStateTokenNonce();
+
+                    return ValueTask.FromResult(new SocialUpgradeResult
+                    {
+                        Success     = true,
+                        AuthUrl     = GetAuthUrl(nonce),
+                        StateData   = new StateData { StateNonce = nonce }
+                    });
+                }
+                else
+                {
+                    //Cannot upgrade if the server info is not loaded
                     return ValueTask.FromResult(new SocialUpgradeResult
                     {
                         Success     = false,
@@ -165,15 +214,6 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
                         StateData   = null
                     });
                 }
-
-                string nonce = GetStateTokenNonce();
-
-                return ValueTask.FromResult(new SocialUpgradeResult
-                {
-                    Success     = true,
-                    AuthUrl     = GetAuthUrl(nonce),
-                    StateData   = new StateData { StateNonce = nonce }
-                });
             }
 
             ///<inheritdoc/>
@@ -189,7 +229,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
                 StateData stateData = stateDataJson.Deserialize<StateData>()!;
                 AuthenticateRequestJson? auth = requestArgs.Deserialize<AuthenticateRequestJson>();
 
-                if(webm.AssertError(manager.ServerInfo is not null, "Server info is not loaded"))
+                if(webm.AssertError(manager.Loaded, "Server info is not loaded"))
                 {
                     return webm;
                 }
@@ -216,108 +256,97 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
                 }
 
                 OpenIdTokenResponse token = await manager.Client.ExchangeCodeForTokenAsync(
-                    manager.ServerInfo.TokenEndpoint!,
-                    auth.Code,
+                    manager.Config.TokenEndpoint,
+                    accessCode: auth.Code,
                     state.Entity.EventCancellation
                 );
 
-                //If the connection sent an identity toke, we can use that to auth the user
-                if (!string.IsNullOrWhiteSpace(token.IdToken))
+                manager.Log.Verbose("Token response: {token}", token.IdToken);
+               
+                await AuthorizeClientFromPlatformId(state, secInfo, webm, token);
+
+                //Store access token info for future use
+                state.SetSecretData(new
                 {
-                    manager.Log.Verbose("Attempting to authorize session {user} in with identity token\n{token}", secInfo.ClientId, token.IdToken);
-
-                    await AuthFromIdentityJwtAsync(state, secInfo, token.IdToken, webm);
-
-                    if (webm.Success)
-                    {
-                        //Store oauth token for future use
-                        state.SetSecretData(token.Token);
-                    }
-                }
-                else
-                {
-                    //Otherwise we need to hit the user data endpoint
-
-                    webm.Result = token;
-                    webm.Success = true;
-                }
+                    access_token = token.Token,
+                    refresh_token = token.RefreshToken,
+                });
 
                 return webm;
             }
+         
 
-            private static bool ValidateReferIfExists(SocialMethodState state, AuthenticateRequestJson request)
+            ///<inheritdoc/>
+            public ValueTask<object?> OnLogoutAsync(SocialMethodState state, JsonElement args)
             {
-                if (state.Entity.Server.Referer is null)
+                throw new NotImplementedException();
+            }
+
+            private async Task AuthorizeClientFromPlatformId(SocialMethodState state, IClientSecInfo secInfo, WebMessage webm, OpenIdTokenResponse token)
+            {
+                //Get the user info from the adapter so we can log the user in
+                OidcLoginDataResult loginData = await manager.IdentityAdapter.GetLoginDataAsync(state, token);
+
+                if (webm.AssertError(loginData.IsValid, loginData.Error!))
                 {
-                    return true;
+                    return;
                 }
 
-                string query = state.Entity.Server.Referer.Query;
+                //Compute a safe user-id from the platform id
+                string userID = state.Users.ComputeSafeUserId(loginData.PlatformId!);
+                
+                IUser? user = await state.Users.GetUserFromUsernameAsync(userID, state.Entity.EventCancellation);
 
-                //If the query contains the code and state parameters, make sure they match the request
-                if (query.Contains("code="))
+                if (user is null)
                 {
-                    /*
-                        If the code paremter is set, the code should also exist in the query string
-                        Yes this is a lazy way to avoid parsing, if the code is there it doesnt matter
-                        if a hijaker changed the key name
-                    */
-                    if (!query.Contains(request.Code, StringComparison.OrdinalIgnoreCase))
+                    //User must be created if configuration allows it
+                    if (manager.ServiceConfig.CanCreateUser)
                     {
-                        return false;
+                        OidcNewUserDataResult userData = await manager.IdentityAdapter.GetNewUserDataAsync(state, token);
+
+                        if (webm.AssertError(userData.IsValid, userData.Error!))
+                        {
+                            return;
+                        }
+
+                        try
+                        {
+                            //create a new user if the user does not exist
+                            user = await CreateUserAsync(state, userID, userData.EmailAddress!);
+                        }
+                        catch (UserCreationFailedException uce)
+                        {
+                            manager.Log.Error("Failed to create user for {platformId} cause:\n{err}", loginData.PlatformId, uce);
+                            webm.Result = AuthErrorString;
+                            return;
+                        }
                     }
-                }
-
-                return !query.Contains("state=") || query.Contains(request.State, StringComparison.OrdinalIgnoreCase);
-            }
-
-            private Task AuthFromIdentityJwtAsync(SocialMethodState state, IClientSecInfo secInfo, string idTokenString, WebMessage webm)
-            {
-                using JsonWebToken idToken = JsonWebToken.Parse(idTokenString);
-                OpenIdIdentityTokenJson? tokenData = idToken.GetPayload<OpenIdIdentityTokenJson>();
-
-                if (webm.AssertError(tokenData is not null, AuthErrorString))
-                {
-                    return Task.CompletedTask;
-                }
-
-                //Validate the id token
-                if(_idTokenValidator.Validate(tokenData, webm))
-                {
-                    return Task.CompletedTask;
-                }
-
-                bool isExpired = tokenData.Expiration < state.Entity.RequestedTimeUtc.ToUnixTimeSeconds();
-                if (webm.AssertError(!isExpired, AuthErrorString))
-                {
-                    return Task.CompletedTask;
-                }
-
-                return AuthorizeUserFromEmail(state, secInfo, webm, tokenData.Email!);
-            }
-
-            private async Task AuthorizeUserFromEmail(SocialMethodState state, IClientSecInfo secInfo, WebMessage webm, string emailAddress)
-            {
-                using IUser? user = await state.Users.GetUserFromUsernameAsync(emailAddress, state.Entity.EventCancellation);
-
-                if (webm.AssertError(user is not null, AuthErrorString))
-                {
-                    return;
-                }
-
-                if (webm.AssertError(user.Status == UserStatus.Active, AuthErrorString))
-                {
-                    return;
-                }
-
-                //Social login is not allowed for local accounts
-                if (webm.AssertError(!user.IsLocalAccount(), AuthErrorString))
-                {
-                    return;
+                    else
+                    {
+                        webm.Result = AuthErrorString;
+                        return;
+                    }
                 }
 
                 try
                 {
+                    if (webm.AssertError(user is not null, AuthErrorString))
+                    {
+                        manager.Log.Verbose("User was not found for id {platformId}", loginData.PlatformId);
+                        return;
+                    }
+
+                    if (webm.AssertError(user.Status == UserStatus.Active, AuthErrorString))
+                    {
+                        return;
+                    }
+
+                    //Social login is not allowed for local accounts
+                    if (webm.AssertError(!user.IsLocalAccount(), AuthErrorString))
+                    {
+                        return;
+                    }
+
                     //Generate authoization
                     state.Entity.GenerateAuthorization(secInfo, user, webm);
                    
@@ -359,10 +388,52 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
                 }
             }
 
-            ///<inheritdoc/>
-            public ValueTask<object?> OnLogoutAsync(SocialMethodState state, JsonElement args)
+            private async Task<IUser> CreateUserAsync(SocialMethodState state, string userId, string userName)
             {
-                throw new NotImplementedException();
+                UserCreationRequest req = new()
+                {
+                    Username        = userName,
+                    Password        = PrivateString.ToPrivateString(RandomHash.GetRandomHex(64), true),
+                    InitialStatus   = UserStatus.Active,
+                    Privileges      = manager.ServiceConfig.DefaultUserPrivilages,
+                };
+
+                IUser? user = await state.Users.CreateUserAsync(
+                    req, 
+                    userId, //Userid is explicitly required so login works correctly for future logins
+                    state.Users.GetHashProvider(),
+                    state.Entity.EventCancellation
+                );
+
+                user.SetAccountOrigin(manager.Config.FriendlyName);
+                
+                return user;
+            }
+
+            private static bool ValidateReferIfExists(SocialMethodState state, AuthenticateRequestJson request)
+            {
+                if (state.Entity.Server.Referer is null)
+                {
+                    return true;
+                }
+
+                string query = state.Entity.Server.Referer.Query;
+
+                //If the query contains the code and state parameters, make sure they match the request
+                if (query.Contains("code="))
+                {
+                    /*
+                        If the code paremter is set, the code should also exist in the query string
+                        Yes this is a lazy way to avoid parsing, if the code is there it doesnt matter
+                        if a hijaker changed the key name
+                    */
+                    if (!query.Contains(request.Code, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return false;
+                    }
+                }
+
+                return !query.Contains("state=") || query.Contains(request.State, StringComparison.OrdinalIgnoreCase);
             }
 
             private string GetStateTokenNonce()
@@ -376,7 +447,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
 
                 ForwardOnlyWriter<char> writer = new(uriBuffer.Span);
 
-                writer.AppendSmall(manager.ServerInfo!.AuthorizationEndpoint);
+                writer.AppendSmall(manager.Config!.AuthorizationEndpoint);
                 writer.AppendSmall("?client_id=");
                 writer.AppendSmall(manager.Config.ClientId);
                 writer.AppendSmall("&redirect_uri=");
@@ -434,21 +505,6 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
                     RuleFor(r => r.State)
                         .NotEmpty()
                         .Matches(@"^[\w\d]{16,128}$");
-                }
-            }
-
-            private sealed class IdTokenValidator: AbstractValidator<OpenIdIdentityTokenJson>
-            {
-                public IdTokenValidator(OpenIdConnectMethod config)
-                {
-                    //Audience tokem must match the client id
-                    RuleFor(r => r.Audience)
-                        .NotEmpty()
-                        .Equal(config.Config.ClientId, StringComparer.OrdinalIgnoreCase);
-
-                    RuleFor(r => r.Email)
-                        .NotEmpty()
-                        .EmailAddress();                        
                 }
             }
         }
