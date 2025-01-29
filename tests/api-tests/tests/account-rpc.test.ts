@@ -1,12 +1,20 @@
 import { describe, expect, it } from 'vitest';
-
 import { useAccountRpc } from '@vnuge/vnlib.browser'
 
 const { getData, exec } = useAccountRpc()
 
 describe('List rpc methods', () => {
     it('Gets enabled rpc methods from the server', async () => {
-        const { rpc_methods } = await getData();
+        const { rpc_methods, http_methods, status } = await getData();
+
+        expect(status)
+            .toMatchObject({
+                authenticated: false,
+                is_local_account: false
+            })
+
+        expect(http_methods)
+            .toEqual(['POST', 'GET']);
 
         // During testing, for now, there may be more methods than expected, 
         // but the expected methods should be present
@@ -83,5 +91,24 @@ describe('When a user is not logged in', () => {
       await expect(exec('heartbeat'))
             .rejects
             .toMatchObject(errorResponse)
+    })
+})
+
+describe('The server should return some required extented properties', () => {
+
+    it('Returns login information if the login command is present', async () => {
+        const { rpc_methods, properties } = await getData();
+     
+        if(rpc_methods.find(method => method.method === 'login')){
+
+            const loginProperty = properties.find(property => property.type === 'login');
+
+            expect(loginProperty)
+                .toMatchObject({
+                    type: "login",
+                    enforce_email: true,
+                    username_max_chars: 64,
+                })
+        }
     })
 })

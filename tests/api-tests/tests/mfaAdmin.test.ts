@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { useAccount, useFidoApi, useMfaApi, useOtpApi, useSession, useTotpApi } from '@vnuge/vnlib.browser'
-const { isLoggedIn } = useSession();
+import { useAccount, useAccountRpc, useFidoApi, useMfaApi, useOtpApi, useTotpApi } from '@vnuge/vnlib.browser'
 const { login, logout } = useAccount()
 const { isEnabled, sendRequest, getData } = useMfaApi()
+const { getData:getAccStatus } = useAccountRpc()
 const testUser = { userName: 'test@test.com', password: 'Password12!' }
 
 describe('Before a user modifes their profile', () => {
@@ -12,17 +12,20 @@ describe('Before a user modifes their profile', () => {
             .resolves
             .toMatchObject({ code: 200, success: true })
     })
+
+    it('Ensures the server returns an authenticated status result', async () => {
+      const { status } = await getAccStatus();
+      expect(status)
+          .toMatchObject({ 
+              authenticated: true, 
+              is_local_account: true 
+          });
+    })
 })
 
 describe('When a user wants to add a totp key', () => {
 
     const { enable, disable } = useTotpApi({ sendRequest })
-
-    it('Ensures the user is logged in', async () => {
-        await expect(isLoggedIn())
-            .resolves
-            .toBe(true)
-    })
 
     it('Ensures mfa is enabled', async () => {
       await expect(isEnabled())
@@ -84,12 +87,6 @@ describe('When a user wants to add a PKOTP public key' , () => {
         "y": "KLVfgvN05TXnL5U9pV1EQkb3A25qTCwF35gGavt9gss",
         "alg": "ES256"
     }
-
-    it('Ensures the user is logged in', async () => {
-        await expect(isLoggedIn())
-            .resolves
-            .toBe(true)
-    })
 
     it('Ensures mfa is enabled', async () => {
       await expect(isEnabled())
@@ -155,13 +152,7 @@ describe('When a user wants to add a PKOTP public key' , () => {
 describe('When a user wants to enable WebAuthn' , () => {
 
     const { registerDefaultDevice, disableDevice, disableAllDevices } = useFidoApi({ sendRequest })
-
-    it('Ensures the user is logged in', async () => {
-        await expect(isLoggedIn())
-            .resolves
-            .toBe(true)
-    })
-
+   
     it('Ensures mfa is enabled', async () => {
       await expect(isEnabled())
             .resolves

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { useAccount, useSession, useAppDataApi } from '@vnuge/vnlib.browser'
-const { isLoggedIn } = useSession();
+import { useAccount, useAppDataApi, useAccountRpc } from '@vnuge/vnlib.browser'
 const { login, logout } = useAccount()
+const { getData } = useAccountRpc();
 
 const appData = useAppDataApi('/app-data')
 
@@ -22,15 +22,18 @@ describe('Before a user accesses app-data', () => {
             .resolves
             .toMatchObject({ code: 200, success: true })
     })
+
+    it('Ensures the server returns an authenticated status result', async () => {
+      const { status } = await getData();
+      expect(status)
+          .toMatchObject({ 
+                  authenticated: true, 
+                  is_local_account: true 
+            });
+    })
 })
 
 describe('When a user wants to read or write app-data', () => {
-
-    it('Ensures the user is logged in', async () => {
-        await expect(isLoggedIn())
-            .resolves
-            .toBe(true)
-    })
 
     it('Fails to access a scope that does not exist', async () => {
         await expect(appData.get<TestAppData>('bad-scope'))
