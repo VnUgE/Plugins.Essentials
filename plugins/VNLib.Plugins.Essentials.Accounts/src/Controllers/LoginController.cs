@@ -608,8 +608,5 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
                 Validate.Range(UsernameMaxChars, 1, 128, "username_max_chars");
             }
         }
-
     }
-
-
 }

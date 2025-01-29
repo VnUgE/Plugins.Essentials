@@ -1,7 +1,7 @@
 import { describe, expect, it, test } from 'vitest';
 import { applications, scopes } from "../../../plugins/VNLib.Plugins.Essentials.Oauth.ClientApps/src/Essentials.Oauth.ClientApps.json"
-import { useAccount, useAxios, useSession } from '@vnuge/vnlib.browser'
-const { isLoggedIn } = useSession()
+import { useAccount, useAccountRpc, useAxios } from '@vnuge/vnlib.browser'
+const { getData } = useAccountRpc()
 const { login, logout } = useAccount()
 
 const testUser = { userName: 'test@test.com', password: 'Password12!' }
@@ -27,15 +27,18 @@ describe('When a user wants to log in', () => {
         .toMatchObject({ code: 200, success: true })
     })
 
+    it('Ensures the server returns an authenticated status result', async () => {
+      const { status } = await getData();
+      expect(status)
+          .toMatchObject({ 
+            authenticated: true, 
+            is_local_account: true 
+        });
+    })
+
 })
 
 describe('When a user gets their client applications', () => {
-
-    it('Ensures the user is logged in', async () => {
-      await expect(isLoggedIn())
-        .resolves
-        .toBe(true)
-    })
 
     it('Checks application scopes', async () => {
       await expect(axios.get<string[]>(scopes.path))
@@ -44,9 +47,10 @@ describe('When a user gets their client applications', () => {
     })
 
     it('Gets the client applications', async () => {
-      await expect(axios.get<OAuth2Application[]>(applications.path))
-        .resolves
-        .toMatchObject({ status: 200, data: [] })
+        const { data, status } = await axios.get<OAuth2Application[]>(applications.path);
+
+        expect(status).toBe(200);
+        expect(data).toMatchObject([]);
     })
 
     it('Adds a new client application', async () => {
