@@ -1,5 +1,5 @@
-﻿/*
-* Copyright (c) 2024 Vaughn Nugent
+﻿﻿/*
+* Copyright (c) 2025 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
@@ -25,7 +25,6 @@
 using System;
 using System.Text.Json;
 using System.Threading.Tasks;
-using System.Text.Json.Serialization;
 
 using VNLib.Utils.Extensions;
 using VNLib.Plugins.Extensions.Loading;
@@ -44,9 +43,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
         ///<inheritdoc/>
         public IAccountRpcMethod[] GetMethods()
         {
-            return [
-                new HeartbeatMethod(tokenRegenTime)
-            ];
+            return [new HeartbeatMethod(tokenRegenTime)];
         }
 
         private sealed class HeartbeatMethod(TimeSpan tokenRegenTime) : IAccountRpcMethod
@@ -64,12 +61,12 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
                  * Quick and dirty check if the user is logged in. Its not critical
                  * for sending some quick info
                  */
-                if (entity.Session.IsSet && entity.Session.UserID.Length > 0)
+                if (entity.Session.UserID.Length > 0)
                 {
-                    return ValueTask.FromResult<object?>(new OnGetResult
+                    return ValueTask.FromResult<object?>(new
                     {
-                        Type            = "heartbeat",
-                        RegenSeconds    = (int)tokenRegenTime.TotalSeconds
+                        type            = "heartbeat",
+                        regen_seconds   = (int)tokenRegenTime.TotalSeconds
                     });
                 }
 
@@ -92,15 +89,6 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
                 }
 
                 return ValueTask.FromResult(RpcCommandResult.Okay());
-            }
-
-            private sealed class OnGetResult
-            {
-                [JsonPropertyName("type")]
-                public required string? Type { get; set; }
-
-                [JsonPropertyName("regen_seconds")]
-                public required int RegenSeconds { get; set; }
             }
         }
     }
