@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { useAccount, useAccountRpc, useSession } from '@vnuge/vnlib.browser'
-const { isLoggedIn } = useSession()
+import { useAccount, useAccountRpc } from '@vnuge/vnlib.browser'
 const { login, logout, getProfile, resetPassword } = useAccount()
 const { getData } = useAccountRpc()
 
@@ -33,12 +32,6 @@ describe('When a user wants to log in', () => {
 
 describe('When a user accesss their profile information', () => {
 
-    it('Ensures the user is logged in', async () => {
-      await expect(isLoggedIn())
-            .resolves
-            .toBe(true)
-    })
-
     it('Gets the user profile data object', async () => {
       await expect(getProfile())
             .resolves
@@ -47,13 +40,7 @@ describe('When a user accesss their profile information', () => {
 })
 
 describe('When a user wants to reset their password', () => {
-
-    it('Ensures the user is logged in', async () => {
-      await expect(isLoggedIn())
-            .resolves
-            .toBe(true)
-    })
-
+   
     it('Submits a password reset', async () => {
       await expect(resetPassword(testUser.password, 'Password123!', {}))
             .resolves

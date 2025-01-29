@@ -1,5 +1,5 @@
-﻿/*
-* Copyright (c) 2024 Vaughn Nugent
+﻿﻿/*
+* Copyright (c) 2025 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
@@ -33,22 +33,21 @@ namespace VNLib.Plugins.Essentials.Accounts.Validators
 
     internal sealed class LoginMessageValidation : ClientSecurityMessageValidator<LoginMessage>
     {
-        public LoginMessageValidation() :base()
+        public LoginMessageValidation(bool enforceEmail, int maxUernameLen) : base()
         {
 
             /* Rules for user-input on passwords, set max length to avoid DOS */
             RuleFor(static t => t.Password)
                 .SetValidator(AccountValidations.PasswordValidator);
-            
+
             //Username/email address
             RuleFor(static t => t.UserName)
                 .NotEmpty()
-                .Length(min: 1, max: 64)
-                .WithName(overridePropertyName: "Email")
-                .EmailAddress()
-                .WithName(overridePropertyName: "Email")
+                .Length(min: 1, max: maxUernameLen)
                 .IllegalCharacters()
-                .WithName(overridePropertyName: "Email");               
+                .EmailAddress()
+                .When(_ => enforceEmail) //Only require email if enforced by configuration
+                .WithName(overridePropertyName: "Email");
 
             RuleFor(static t => t.LocalLanguage!)
                 .NotEmpty()

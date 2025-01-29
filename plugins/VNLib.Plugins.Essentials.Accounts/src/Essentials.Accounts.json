@@ -60,8 +60,10 @@
   },
 
   "login": {
-    "token_refresh_sec": 600, //10 minute refresh
-    "max_login_attempts": 10, //10 failed attempts in 10 minutes
+    "enforce_email_address": true,    //If true, requires username's to be email addresses
+    "username_max_chars": 64,         //Max length of a username
+    "token_refresh_sec": 600,         //10 minute refresh
+    "max_login_attempts": 10,         //10 failed attempts in 10 minutes
     "failed_attempt_timeout_sec": 600 //10 minutes
   },
 
