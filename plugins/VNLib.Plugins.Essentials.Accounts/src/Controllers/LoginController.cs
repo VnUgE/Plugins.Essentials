@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2024 Vaughn Nugent
+* Copyright (c) 2025 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
@@ -36,7 +36,6 @@ using FluentValidation;
 
 using VNLib.Utils;
 using VNLib.Utils.Logging;
-using VNLib.Utils.Extensions;
 using VNLib.Plugins.Essentials.Users;
 using VNLib.Plugins.Extensions.Validation;
 using VNLib.Plugins.Essentials.Accounts.MFA;
@@ -45,6 +44,7 @@ using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Users;
 using static VNLib.Plugins.Essentials.Statics;
 using VNLib.Plugins.Essentials.Accounts.AccountRpc;
+using VNLib.Plugins.Extensions.Loading.Configuration;
 
 namespace VNLib.Plugins.Essentials.Accounts.Controllers
 {
@@ -56,14 +56,9 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
         public const string LOCKED_ACCOUNT_MESSAGE = "You have been timed out, please try again later";
         public const string MFA_ERROR_MESSAGE = "Invalid or expired request.";
 
-
-        private readonly FailedLoginLockout lockout = new(
-            maxCounts: config.GetRequiredProperty<uint>("max_login_attempts"),
-            maxTimeout: config.GetRequiredProperty("failed_attempt_timeout_sec", p => p.GetTimeSpan(TimeParseType.Seconds))
-        );
-
         private readonly MfaAuthManager mfa = plugin.GetOrCreateSingleton<MfaAuthManager>();
         private readonly UserManager users = plugin.GetOrCreateSingleton<UserManager>();
+        private readonly LoginConfigJson conf = config.DeserialzeAndValidate<LoginConfigJson>();
 
         /// <inheritdoc/>
         public IAccountRpcMethod[] GetMethods()
@@ -73,11 +68,11 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
             {
                 return [
                     new LogoutMethod(),
-                    new UserPassLoginMethod(plugin, lockout, mfa, users),
+                    new UserPassLoginMethod(plugin, conf, mfa, users),
 
                     //Enable mfa methods
                     new MfaGetDataMethod(mfa, users),
-                    new MfaLoginMethod(plugin, mfa, lockout, users),
+                    new MfaLoginMethod(plugin, conf, mfa, users),
                     new MfaRpcMethod(mfa, users)
                ];
             }
@@ -85,7 +80,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
             {
                 return [
                     new LogoutMethod(),
-                    new UserPassLoginMethod(plugin, lockout, mfa, users)
+                    new UserPassLoginMethod(plugin, conf, mfa, users)
                ];
             }
         }
@@ -100,11 +95,10 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
             public RpcMethodOptions Flags => RpcMethodOptions.None;
 
             ///<inheritdoc/>
-            public ValueTask<RpcCommandResult> InvokeAsync(
-                HttpEntity entity,
-                AccountJRpcRequest message,
-                JsonElement args
-            )
+            public ValueTask<object?> OnUserGetAsync(HttpEntity entity) => default;
+
+            ///<inheritdoc/>
+            public ValueTask<RpcCommandResult> InvokeAsync(HttpEntity entity, AccountJRpcRequest _, JsonElement args)
             {
                 /*
                 * If a connection is not properly authorized to modify the session
@@ -128,9 +122,6 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
 
                 return ValueTask.FromResult(RpcCommandResult.Okay());
             }
-
-            ///<inheritdoc/>
-            public ValueTask<object?> OnUserGetAsync(HttpEntity entity) => default;
         }
 
         /*
@@ -147,14 +138,14 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
 
         private sealed class UserPassLoginMethod(
             PluginBase pbase,
-            FailedLoginLockout Lockout,
+            LoginConfigJson config,
             MfaAuthManager MultiFactor,
             UserManager Users
         ) : IAccountRpcMethod
         {
-            private static readonly LoginMessageValidation LmValidator = new();
-
             private readonly ILogProvider Log = pbase.Log.CreateScope("LOGIN");
+            private readonly LoginMessageValidation LmValidator = new(config.EnforceEmailAddress, config.UsernameMaxChars);
+            private readonly FailedLoginLockout Lockout = new(config.MaxLoginAttempts, TimeSpan.FromSeconds(config.FailedAttemptTimeoutSec));
 
             ///<inheritdoc/>
             public string MethodName => "login";
@@ -163,7 +154,15 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
             public RpcMethodOptions Flags => RpcMethodOptions.None;
 
             ///<inheritdoc/>
-            public ValueTask<object?> OnUserGetAsync(HttpEntity entity) => default;
+            public ValueTask<object?> OnUserGetAsync(HttpEntity entity)
+            {
+                return new ValueTask<object?>(new
+                {
+                    type                = "login",
+                    enforce_email       = config.EnforceEmailAddress,
+                    username_max_chars  = config.UsernameMaxChars
+                });
+            }
 
             ///<inheritdoc/>
             public async ValueTask<RpcCommandResult> InvokeAsync(HttpEntity entity, AccountJRpcRequest _, JsonElement args)
@@ -321,7 +320,6 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
 
             private static bool IsUserActive(IUser user) => user.Status == UserStatus.Active;
 
-
             private async Task<bool> ValidatePasswordAsync(IUser user, LoginMessage login, CancellationToken cancellation)
             {
                 //Validate password against store
@@ -356,13 +354,16 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
 
         private sealed class MfaLoginMethod(
             PluginBase plugin,
+            LoginConfigJson config,
             MfaAuthManager MultiFactor,
-            FailedLoginLockout Lockout,
             UserManager Users
         ) : IAccountRpcMethod
         {
-
             private readonly ILogProvider _log = plugin.Log.CreateScope("MFA Login");
+            private readonly FailedLoginLockout Lockout = new(
+                config.MaxLoginAttempts,
+                TimeSpan.FromSeconds(config.FailedAttemptTimeoutSec)
+            );
 
             ///<inheritdoc/>
             public string MethodName => "mfa.login";
@@ -463,6 +464,9 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
             public RpcMethodOptions Flags => RpcMethodOptions.AuthRequired;
 
             ///<inheritdoc/>
+            public ValueTask<object?> OnUserGetAsync(HttpEntity entity) => default;
+
+            ///<inheritdoc/>
             public async ValueTask<RpcCommandResult> InvokeAsync(HttpEntity entity, AccountJRpcRequest message, JsonElement args)
             {
                 using IUser? user = await Users.GetUserFromIDAsync(
@@ -524,9 +528,6 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
                 public required object? Data { get; set; }
 
             }
-
-            ///<inheritdoc/>
-            public ValueTask<object?> OnUserGetAsync(HttpEntity entity) => default;
         }
 
 
@@ -581,7 +582,31 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
             }
         }
 
+        private sealed class LoginConfigJson : IOnConfigValidation
+        {
+
+            [JsonPropertyName("max_login_attempts")]
+            public uint MaxLoginAttempts { get; init; } = 5;
+
+            [JsonPropertyName("failed_attempt_timeout_sec")]
+            public int FailedAttemptTimeoutSec { get; init; } = 600;
+
+            /// <summary>
+            /// A value that indicates if the email address is required for 
+            /// a username value
+            /// </summary>
+            [JsonPropertyName("enforce_email_address")]
+            public bool EnforceEmailAddress { get; init; }
+
+            [JsonPropertyName("username_max_chars")]
+            public int UsernameMaxChars { get; init; } = 64;
+
+            public void OnValidate()
+            {
+                Validate.Range(MaxLoginAttempts, 1u, 100u, "max_login_attempts");
+                Validate.Range(FailedAttemptTimeoutSec, 60, 3600, "failed_attempt_timeout_sec");
+                Validate.Range(UsernameMaxChars, 1, 128, "username_max_chars");
+            }
+        }
     }
-
-
 }
