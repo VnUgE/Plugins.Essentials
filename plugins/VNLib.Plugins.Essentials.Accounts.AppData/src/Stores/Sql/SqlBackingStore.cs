@@ -42,7 +42,7 @@ using VNLib.Plugins.Essentials.Accounts.AppData.Model;
 namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores.Sql
 {
 
-    internal sealed class SqlBackingStore(PluginBase plugin) 
+    internal sealed class SqlBackingStore(PluginBase plugin)
         : IEntityStore<UserRecordData, AppDataRequest>, IAsyncConfigurable
     {
         private readonly DbRecordStore _store = new(plugin.GetContextOptionsAsync());
@@ -54,7 +54,7 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores.Sql
             await Task.Delay(2000);
             await plugin.EnsureDbCreatedAsync<UserRecordDbContext>(plugin);
         }
-    
+
         ///<inheritdoc/>
         public async Task<UserRecordData?> GetAsync(AppDataRequest request, CancellationToken cancellation = default)
         {
@@ -145,7 +145,5 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores.Sql
                 }
             }
         }
-
-       
     }
 }
