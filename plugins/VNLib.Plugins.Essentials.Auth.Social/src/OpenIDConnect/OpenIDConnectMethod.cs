@@ -279,7 +279,9 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
             ///<inheritdoc/>
             public ValueTask<object?> OnLogoutAsync(SocialMethodState state, JsonElement args)
             {
-                throw new NotImplementedException();
+                //TODO Implement logut for OIDC
+                state.Entity.InvalidateLogin();
+                return ValueTask.FromResult<object?>(null);
             }
 
             private async Task AuthorizeClientFromPlatformId(SocialMethodState state, IClientSecInfo secInfo, WebMessage webm, OpenIdTokenResponse token)

@@ -85,6 +85,8 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
             FrozenDictionary<string, ISocialOauthMethod> _methods
         ) : IAccountRpcMethod
         {
+            private static readonly string[] supported_procedures = [ "upgrade", "authenticate", "logout" ];
+
             private readonly JsonDocument EmptyDoc = JsonDocument.Parse("{}");
             private readonly UpgradeValidator _validator = new();
             private readonly SocialAuthStateManager _authUtil = new(_controller.Config);
@@ -129,7 +131,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
                 {
                     type = "social_oauth",
                     methods = mData,
-                    supported_procedures = new string[] { "upgrade", "authenticate", "logout" }
+                    supported_procedures
                 };
             }
 
@@ -187,7 +189,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
                 return await result.ConfigureAwait(false);
             }
 
-            private ValueTask<RpcCommandResult> LogoutAsync(HttpEntity entity)
+            private async ValueTask<RpcCommandResult> LogoutAsync(HttpEntity entity)
             {
                 WebMessage webm = new();
 
@@ -203,7 +205,28 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
 
                 if (entity.IsClientAuthorized(AuthorzationCheckLevel.Critical))
                 {
-                    entity.InvalidateLogin();
+                    //perform logout for the authenticated method
+                    string? methodId = _authUtil.GetAuthenticatedMethod(entity);
+
+                    if (!string.IsNullOrWhiteSpace(methodId))
+                    {
+                        if (_methods.TryGetValue(methodId, out ISocialOauthMethod? method))
+                        {
+                            SocialMethodState state = new()
+                            {
+                                Entity      = entity,
+                                Users       = _controller.Users,
+                                MethodId    = methodId
+                            };
+
+                            webm.Result = await method.OnLogoutAsync(state, EmptyDoc.RootElement);
+                        }
+                    }
+                    else
+                    {
+                        //Method was not used, so perform a normal deauth for the client
+                        entity.InvalidateLogin();
+                    }
                 }
                 else
                 {
@@ -211,7 +234,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
                     entity.Session.Detach();
                 }
 
-                return ValueTask.FromResult(RpcCommandResult.Okay());
+                return RpcCommandResult.Okay(webm);
             }
 
             private async ValueTask<RpcCommandResult> InitUpgradeAsync(HttpEntity entity, JsonElement args)
@@ -325,7 +348,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
                     {
                         Entity      = entity,
                         Users       = _controller.Users,
-                        MethodId    = methodId
+                        MethodId    = method.MethodName
                     };
 
                     object? result = await method.OnAuthenticateAsync(state, secInfo, args, userStateDatEl);                    
@@ -333,6 +356,9 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
                     {
                         return RpcCommandResult.Error(HttpStatusCode.BadRequest, webm);
                     }
+
+                    //Assign the authenticated method assuming autentication was successful
+                    _authUtil.SetAuthenticatedMethod(entity, method.MethodName);
 
                     return RpcCommandResult.Okay(result);
                 }

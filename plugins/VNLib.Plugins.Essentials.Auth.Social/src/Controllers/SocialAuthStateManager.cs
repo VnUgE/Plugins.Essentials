@@ -167,5 +167,11 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
 
         private static void SetSigningKey(HttpEntity entity, string key)
             => entity.Session["social.sig"] = key;
+
+        public void SetAuthenticatedMethod(HttpEntity entity, string methodId)
+            => entity.Session["social.method"] = methodId;
+
+        public string? GetAuthenticatedMethod(HttpEntity entity)
+            => entity.Session["social.method"];
     }
 }
