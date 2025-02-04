@@ -73,100 +73,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
         }
 
         ///<inheritdoc/>
-        public virtual ValueTask<OidcLoginDataResult> GetLoginDataAsync(SocialMethodState state, OpenIdTokenResponse token)
-        {
-            OidcLoginDataResult result = GetUserInfoFromToken(state, token);
-            return ValueTask.FromResult(result);
-        }
-
-        public async Task<OidcNewUserDataResult> GetNewUserDataAsync(SocialMethodState state, OpenIdTokenResponse token)
-        {
-            using JsonWebToken openIdToken = JsonWebToken.Parse(token.IdToken);
-            using JsonDocument idDocument = openIdToken.GetPayload();
-
-            if (TryGetEmailFromToken(idDocument, out string? email))
-            {
-                return new OidcNewUserDataResult
-                {
-                    IsValid         = true,
-                    Error           = null,
-                    EmailAddress    = email
-                };
-            }
-            //User info endpoint must be available
-            else if (string.IsNullOrEmpty(_config.UserInfoEndpoint))
-            {
-                return new OidcNewUserDataResult
-                {
-                    IsValid     = false,
-                    Error       = "User info endpoint is not available"
-                };
-            }
-            else
-            {
-                return await FetchUserDataAsync(state, token);
-            }
-        }
-
-        private async Task<OidcNewUserDataResult> FetchUserDataAsync(SocialMethodState state, OpenIdTokenResponse token)
-        {
-            RestResponse response = await _client.Adapter.ExecuteAsync<UserinfoGetRequest>(
-                entity: new (token.Token),
-                state.Entity.EventCancellation
-            );
-
-            if (response.StatusCode == HttpStatusCode.OK)
-            {
-                //Ensure the response is json
-                if (response.ContentType != "application/json")
-                {
-                    return new OidcNewUserDataResult
-                    {
-                        IsValid = false,
-                        Error = "Failed to fetch user info"
-                    };
-                }
-
-                UserInfoJson? userInfo = JsonSerializer.Deserialize<UserInfoJson>(response.RawBytes);
-
-                if (userInfo is null)
-                {
-                    return new OidcNewUserDataResult
-                    {
-                        IsValid = false,
-                        Error = "Failed to fetch user info"
-                    };
-                }
-
-                return new OidcNewUserDataResult
-                {
-                    IsValid         = true,
-                    Error           = null,
-                    EmailAddress    = userInfo.Email,
-                    Name            = userInfo.Subject
-                };
-            }
-
-            return new OidcNewUserDataResult
-            {
-                IsValid = false,
-                Error = "Failed to fetch user info"
-            };
-        }
-
-        private static bool TryGetEmailFromToken(JsonDocument idTokenPayload, out string? email)
-        {
-            if (idTokenPayload.RootElement.TryGetProperty("email", out JsonElement emailElement))
-            {
-                email = emailElement.GetString();
-                return true;
-            }
-
-            email = null;
-            return false;
-        }
-
-        private protected virtual OidcLoginDataResult GetUserInfoFromToken(SocialMethodState state, OpenIdTokenResponse token)
+        public virtual async ValueTask<OidcLoginDataResult> GetLoginDataAsync(SocialMethodState state, OpenIdTokenResponse token)
         {
             using JsonWebToken openIdToken = JsonWebToken.Parse(token.IdToken);
             OpenIdIdentityTokenJson? idToken = openIdToken.GetPayload<OpenIdIdentityTokenJson>();
@@ -201,19 +108,170 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
                 };
             }
 
-            //Prepend a prefix to the user id if it was set by the configuration
-            if (!string.IsNullOrWhiteSpace(_config.UserIdPrefix))
+            //Email is being used as an authoritative username
+            if (_config.UseEmailAsUsername)
             {
-                idToken.Subject = $"{_config.UserIdPrefix}|{idToken.Subject}";
+                if (string.IsNullOrWhiteSpace(idToken.Email))
+                {
+                    /*
+                     * If no email address is present in the token, fallback to the 
+                     * user-info endpoint to fetch the email address. If the user-info endpoint
+                     * is not available, then the login data is invalid.
+                     */
+
+                    OidcNewUserDataResult userData = await GetNewUserDataAsync(state, token);
+
+                    return new OidcLoginDataResult
+                    {
+                        Error       = userData.Error,
+                        IsValid     = userData.IsValid,
+                        Username    = userData.EmailAddress
+                    };
+                }
+                else if (idToken.EmailVerified)
+                {
+                    return new OidcLoginDataResult
+                    {
+                        IsValid     = true,
+                        Error       = null,
+                        Username    = idToken.Email
+                    };
+                }
+                else
+                {
+                    return new OidcLoginDataResult
+                    {
+                        IsValid = false,
+                        Error   = "Email address is required"
+                    };
+                }
             }
 
-            return new OidcLoginDataResult
+            /*
+             * Platform id's may be unsafe to enter in the database so 
+             * a safe user-id must be generated from the platform id.
+             */
+            else if (!string.IsNullOrWhiteSpace(_config.UserIdPrefix))
             {
-                IsValid     = true,
-                Error       = null,
-                PlatformId  = idToken.Subject!
+                //Prepend a prefix to the user id if it was set by the configuration
+                return new OidcLoginDataResult
+                {
+                    IsValid     = true,
+                    Error       = null,
+                    Username    = state.Users.ComputeSafeUserId($"{_config.UserIdPrefix}|{idToken.Subject}")
+                };
+            }
+            else
+            {
+                return new OidcLoginDataResult
+                {
+                    IsValid     = true,
+                    Error       = null,
+                    Username    = state.Users.ComputeSafeUserId(idToken.Subject!)
+                };
+            }
+        }
+
+        public async Task<OidcNewUserDataResult> GetNewUserDataAsync(SocialMethodState state, OpenIdTokenResponse token)
+        {
+            using JsonWebToken openIdToken = JsonWebToken.Parse(token.IdToken);
+            using JsonDocument idDocument = openIdToken.GetPayload();
+
+            if (TryGetEmailFromToken(idDocument, out string? email))
+            {
+                string platformId = idDocument.RootElement.GetProperty("sub").GetString();
+
+                return new OidcNewUserDataResult
+                {
+                    IsValid         = true,
+                    Error           = null,
+                    EmailAddress    = email,
+                    SafeUserId      = state.Users.ComputeSafeUserId(platformId!) 
+                };
+            }
+            //User info endpoint must be available
+            else if (string.IsNullOrEmpty(_config.UserInfoEndpoint))
+            {
+                return new OidcNewUserDataResult
+                {
+                    IsValid         = false,
+                    Error           = "User info endpoint is not available",
+                    SafeUserId      = null,
+                    EmailAddress    = null
+                };
+            }
+            else
+            {
+                return await FetchUserDataAsync(state, token);
+            }
+        }
+
+        private async Task<OidcNewUserDataResult> FetchUserDataAsync(SocialMethodState state, OpenIdTokenResponse token)
+        {
+            RestResponse response = await _client.Adapter.ExecuteAsync<UserinfoGetRequest>(
+                entity: new (token.Token),
+                state.Entity.EventCancellation
+            );
+
+            if (response.StatusCode == HttpStatusCode.OK)
+            {
+                //Ensure the response is json
+                if (response.ContentType != "application/json")
+                {
+                    return new OidcNewUserDataResult
+                    {
+                        IsValid         = false,
+                        Error           = "Failed to fetch user info",
+                        SafeUserId      = null,
+                        EmailAddress    = null
+                    };
+                }
+
+                UserInfoJson? userInfo = JsonSerializer.Deserialize<UserInfoJson>(response.RawBytes);
+
+                if (userInfo is null)
+                {
+                    return new OidcNewUserDataResult
+                    {
+                        IsValid         = false,
+                        Error           = "Failed to fetch user info",
+                        SafeUserId      = null,
+                        EmailAddress    = null
+                    };
+                }
+                else
+                {
+                    return new OidcNewUserDataResult
+                    {
+                        IsValid         = true,
+                        Error           = null,
+                        SafeUserId      = state.Users.ComputeSafeUserId(userInfo.Subject!),
+                        EmailAddress    = userInfo.Email,
+                        Name            = userInfo.Subject
+                    };
+                }
+            }
+
+            return new OidcNewUserDataResult
+            {
+                IsValid         = false,
+                Error           = "Failed to fetch user info",
+                SafeUserId      = null,
+                EmailAddress    = null
             };
         }
+
+        private static bool TryGetEmailFromToken(JsonDocument idTokenPayload, out string? email)
+        {
+            if (idTokenPayload.RootElement.TryGetProperty("email", out JsonElement emailElement))
+            {
+                email = emailElement.GetString();
+                return true;
+            }
+
+            email = null;
+            return false;
+        }       
 
         private sealed class IdTokenValidator : AbstractValidator<OpenIdIdentityTokenJson>
         {
@@ -230,6 +288,11 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
 
                 RuleFor(r => r.Subject)
                     .NotEmpty();
+
+                //If an email is specified, it must be a valid email
+                RuleFor(r => r.Email)
+                    .EmailAddress()
+                    .When(r => !string.IsNullOrEmpty(r.Email));
             }
         }
 
@@ -238,13 +301,19 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
         private sealed record UserInfoJson
         {
             [JsonPropertyName("sub")]
-            public string? Subject { get; set; }
+            public string? Subject { get; init; }
 
             [JsonPropertyName("email")]
-            public string Email { get; set; } = null!;
+            public string Email { get; init; } = null!;
 
             [JsonPropertyName("verified")]
-            public bool Verified { get; set; }
+            public bool Verified { get; init; }
+
+            [JsonPropertyName("email_verified")]
+            public bool EmailVerified
+            {
+                init => Verified = value;
+            }
         }
 
         private sealed class UserinfoResultValidator : AbstractValidator<UserInfoJson>

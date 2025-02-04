@@ -30,7 +30,9 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
 
         public required string? Error { get; init; }
 
-        public string? EmailAddress { get; init; }
+        public required string? EmailAddress { get; init; }
+
+        public required string? SafeUserId { get; init; }
 
         public string? Name { get; init; }
     }

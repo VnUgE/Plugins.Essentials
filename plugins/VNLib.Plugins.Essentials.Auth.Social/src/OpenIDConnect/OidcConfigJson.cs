@@ -64,12 +64,6 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
         public bool SendErrorsToClient { get; init; } = true;
 
         /// <summary>
-        /// The size of the state nonce used for the upgrade request
-        /// </summary>
-        [JsonPropertyName("state_nonce_size")]
-        public int StateNonceSize { get; init; } = 16;
-
-        /// <summary>
         /// The URL to redirect to after a successful upgrade
         /// </summary>
         [JsonPropertyName("redirect_url")]
@@ -79,7 +73,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
         /// The specific scope names requires for this oauth source
         /// </summary>
         [JsonPropertyName("required_scopes")]
-        public string[] RequiredScopes { get; init; } = [];
+        public string[] RequiredScopes { get; init; } = ["openid"];
 
         /// <summary>
         /// A value that indicates if the user will be redirected to the method's specific 
@@ -95,6 +89,12 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
         [JsonPropertyName("user_id_prefix")]
         public string? UserIdPrefix { get; init; }
 
+        /// <summary>
+        /// A value that indicates if the email address should be used as the username
+        /// </summary>
+        [JsonPropertyName("email_is_username")]
+        public bool UseEmailAsUsername { get; init; }
+
         public void Validate()
         {
             InlineValidator<OidcConfigJson> val = [];
@@ -104,9 +104,6 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
 
             val.RuleFor(c => c.TimeoutMilliseconds)
                 .InclusiveBetween(100, 60000);
-
-            val.RuleFor(c => c.StateNonceSize)
-                .InclusiveBetween(8, 128);
 
             val.RuleFor(c => c.RedirectUrl)
                 .NotEmpty()

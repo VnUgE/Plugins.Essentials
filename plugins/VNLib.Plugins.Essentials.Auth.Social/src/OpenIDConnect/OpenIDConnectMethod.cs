@@ -294,32 +294,24 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
                     return;
                 }
 
-                //Compute a safe user-id from the platform id
-                string userID = state.Users.ComputeSafeUserId(loginData.PlatformId!);
-                
-                IUser? user = await state.Users.GetUserFromUsernameAsync(userID, state.Entity.EventCancellation);
+                /*
+                 * If the configuration requires using an email address as a username,
+                 * vs the platform id, then we need to get the user from the email address
+                 */
+                IUser? user = manager.Config.UseEmailAsUsername
+                    ? await state.Users.GetUserFromUsernameAsync(loginData.Username!, state.Entity.EventCancellation)
+                    : await state.Users.GetUserFromIDAsync(loginData.Username!, state.Entity.EventCancellation);
 
                 if (user is null)
                 {
                     //User must be created if configuration allows it
                     if (manager.ServiceConfig.CanCreateUser)
                     {
-                        OidcNewUserDataResult userData = await manager.IdentityAdapter.GetNewUserDataAsync(state, token);
+                        //create a new user if the user does not exist
+                        user = await CreateUserAsync(state, token, webm);
 
-                        if (webm.AssertError(userData.IsValid, userData.Error!))
+                        if(user is null)
                         {
-                            return;
-                        }
-
-                        try
-                        {
-                            //create a new user if the user does not exist
-                            user = await CreateUserAsync(state, userID, userData.EmailAddress!);
-                        }
-                        catch (UserCreationFailedException uce)
-                        {
-                            manager.Log.Error("Failed to create user for {platformId} cause:\n{err}", loginData.PlatformId, uce);
-                            webm.Result = AuthErrorString;
                             return;
                         }
                     }
@@ -334,7 +326,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
                 {
                     if (webm.AssertError(user is not null, AuthErrorString))
                     {
-                        manager.Log.Verbose("User was not found for id {platformId}", loginData.PlatformId);
+                        manager.Log.Verbose("User was not found for id {platformId}", loginData.Username);
                         return;
                     }
 
@@ -343,8 +335,9 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
                         return;
                     }
 
-                    //Social login is not allowed for local accounts
-                    if (webm.AssertError(!user.IsLocalAccount(), AuthErrorString))
+                    //Social login may not be allowed for local accounts
+                    bool allowLocal = manager.ServiceConfig.AllowForLocalAccounts;
+                    if (webm.AssertError(allowLocal || !user.IsLocalAccount(), AuthErrorString))
                     {
                         return;
                     }
@@ -386,30 +379,50 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
                 }
                 finally
                 {
-                    user.Dispose();
+                    user?.Dispose();
                 }
             }
 
-            private async Task<IUser> CreateUserAsync(SocialMethodState state, string userId, string userName)
+            private async Task<IUser?> CreateUserAsync(SocialMethodState state, OpenIdTokenResponse token, WebMessage webm)
             {
+                //Fetch the user data from the adapter for the current user auth token
+                OidcNewUserDataResult userData = await manager.IdentityAdapter.GetNewUserDataAsync(state, token);
+
+                if (webm.AssertError(userData.IsValid, userData.Error!))
+                {
+                    return null;
+                }
+
+                int passwordSize = manager.ServiceConfig.PasswordSize;
+
                 UserCreationRequest req = new()
                 {
-                    Username        = userName,
-                    Password        = PrivateString.ToPrivateString(RandomHash.GetRandomHex(64), true),
+                    Username        = userData.EmailAddress!,
+                    Password        = PrivateString.ToPrivateString(RandomHash.GetRandomHex(passwordSize), ownsString: true),
                     InitialStatus   = UserStatus.Active,
                     Privileges      = manager.ServiceConfig.DefaultUserPrivilages,
                 };
 
-                IUser? user = await state.Users.CreateUserAsync(
-                    req, 
-                    userId, //Userid is explicitly required so login works correctly for future logins
-                    state.Users.GetHashProvider(),
-                    state.Entity.EventCancellation
-                );
+                try
+                {
+                    IUser? user = await state.Users.CreateUserAsync(
+                        req,
+                        userId: userData.SafeUserId!, //Userid is explicitly required so login works correctly for future logins
+                        state.Users.GetHashProvider(),
+                        state.Entity.EventCancellation
+                    );
 
-                user.SetAccountOrigin(manager.Config.FriendlyName);
-                
-                return user;
+                    user.SetAccountOrigin(manager.Config.FriendlyName);
+
+                    return user;
+                }
+                catch (UserCreationFailedException uce)
+                {
+                    manager.Log.Error("Failed to create user for {platformId} cause:\n{err}", userData.SafeUserId, uce);
+                    webm.Result = AuthErrorString;
+                }
+
+                return null;
             }
 
             private static bool ValidateReferIfExists(SocialMethodState state, AuthenticateRequestJson request)
@@ -440,7 +453,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
 
             private string GetStateTokenNonce()
             {
-                return RandomHash.GetRandomBase32(manager.Config.StateNonceSize);
+                return RandomHash.GetRandomBase32(manager.ServiceConfig.StateNonceSize);
             }
 
             private string GetAuthUrl(string nonce)

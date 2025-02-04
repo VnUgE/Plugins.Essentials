@@ -89,6 +89,21 @@ namespace VNLib.Plugins.Essentials.Auth.Social
         public string[] AllowedCorsOrigins { get; init; } = [];
 
         /// <summary>
+        /// The size of the state nonce used for the upgrade request
+        /// </summary>
+        [JsonPropertyName("state_nonce_size")]
+        public int StateNonceSize { get; init; } = 16;
+
+        /// <summary>
+        /// When true, local accounts with the same email or username
+        /// as the internal database, are allowed to be authenticated.
+        /// By default, accounts created in the local database are not
+        /// allowed to be authenticated by external authentication sources.
+        /// </summary>
+        [JsonPropertyName("allow_local_accounts")]
+        public bool AllowForLocalAccounts { get; init; }
+
+        /// <summary>
         /// A value that indicates if all origins are denied
         /// </summary>
         public bool DenyCorsConnections => AllowedCorsOrigins.Length == 0;
@@ -117,6 +132,9 @@ namespace VNLib.Plugins.Essentials.Auth.Social
             val.RuleFor(c => c.PasswordSize)
                 .InclusiveBetween(8, 128)
                 .When(c => c.CanCreateUser);
+
+            val.RuleFor(c => c.StateNonceSize)
+                .InclusiveBetween(8, 128);
 
             val.ValidateAndThrow(this);
         }

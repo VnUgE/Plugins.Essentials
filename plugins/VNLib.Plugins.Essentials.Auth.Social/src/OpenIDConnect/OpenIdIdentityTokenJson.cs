@@ -33,23 +33,29 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
     internal sealed class OpenIdIdentityTokenJson
     {
         [JsonPropertyName("iss")]
-        public string? Issuer { get; set; }
+        public string? Issuer { get; init; }
 
         [JsonPropertyName("aud")]
         [JsonConverter(typeof(FlexibleStringArrayConverter))]
         public string[]? Audience { get; set; }
 
         [JsonPropertyName("exp")]
-        public long Expiration { get; set; }
+        public long Expiration { get; init; }
 
         [JsonPropertyName("iat")]
-        public long IssuedAt { get; set; }
+        public long IssuedAt { get; init; }
 
         [JsonPropertyName("sub")]
         public string? Subject { get; set; }
 
         [JsonPropertyName("picture")]
-        public string? Picture { get; set; }
+        public string? Picture { get; init; }
+
+        [JsonPropertyName("email")]
+        public string? Email { get; init; }
+
+        [JsonPropertyName("email_verified")]
+        public bool EmailVerified { get; init; }
 
         /*
          * Some identity providers (Discord namely) return an arary of strings for 

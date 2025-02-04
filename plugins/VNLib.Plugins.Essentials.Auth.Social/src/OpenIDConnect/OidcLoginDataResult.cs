@@ -30,6 +30,6 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
 
         public required string? Error { get; init; }
 
-        public string? PlatformId { get; init; }
+        public string? Username { get; init; }
     }
 }
