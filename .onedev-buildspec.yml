@@ -1,4 +1,4 @@
-version: 37
+version: 38
 jobs:
 - name: GitHub Push
   steps:
@@ -25,18 +25,12 @@ jobs:
     runInContainer: false
     interpreter: !DefaultInterpreter
       commands: |
+        git clone @server_url@/@project_name@ --branch @branch@
         git clone @server_url@/VNLib.Core core --branch master
         git clone @server_url@/VNLib.Data.Caching --branch master
         git clone @server_url@/Emails.Transactional --branch master
         git clone @server_url@/VNLib.Plugins.Extensions --branch master
     useTTY: true
-    condition: ALL_PREVIOUS_STEPS_WERE_SUCCESSFUL
-  - !CheckoutStep
-    name: checkout
-    cloneCredential: !DefaultCredential {}
-    withLfs: false
-    withSubmodules: false
-    checkoutPath: '@project_name@'
     condition: ALL_PREVIOUS_STEPS_WERE_SUCCESSFUL
   - !CommandStep
     name: dev-init core
@@ -53,7 +47,7 @@ jobs:
     interpreter: !DefaultInterpreter
       commands: |
         cd @project_name@
-        task -t Module.Taskfile.yaml test
+        vnbuild test --include @project_name@
     useTTY: true
     condition: ALL_PREVIOUS_STEPS_WERE_SUCCESSFUL
   triggers:
@@ -70,18 +64,12 @@ jobs:
     runInContainer: false
     interpreter: !DefaultInterpreter
       commands: |
+        git clone @server_url@/@project_name@ --branch @branch@
         git clone @server_url@/VNLib.Core core --branch master
         git clone @server_url@/VNLib.Data.Caching --branch master
         git clone @server_url@/Emails.Transactional --branch master
         git clone @server_url@/VNLib.Plugins.Extensions --branch master
     useTTY: true
-    condition: ALL_PREVIOUS_STEPS_WERE_SUCCESSFUL
-  - !CheckoutStep
-    name: checkout
-    cloneCredential: !DefaultCredential {}
-    withLfs: false
-    withSubmodules: false
-    checkoutPath: '@project_name@'
     condition: ALL_PREVIOUS_STEPS_WERE_SUCCESSFUL
   - !CommandStep
     name: VNBuild build
@@ -120,18 +108,12 @@ jobs:
     runInContainer: false
     interpreter: !DefaultInterpreter
       commands: |
+        git clone @server_url@/@project_name@ --branch @branch@
         git clone @server_url@/VNLib.Core core --branch master
         git clone @server_url@/VNLib.Data.Caching --branch master
         git clone @server_url@/Emails.Transactional --branch master
         git clone @server_url@/VNLib.Plugins.Extensions --branch master
     useTTY: true
-    condition: ALL_PREVIOUS_STEPS_WERE_SUCCESSFUL
-  - !CheckoutStep
-    name: checkout
-    cloneCredential: !DefaultCredential {}
-    withLfs: false
-    withSubmodules: false
-    checkoutPath: '@project_name@'
     condition: ALL_PREVIOUS_STEPS_WERE_SUCCESSFUL
   - !CommandStep
     name: VNBuild build
