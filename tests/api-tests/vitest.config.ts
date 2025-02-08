@@ -17,19 +17,5 @@ export default defineConfig({
         }
       },
     }
-  },
-  test: {
-    name: 'api-tests',
-    environment: 'jsdom',
-    setupFiles: ['./setup.ts'],
-    browser: {
-      enabled: true,
-      name: 'firefox',
-      headless: true,
-      provider: 'webdriverio',
-      // https://webdriver.io
-      providerOptions: {
-      },
-    },
-  },
+  }
 })
