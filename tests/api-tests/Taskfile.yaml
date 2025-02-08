@@ -16,7 +16,9 @@ tasks:
 
   test:
     cmds:
-      - cmd: echo "TODO"
+      - cmd: npm install
+      - cmd: "npm run test:ci"
+        ignore_error: true    #TEMPORARY until a headless test server can be staged
 
   postbuild_success:
     vars:
