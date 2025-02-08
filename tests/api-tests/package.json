@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "test:dev": "vitest --workspace=vitest.dev.ts",
-    "test:ci": "vitest run --workspace=vitest.headless.ts"
+    "test:ci": "vitest run --no-color --workspace=vitest.headless.ts"
   },
   "repository": "https://git.vaughnnugent.com/cgit/vnuge/plugins.essentials/tree/tests/api-tests",
   "author": "Vaughn Nugent",
