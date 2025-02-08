@@ -11,13 +11,13 @@ export default defineWorkspace([
         setupFiles: ['./setup.ts'],
         browser: {
           enabled: true,
-          name: 'firefox',
           headless: true,
           ui: false,
           screenshotFailures: false,
           provider: 'webdriverio',
-          // https://webdriver.io
-          providerOptions: { },
+          instances: [ 
+            { browser: 'firefox'} 
+          ],
       },
     },
   },
