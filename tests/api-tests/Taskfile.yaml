@@ -16,8 +16,8 @@ tasks:
 
   test:
     cmds:
-      - cmd: cd '{{ .MODULE_DIR }}/lib/vnlib.browser' && npm install
-      - cmd: cd '{{ .MODULE_DIR }}/lib/vnlib.browser' && npm run build
+      - cmd: cd '../../lib/vnlib.browser' && npm install
+      - cmd: cd '../../lib/vnlib.browser' && npm run build
       - cmd: npm install
       - cmd: "npm run test:ci"
         ignore_error: true    #TEMPORARY until a headless test server can be staged

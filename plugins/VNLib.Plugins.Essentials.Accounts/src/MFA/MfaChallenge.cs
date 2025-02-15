@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2024 Vaughn Nugent
+* Copyright (c) 2025 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
@@ -38,7 +38,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
         /// The id of the user that is requesting a login
         /// </summary>
         [JsonPropertyName("uname")]
-        public string? UserName{ get; set; }
+        public string? UserName { get; set; }
 
         /// <summary>
         /// The supported mfa types enabled for the user

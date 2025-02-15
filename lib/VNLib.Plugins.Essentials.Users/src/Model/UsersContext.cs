@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2024 Vaughn Nugent
+* Copyright (c) 2025 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Users
@@ -58,7 +58,7 @@ namespace VNLib.Plugins.Essentials.Users.Model
             PluginBase plugin = (userState as PluginBase)!;
 
             //Try to get the configuration for the users implementation
-            IConfigScope? userConfig = plugin.TryGetConfig("users");
+            IConfigScope? userConfig = plugin.TryGetConfigForType<UserManager>();
 
             //Maxium char size in most dbs
             int userMaxLen = userConfig?.GetValueOrDefault<int>("max_data_size", 8000) ?? 8000;

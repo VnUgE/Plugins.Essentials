@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2024 Vaughn Nugent
+* Copyright (c) 2025 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Users
@@ -30,6 +30,7 @@ using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Security.Cryptography;
 using System.Runtime.InteropServices;
+using System.Text.Json.Serialization;
 
 using Microsoft.EntityFrameworkCore;
 
@@ -42,6 +43,7 @@ using VNLib.Plugins.Essentials.Users.Model;
 using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Loading.Sql;
 using VNLib.Plugins.Extensions.Loading.Users;
+using VNLib.Plugins.Extensions.Loading.Configuration;
 
 namespace VNLib.Plugins.Essentials.Users
 {
@@ -57,20 +59,23 @@ namespace VNLib.Plugins.Essentials.Users
 
         private readonly IAsyncLazy<DbContextOptions> _dbOptions = plugin.GetContextOptionsAsync();
         private readonly IPasswordHashingProvider _passwords = plugin.GetOrCreateSingleton<ManagedPasswordHashing>();
-        private readonly int _randomPasswordLength = DefaultRandomPasswordLength;
+        private readonly UserConfigurationJson _config = new();
 
         public UserManager(PluginBase plugin, IConfigScope config) : this(plugin)
         {
-            _randomPasswordLength = config.GetValueOrDefault(
-                property: "random_password_length",
-                DefaultRandomPasswordLength
-            );
+            _config = config.DeserialzeAndValidate<UserConfigurationJson>();
         }
 
         ///<inheritdoc/>
         public async Task ConfigureServiceAsync(PluginBase plugin)
         {
             //Add random startup delay to prevent excess startup load
+
+            bool runInit = _config.EnableDbCreation || plugin.HostArgs.HasArgument("--users-db-init");
+            if (!runInit)
+            {
+                return;
+            }
 
 #pragma warning disable CA5394 // Do not use insecure randomness
             int randomDelay = Random.Shared.Next(1000, 4000);
@@ -205,7 +210,7 @@ namespace VNLib.Plugins.Essentials.Users
                 if (hashProvider is not null)
                 {
                     storedPassword = new(
-                        value: GetRandomPassword(hashProvider, _randomPasswordLength),
+                        value: GetRandomPassword(hashProvider, _config.RandomPasswordLength),
                         ownsString: true
                     );
                 }
@@ -214,7 +219,7 @@ namespace VNLib.Plugins.Essentials.Users
                     //Dispose always happens in the finally block
 #pragma warning disable CA2000 // Dispose objects before losing scope
                     storedPassword = new(
-                        value: GetRandomPassword(_randomPasswordLength),
+                        value: GetRandomPassword(_config.RandomPasswordLength),
                         ownsString: true
                     );
 #pragma warning restore CA2000 // Dispose objects before losing scope
@@ -551,7 +556,21 @@ namespace VNLib.Plugins.Essentials.Users
                 }
             }
 
-            public string? GetStringReference() => (string?)Value;
+            public string? GetStringReference() => Value?.DangerousGetStringReference();
+        }
+
+        private sealed class UserConfigurationJson : IOnConfigValidation
+        {
+            [JsonPropertyName("random_password_length")]
+            public int RandomPasswordLength { get; init; } = DefaultRandomPasswordLength;
+
+            [JsonPropertyName("run_db_init")]
+            public bool EnableDbCreation { get; init; } = false;
+
+            public void OnValidate()
+            {
+                Validate.Range(RandomPasswordLength, 0, 512);
+            }
         }
     }
 }
