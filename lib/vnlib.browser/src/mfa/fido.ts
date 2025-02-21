@@ -64,14 +64,11 @@ interface FidoRegistration{
     readonly attestationObject?: string;
 }
 
-export interface MinimalFidoApi{
-    /*
+export interface IFidoApi {   
+     /*
     * Checks if the current browser supports the FIDO authentication API
     */
     isSupported(): boolean;
-}
-
-export interface IFidoApi extends MinimalFidoApi{   
     /**
      * Gets fido credential options from the server for a currently logged-in user
      * @returns A promise that resolves to the server options for the FIDO API
@@ -110,19 +107,18 @@ export interface IFidoApi extends MinimalFidoApi{
 }
 
 export interface UseFidoApi {
-    /*
+    /**
      * Creates a minimal fido api for checking browser support 
      */
-    (): MinimalFidoApi;
-    /**
-     * Creates a fido api for configuration and management of fido client devices
-     * @param sendRequest The function to send a request to the server
-     * @returns An object containing the fido api
-     */
+    (): Pick<IFidoApi, 'isSupported'>;
     (options: Pick<MfaApi, 'sendRequest'>): IFidoApi;
 }
 
-
+ /**
+ * Creates a fido api for configuration and management of fido client devices
+ * @param sendRequest The function to send a request to the server
+ * @returns An object containing the fido api
+ */
 export const useFidoApi: UseFidoApi = (options?: Pick<MfaApi, 'sendRequest'>): IFidoApi =>{
 
     const sendRequest = options?.sendRequest ?? (() => { throw new Error('No sendRequest function provided') });

@@ -18,9 +18,8 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import { useAccountRpc } from '../account';
-import { includes, map } from 'lodash-es';
 import type { MfaMethod } from "./login"
-import { AccountRpcResponse } from '../account/types';
+import type { AccountRpcGetResult, AccountRpcResponse } from '../account/types';
 
 export type UserArg = object;
 
@@ -51,7 +50,7 @@ export interface MfaApi{
      * Determines if the mfa rpc api is available
      * and enabled on the server
      */
-    isEnabled(): Promise<boolean>;
+    isEnabled(getData: Pick<AccountRpcGetResult, 'rpc_methods'>): boolean;
     /**
      * Gets the mfa data for the current user
      */
@@ -73,11 +72,10 @@ type MfaRpcMethod = 'mfa.rpc' | 'mfa.get';
  */
 export const useMfaApi = (): MfaApi =>{
 
-    const { getData: getRpcData, exec } = useAccountRpc<MfaRpcMethod>();
-
-    const isEnabled = async (): Promise<boolean> => {
-        const { rpc_methods } = await getRpcData();
-        return includes(map(rpc_methods, m => m.method), 'mfa.rpc');
+    const { exec, isMethodEnabled } = useAccountRpc<MfaRpcMethod>();
+   
+    const isEnabled = (getData: Pick<AccountRpcGetResult, 'rpc_methods'>): boolean => {
+        return isMethodEnabled(getData, 'mfa.get');
     }
 
     const getData = async (): Promise<MfaGetResponse> => {

@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Vaughn Nugent
+// Copyright (c) 2025 Vaughn Nugent
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -22,7 +22,7 @@ import { trim } from "lodash-es";
 import { useAccount, useAccountRpc } from "../account"
 import { debugLog } from "../util"
 import type { WebMessage } from '../types'
-import type { IUserLoginRequest, AccountRpcResponse } from "../account/types"
+import type { IUserLoginRequest, AccountRpcResponse, AccountRpcGetResult } from "../account/types"
 import type { ITokenResponse } from "../session"
 import type { MfaApi } from "./config";
 
@@ -36,6 +36,12 @@ export interface PkOtpLogin{
      * @returns A promise that resolves to the login result
      */
     login<T>(pkiJwt: string): Promise<WebMessage<T>>
+
+    /**
+     * Gets a value that indicates if the pki login method is enabled 
+     * on the server
+     */
+    isEnabled(getResponse: Pick<AccountRpcGetResult, 'rpc_methods'>): boolean;
 }
 export type PkiLogin = PkOtpLogin
 
@@ -82,7 +88,7 @@ interface PkiLoginRequest extends IUserLoginRequest{
 export const useOtpAuth = (): PkOtpLogin =>{
 
     const { prepareLogin } = useAccount()
-    const { exec } = useAccountRpc()
+    const { exec, isMethodEnabled } = useAccountRpc<'otp.login'>()
 
     const login = async <T>(pkiJwt: string): Promise<WebMessage<T>> => {
 
@@ -111,7 +117,11 @@ export const useOtpAuth = (): PkOtpLogin =>{
         return data as WebMessage<T>;
     }
 
-    return { login }
+    const isEnabled = (getResponse: Pick<AccountRpcGetResult, 'rpc_methods'>): boolean => {
+       return isMethodEnabled(getResponse, 'otp.login');
+    }
+
+    return { login, isEnabled }
 }
 
 /**
