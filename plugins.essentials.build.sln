@@ -41,7 +41,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VNLib.Plugins.Sessions.OAut
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VNLib.Plugins.Sessions.VNCache", "lib\VNLib.Plugins.Sessions.VNCache\src\VNLib.Plugins.Sessions.VNCache.csproj", "{2F644B72-9651-4DDD-9B88-23FECF4D7A59}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SessionProvider", "plugins\VNLib.Plugins.Sessions.SessionProvider\src\SessionProvider.csproj", "{7A0CCAB4-383F-4966-A04E-0DD429E8A45E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VNLib.Plugins.Sessions.SessionProvider", "plugins\VNLib.Plugins.Sessions.SessionProvider\src\VNLib.Plugins.Sessions.SessionProvider.csproj", "{7A0CCAB4-383F-4966-A04E-0DD429E8A45E}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VNLib.Plugins.Essentials.Oauth.ClientApps", "plugins\VNLib.Plugins.Essentials.Oauth.ClientApps\src\VNLib.Plugins.Essentials.Oauth.ClientApps.csproj", "{7114E9E6-5093-4ABB-BC37-149769D2FED7}"
 EndProject

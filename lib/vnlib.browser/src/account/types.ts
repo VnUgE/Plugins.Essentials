@@ -116,6 +116,7 @@ export interface AccountRpcGetResult{
 export interface AccountRpcApi<TMethod>{
     getData(): Promise<AccountRpcGetResult>;
     exec<T = any>(method: AccountRpcMethod | TMethod, args?: object): Promise<AccountRpcResponse<T>>;
+    isMethodEnabled(data: Pick<AccountRpcGetResult, 'rpc_methods'>, method: TMethod): boolean;
 }
 
 export interface AccountRpcApiConfig{

@@ -1,0 +1,7 @@
+{
+  "debug": true,
+
+  "store": {
+    "route_file": "../../../../config/test-routes.xml"
+  }
+}

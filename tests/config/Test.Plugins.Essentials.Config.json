@@ -35,6 +35,20 @@
     }
   },
 
+  "users": {
+    "custom_assembly": null,        //Null assembly should load the default users assembly
+    "random_password_length": 64,
+    "run_db_init": true             //Enable db init so tests can run on user's in the database
+  },
+
+
+  "passwords": {
+    "provider_name": "argon2",  //Only argon2 is supported atm
+    "custom_assembly": null,    //Not loading a custom assembly, so should work when set to null
+    "disable_pepper": false,    //Pepper is set below
+    "argon2_options": null      //Should default when set to null
+  },
+
   "secrets": {
     "passwords": "aGVsbG8td29ybGQ=" // 'hello-world' - just a random pepper for password library
   }
