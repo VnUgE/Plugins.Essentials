@@ -18,10 +18,9 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import { defaultTo, filter } from "lodash-es";
-import { useAccount } from "../account";
+import { useAccountRpc, useAccount } from "../account";
 import { useSession, type ITokenResponse } from "../session";
-import { useAccountRpc } from "../account"
-import { AccountRpcResponse } from "../account/types";
+import type { AccountRpcGetResult, AccountRpcResponse } from "../account/types";
 
 type ProcedureName = 'upgrade' | 'authenticate' | 'logout';
 
@@ -52,8 +51,9 @@ export type BeginFlowArgs<T = true> = {
 export interface SocialLoginApi{
     /**
      * Gets enabled social login methods
+     * @param rpcData The account rpc data returned from a call to getData()
      */
-    getPortals(): Promise<SocialOAuthMethod[]>
+    getPortals(rpcData: Pick<AccountRpcGetResult, 'properties'>): SocialOAuthMethod[]
     /**
      * Begins an OAuth2 social web authentication flow against the server
      * handling encryption and redirection of the browser
@@ -78,17 +78,11 @@ export interface SocialLoginApi{
      * the current method, otherwise false
      */
     logout(): Promise<void>;
-}
-
-export interface UseOauthLoginInterface {
-     <T extends AccountRpcExtendedProps>(getData: () => Promise<T>): SocialLoginApi
-    (): Pick<SocialLoginApi, 'logout' | 'completeLogin'>
-}
-
-export interface AccountRpcExtendedProps {
-    readonly properties: object & {
-        readonly type: string
-    } []
+    /**
+     * Gets a value indicating if this service is enabled on the server
+     * @param rpcData The account rpc data returned from a call to getData()
+     */
+    isEnabled(rpcData: Pick<AccountRpcGetResult, 'rpc_methods'>): boolean;
 }
 
 type UpgradeResponse = {
@@ -119,19 +113,17 @@ const useSocialRpc = () => {
 /**
  * Creates a new social login api for the given methods
  */
-export const useOauthLogin : UseOauthLoginInterface = <T extends AccountRpcExtendedProps>(getData?: () => Promise<T>): SocialLoginApi => {
+export const useOauthLogin = (): SocialLoginApi => {
 
-    const { exec, execRaw } = useSocialRpc()
+    const { exec, execRaw } = useSocialRpc();
     const { prepareLogin, } = useAccount();
     const { clearLoginState } = useSession();
+    const { isMethodEnabled } = useAccountRpc<'social_oauth'>();
 
-    const getPortals = async (): Promise<SocialOAuthMethod[]> => {
-
-        if (!getData) {
+    const getPortals = ({ properties } : Pick<AccountRpcGetResult, 'properties'>): SocialOAuthMethod[] => {
+        if (!properties) {
             return [];
         }
-
-        const { properties } = await getData();
         const [social_properties] = filter(properties, { type: 'social_oauth' });
         return defaultTo((social_properties as any as SocialLoginRpcResponse)?.methods, []);
     }
@@ -186,10 +178,15 @@ export const useOauthLogin : UseOauthLoginInterface = <T extends AccountRpcExten
         clearLoginState();
     }
 
+    const isEnabled = ({ rpc_methods } : Pick<AccountRpcGetResult, 'rpc_methods'>): boolean => {
+        return isMethodEnabled({ rpc_methods }, 'social_oauth');
+    }
+
     return {
         getPortals,
         beginLoginFlow: (beginLoginFlow as any),
         completeLogin,
-        logout
+        logout,
+        isEnabled
     }
 }

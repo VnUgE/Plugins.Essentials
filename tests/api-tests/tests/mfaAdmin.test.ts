@@ -21,17 +21,17 @@ describe('Before a user modifes their profile', () => {
               is_local_account: true 
           });
     })
+
+    it('Ensures the server supports mfa', async () => {
+       const { rpc_methods } = await getAccStatus();
+        expect(isEnabled({rpc_methods}))
+          .toBe(true);
+    })
 })
 
 describe('When a user wants to add a totp key', () => {
 
     const { enable, disable } = useTotpApi({ sendRequest })
-
-    it('Ensures mfa is enabled', async () => {
-      await expect(isEnabled())
-            .resolves
-            .toBe(true)
-    })
 
     it('Ensures the server supports totp', async () => {
       await expect(getData())
@@ -87,12 +87,6 @@ describe('When a user wants to add a PKOTP public key' , () => {
         "y": "KLVfgvN05TXnL5U9pV1EQkb3A25qTCwF35gGavt9gss",
         "alg": "ES256"
     }
-
-    it('Ensures mfa is enabled', async () => {
-      await expect(isEnabled())
-            .resolves
-            .toBe(true)
-    })
 
     it('Ensures the server supports pkotp', async () => {
       await expect(getData())
@@ -152,12 +146,6 @@ describe('When a user wants to add a PKOTP public key' , () => {
 describe('When a user wants to enable WebAuthn' , () => {
 
     const { registerDefaultDevice, disableDevice, disableAllDevices } = useFidoApi({ sendRequest })
-   
-    it('Ensures mfa is enabled', async () => {
-      await expect(isEnabled())
-            .resolves
-            .toBe(true)
-    })
 
     it('Ensures the server supports pkotp', async () => {
       await expect(getData())
