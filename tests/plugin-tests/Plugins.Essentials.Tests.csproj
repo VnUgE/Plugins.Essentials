@@ -37,7 +37,7 @@
     <ProjectReference Include="..\..\plugins\VNLib.Plugins.Essentials.Auth.Social\src\VNLib.Plugins.Essentials.Auth.Social.csproj" />
     <ProjectReference Include="..\..\plugins\VNLib.Plugins.Essentials.Content.Routing\src\VNLib.Plugins.Essentials.Content.Routing.csproj" />
     <ProjectReference Include="..\..\plugins\VNLib.Plugins.Essentials.Oauth.ClientApps\src\VNLib.Plugins.Essentials.Oauth.ClientApps.csproj" />
-    <ProjectReference Include="..\..\plugins\VNLib.Plugins.Sessions.SessionProvider\src\SessionProvider.csproj" />
+    <ProjectReference Include="..\..\plugins\VNLib.Plugins.Sessions.SessionProvider\src\VNLib.Plugins.Sessions.SessionProvider.csproj" />
   </ItemGroup>
 
 

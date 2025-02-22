@@ -7,6 +7,7 @@ const { getData:getAccStatus } = useAccountRpc()
 const testUser = { userName: 'test@test.com', password: 'Password12!' }
 
 describe('Before a user modifes their profile', () => {
+
     it('Logs the user into their account', async () => {
       await expect(login<any>(testUser))
             .resolves
@@ -14,25 +15,22 @@ describe('Before a user modifes their profile', () => {
     })
 
     it('Ensures the server returns an authenticated status result', async () => {
-      const { status } = await getAccStatus();
+      const { status, rpc_methods } = await getAccStatus();
       expect(status)
           .toMatchObject({ 
               authenticated: true, 
               is_local_account: true 
           });
+
+        expect(isEnabled({ rpc_methods }))
+          .toBe(true)
     })
 })
 
 describe('When a user wants to add a totp key', () => {
 
     const { enable, disable } = useTotpApi({ sendRequest })
-
-    it('Ensures mfa is enabled', async () => {
-      await expect(isEnabled())
-            .resolves
-            .toBe(true)
-    })
-
+  
     it('Ensures the server supports totp', async () => {
       await expect(getData())
             .resolves
@@ -88,12 +86,6 @@ describe('When a user wants to add a PKOTP public key' , () => {
         "alg": "ES256"
     }
 
-    it('Ensures mfa is enabled', async () => {
-      await expect(isEnabled())
-            .resolves
-            .toBe(true)
-    })
-
     it('Ensures the server supports pkotp', async () => {
       await expect(getData())
             .resolves
@@ -145,19 +137,13 @@ describe('When a user wants to add a PKOTP public key' , () => {
 
         await expect(getData())
             .resolves
-            .toMatchObject({ methods: []})
+            .toMatchObject({ methods: [] })
     })
 })
 
 describe('When a user wants to enable WebAuthn' , () => {
 
     const { registerDefaultDevice, disableDevice, disableAllDevices } = useFidoApi({ sendRequest })
-   
-    it('Ensures mfa is enabled', async () => {
-      await expect(isEnabled())
-            .resolves
-            .toBe(true)
-    })
 
     it('Ensures the server supports pkotp', async () => {
       await expect(getData())

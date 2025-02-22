@@ -16,6 +16,14 @@ vars:
 
 tasks:
   
+  default:
+    desc: 'Builds a single managed library when run from a project root'
+    dir: '{{ .USER_WORKING_DIR }}'
+    vars:
+      CONFIGURATION: '{{ .CONFIGURATION | default "release" }}'
+    cmds:
+      - cmd: dotnet build -c {{ .CONFIGURATION }} {{ .MS_ARGS }} {{ .CLI_ARGS }}
+
   #when build succeeds, archive the output into a tgz 
   postbuild_success:
     dir: '{{ .USER_WORKING_DIR }}'
@@ -67,7 +75,7 @@ tasks:
 
 #Remove the output dirs on clean
   clean:
-    dir: '{{.USER_WORKING_DIR}}'
+    dir: '{{ .USER_WORKING_DIR }}'
     ignore_error: true
     cmds:
      - for: ['bin/', 'obj/']

@@ -1,0 +1,94 @@
+{
+  //Host application config, config is loaded as a read-only DOM that is available
+  //to the host and loaded child plugins, all elements are available to plugins via the 'HostConfig' property
+
+  "tcp": {
+    "keepalive_sec": 0, //How long to wait for a keepalive response before closing the connection (0 to disable tcp keepalive)
+    "keepalive_interval_sec": 0, //How long to wait between keepalive probes
+    "max_recv_size": 655360, //640k absolute maximum recv buffer (defaults to OS socket buffer size)
+    "max_connections": 50000, //Per listener instance
+    "backlog": 1000, //OS socket backlog,
+
+    "tx_buffer": 65536, //OS socket send buffer size
+    "rx_buffer": 65536 //OS socket recv buffer size
+  },
+
+  "http": {
+    "default_version": "HTTP/1.1", //The defaut HTTP version to being requests with (does not support http/2 yet)
+    "multipart_max_buf_size": 20480, //The size of the buffer to use when parsing multipart/form data uploads
+    "multipart_max_size": 80240, //The maxium ammount of data (in bytes) allows for mulitpart/form data file uploads
+    "max_entity_size": 1024000, //Absolute maximum size (in bytes) of the request entity body (exludes headers)
+    "header_buf_size": 8128, //The buffer size to use when parsing headers (also the maxium request header size allowed)
+    "max_request_header_count": 50, //The maxium number of headers allowed in an HTTP request message
+    "max_connections": 5000, //The maxium number of allowed network connections, before 503s will be issued automatically and connections closed
+    "response_header_buf_size": 16384, //The size (in bytes) of the buffer used to store all response header data
+    "max_uploads_per_request": 10, //Max number of file (or multi-part) uploads allowed per request
+    "keepalive_ms": 1000000, //Keepalive ms for HTTP1.1 keepalive connections
+    "recv_timeout_ms": 5000, //time (in ms) to wait for a response from an active connection in recv mode, before dropping it
+    "send_timeout_ms": 60000, //Time in ms to wait for the client to accept transport data before terminating the connection
+
+    "compression": {
+      "enabled": true, //controls compression globally
+      "assembly": "", //A custom assembly path (ex: 'VNLib.Net.Compression.dll')
+      "max_size": 512000, //Maxium size of a response to compress before it's bypassed
+      "min_size": 2048 //Minium size of a response to compress, if smaller compression is bypassed
+    }
+  },
+  "virtual_hosts": [
+    {
+      "enabled": true,
+      "path": "temp/",
+      "hostnames": ["*"],
+      "trace": true,
+      "force_port_check": false,
+      "interfaces": [{ "address": "127.0.0.1", "port": 8569 }],
+      "max_execution_time_ms": 20000
+    }
+  ],
+
+  "plugins": {
+    "enabled": true,
+    "hot_reload": false,
+    "reload_delay_sec": 2,
+    "path": "temp/plugins",
+    "config_dir": "config",
+    "assets": "temp/plugins/assets"
+  },
+
+  "secrets": { },
+
+  "sql": {
+    //Use sqlite provider for testing
+    "provider": "VNLib.Plugins.Extensions.Sql.SQLite.dll",
+    "connection_string": "Data Source=plugins-essentials-test.db;"
+  },
+
+  //Enable vncache as the providers above rely on the object caching server
+  "cache": {
+
+    "assembly_name": "VNLib.Data.Caching.Providers.VNCache.dll",
+
+    //Use remote only caching for testing
+    "memory_only": true,
+
+    //enable memory cache
+    "memory_cache": {
+      "buckets": 2,
+      "bucket_size": 50,
+      "max_age_sec": 600,
+      "refresh_interval_sec": 60,
+      "zero_all": false,
+      "max_object_size": 8128
+    }
+  },
+
+  "users": {
+    "random_password_length": 64,
+    "run_db_init": true
+  },
+
+  "passwords": {
+    "provider_name": "argon2",
+    "disable_pepper": true
+  }
+}

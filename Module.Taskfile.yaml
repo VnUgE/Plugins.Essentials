@@ -10,7 +10,7 @@
 
 version: '3'
 
-vars:  
+vars:
   ARCHIVE_FILE_NAME: '{{ .ARCHIVE_FILE_NAME | default "archive.tgz" }}'
   MS_ARGS: 
     /p:RunAnalyzersDuringBuild=false 
@@ -23,7 +23,7 @@ tasks:
   default:
     desc: 'Builds the managed libraries in this module for development'
     cmds:
-      - cmd: dotnet build -c debug {{ .MS_ARGS }}
+      - cmd: dotnet build -c debug {{ .MS_ARGS }} {{ .CLI_ARGS }}
 
 #called by build pipeline to sync repo
   update:
@@ -76,12 +76,20 @@ tasks:
     vars:
       NATIVE_BUILD_PATH: 'build/{{ OS }}/{{ if eq OS "windows"}}Debug/{{end}}'
       LIB_PREFIX: '{{ if eq OS "windows"}}vnlib{{else}}libvn{{end}}'
-      CONFIG_DIR: '{{ .USER_WORKING_DIR }}/tests/plugin-tests/Config'
+      CONFIG_DIR: '{{ .USER_WORKING_DIR }}/tests/config'
       ARGON2_LIB_PATH: '{{ .USER_WORKING_DIR }}/../core/lib/Utils.Cryptography/argon2/{{ .NATIVE_BUILD_PATH }}argon2'
     cmds:
+     - cmd: dotnet build 
+        {{ .MS_ARGS }}
+        --configuration debug 
+        --nologo 
+        --verbosity minimal
+
      - cmd: dotnet test
         {{ .CLI_ARGS }}
         --logger "console;verbosity=detailed"
+        --no-build
+        --nologo
         --configuration debug
         --verbosity normal
         --framework {{ .TARGET_FRAMEWORK | default "net8.0" }}
