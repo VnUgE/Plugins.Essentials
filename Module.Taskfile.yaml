@@ -82,7 +82,6 @@ tasks:
      - cmd: dotnet build 
         {{ .MS_ARGS }}
         --configuration debug 
-        --no-restore 
         --nologo 
         --verbosity minimal
 
