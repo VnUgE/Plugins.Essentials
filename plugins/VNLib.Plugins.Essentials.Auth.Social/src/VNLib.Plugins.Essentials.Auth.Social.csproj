@@ -19,7 +19,7 @@
     <Authors>Vaughn Nugent</Authors>
     <Company>Vaughn Nugent</Company>
     <Product>A shared library for building social OAuth authentication endpoints.</Product>
-    <Copyright>Copyright © 2024 Vaughn Nugent</Copyright>
+    <Copyright>Copyright © 2025 Vaughn Nugent</Copyright>
     <PackageProjectUrl>https://www.vaughnnugent.com/resources/software/modules/Plugins.Essentials</PackageProjectUrl>
     <RepositoryUrl>https://github.com/VnUgE/Plugins.Essentials/tree/master/plugins/VNLib.Plugins.Essentials.Auth.Social</RepositoryUrl>
     <Description>Essentials framework plugin that loads dynamic providers like my packaged GitHub, Discord, and Auth0 providers. This package also contains abstractions for building other providers. and may be inlcuded as a library to build a new provider</Description>

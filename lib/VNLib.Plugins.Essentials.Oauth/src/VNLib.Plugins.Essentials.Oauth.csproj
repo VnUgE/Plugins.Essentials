@@ -16,7 +16,7 @@
     <Company>Vaughn Nugent</Company>
     <Product>Essentials OAuth2 data structures library</Product>
     <Description>A library containing common data-structures for client application driven OAuth2 implementations</Description>
-    <Copyright>Copyright © 2024 Vaughn Nugent</Copyright>
+    <Copyright>Copyright © 2025 Vaughn Nugent</Copyright>
     <PackageProjectUrl>https://www.vaughnnugent.com/resources/software/modules/Plugins.Essentials</PackageProjectUrl>
     <RepositoryUrl>https://github.com/VnUgE/Plugins.Essentials/tree/master/lib/VNLib.Plugins.Essentials.Oauth</RepositoryUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
