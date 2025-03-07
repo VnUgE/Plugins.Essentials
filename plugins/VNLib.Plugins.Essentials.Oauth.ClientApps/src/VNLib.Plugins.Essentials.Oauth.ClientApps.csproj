@@ -17,7 +17,7 @@
     <Company>Vaughn Nugent</Company>
     <Product>OAuth2 client application web api plugin</Product>
     <Description>An essentials framework plugin that provides user api access for managing OAuth2 client applications</Description>
-    <Copyright>Copyright © 2024 Vaughn Nugent</Copyright>
+    <Copyright>Copyright © 2025 Vaughn Nugent</Copyright>
     <PackageProjectUrl>https://www.vaughnnugent.com/resources/software/modules/plugins.essentials</PackageProjectUrl>
     <RepositoryUrl>https://github.com/VnUgE/Plugins.Essentials/tree/master/plugins/vnlib.plugins.essentials.oauth.clientapps</RepositoryUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
