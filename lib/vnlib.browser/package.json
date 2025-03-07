@@ -4,7 +4,7 @@
   "author": "Vaughn Nugent",
   "description": "Client JavaScript helper library for vuejs3 web-apps for connecting with Essentials.Accounts plugin and vuejs helpers.",
   "repository": "https://github.com/VnUgE/Plugins.Essentials/tree/master/lib/vnlib.browser",
-  "copyright":"Copyright \u00A9 2024 Vaughn Nugent",
+  "copyright":"Copyright \u00A9 2025 Vaughn Nugent",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -27,7 +27,7 @@
     "@simplewebauthn/browser": "^10.x.x",
     "@vueuse/core": "^12.x",
     "axios": "^1.x",
-    "jose": "^5.x",
+    "jose": "^6.0.8",
     "lodash-es": "^4.x",
     "universal-cookie": "^7.0.x",
     "vue": "^3.x"

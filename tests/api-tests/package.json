@@ -23,7 +23,7 @@
     "@vueuse/core": "^12.x",
     "axios": "^1.7.9",
     "axios-cookiejar-support": "^5.0.3",
-    "jose": "^5.x",
+    "jose": "^6.0.8",
     "lodash-es": "^4.x",
     "universal-cookie": "^7.0.x",
     "vue": "^3.x"
