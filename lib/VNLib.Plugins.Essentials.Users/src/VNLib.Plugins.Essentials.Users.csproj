@@ -15,7 +15,7 @@
     <Authors>Vaughn Nugent</Authors>
     <Company>Vaughn Nugent</Company>
     <Product>VNLib.Plugins.Essentials.Users</Product>
-    <Copyright>Copyright © 2024 Vaughn Nugent</Copyright>
+    <Copyright>Copyright © 2025 Vaughn Nugent</Copyright>
     <PackageProjectUrl>https://www.vaughnnugent.com/resources/software/modules/Plugins.Essentials</PackageProjectUrl>
     <RepositoryUrl>https://github.com/VnUgE/Plugins.Essentials/tree/master/lib/VNLib.Plugins.Essentials.Users</RepositoryUrl>
     <Description>Provides a runtime loadable IUserManager and IUser implementation, backed by an SQL database. This project may be stored in your plugin's Assets directory to be loaded at runtime by the Extensions.Loading.UserManger singleton.</Description>

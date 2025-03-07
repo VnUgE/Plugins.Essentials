@@ -16,7 +16,7 @@
     <Company>Vaughn Nugent</Company>
     <Product>Cache backed session client library</Product>
     <Description>Boilerplate and abstractions library for implementing cache backed HTTP sessions.</Description>
-    <Copyright>Copyright © 2024 Vaughn Nugent</Copyright>
+    <Copyright>Copyright © 2025 Vaughn Nugent</Copyright>
     <PackageProjectUrl>https://www.vaughnnugent.com/resources/software/modules/Plugins.Essentials</PackageProjectUrl>
     <RepositoryUrl>https://github.com/VnUgE/Plugins.Essentials/tree/master/libs/VNLib.Plugins.Sessions.Cache.Client</RepositoryUrl>
   </PropertyGroup>

@@ -61,8 +61,7 @@ tasks:
         --no-restore
         --include-symbols
         --configuration release
-        --output "{{ .PACK_OUT }}/release/" 
-        -p:PackageVersion={{ .BUILD_VERSION }}
+        --output "{{ .PACK_OUT }}/release/"
         {{ .MS_ARGS }}
 
   publish:
