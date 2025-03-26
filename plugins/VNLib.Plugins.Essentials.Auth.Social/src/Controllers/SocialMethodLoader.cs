@@ -40,7 +40,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
     {
         private readonly MethodConfigValidator _methodValidator = new();
         private readonly ILogProvider _log = plugin.Log.CreateScope("SocialMethodLoader");
-        private readonly SocialOauthConfigJson _serviceConfig = config.Deserialze<SocialOauthConfigJson>();
+        private readonly SocialOauthConfigJson _serviceConfig = config.Deserialize<SocialOauthConfigJson>();
 
         /// <summary>
         /// Retruns all the loaded Social OAuth login methods from the loaded controllers
