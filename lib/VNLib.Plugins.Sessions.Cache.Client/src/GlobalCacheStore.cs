@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2023 Vaughn Nugent
+* Copyright (c) 2025 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Sessions.Cache.Client
@@ -34,20 +34,20 @@ namespace VNLib.Plugins.Sessions.Cache.Client
 
     /// <summary>
     /// A wrapper class to provide a <see cref="IRemoteCacheStore"/> from 
-    /// a <see cref="IGlobalCacheProvider"/> client instance
+    /// a <see cref="ICacheClient"/> client instance
     /// </summary>
     /// <remarks>
-    /// Initiailzes a new <see cref="GlobalCacheStore"/> with the backing <see cref="IGlobalCacheProvider"/>
+    /// Initiailzes a new <see cref="GlobalCacheStore"/> with the backing <see cref="ICacheClient"/>
     /// global cache
     /// </remarks>
     /// <param name="globalCache">The backing cache store</param>
     /// <param name="bufferSize">The size of the buffer used to serialize session objects</param>
     /// <param name="debugLog">An optional log provider for writing serializing events to</param>
     /// <exception cref="ArgumentNullException"></exception>
-    public sealed class GlobalCacheStore(IGlobalCacheProvider globalCache, int bufferSize, ILogProvider? debugLog) 
+    public sealed class GlobalCacheStore(ICacheClient globalCache, int bufferSize, ILogProvider? debugLog) 
         : IRemoteCacheStore
     {
-        private readonly IGlobalCacheProvider _cache = globalCache ?? throw new ArgumentNullException(nameof(globalCache));
+        private readonly ICacheClient _cache = globalCache ?? throw new ArgumentNullException(nameof(globalCache));
 
         private readonly SessionDataSerialzer _serialzer = new(bufferSize, debugLog);
 
