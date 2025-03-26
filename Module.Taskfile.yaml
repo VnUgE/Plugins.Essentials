@@ -103,3 +103,10 @@ tasks:
     #clean solution
      - cmd: dotnet clean /p:BuildInParallel=true /p:MultiProcessorCompilation=true
      - cmd: powershell rm '{{ .ARCHIVE_FILE_NAME }}' --Force
+
+
+  npm-update:
+    desc: "Updates npm dependencies for all npm projects in the module"
+    cmds:
+     - cmd: cd lib/vnlib.browser && npm update
+     - cmd: cd tests/api-tests && npm update
