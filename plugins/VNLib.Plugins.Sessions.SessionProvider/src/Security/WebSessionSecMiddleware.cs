@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2024 Vaughn Nugent
+* Copyright (c) 2025 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: SessionProvider
@@ -39,7 +39,7 @@ namespace VNLib.Plugins.Essentials.Sessions
     internal sealed class WebSessionSecMiddleware(PluginBase plugin, IConfigScope config) : IHttpMiddleware
     {
         private readonly ILogProvider _log = plugin.Log.CreateScope("Session-Sec");
-        private readonly SecConfig _secConfig = config.Deserialze<SecConfig>();
+        private readonly SecConfig _secConfig = config.Deserialize<SecConfig>();
 
         ///<inheritdoc/>
         public ValueTask<FileProcessArgs> ProcessAsync(HttpEntity entity)

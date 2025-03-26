@@ -25,7 +25,7 @@
     "axios-cookiejar-support": "^5.0.3",
     "jose": "^6.0.8",
     "lodash-es": "^4.x",
-    "universal-cookie": "^7.0.x",
+    "universal-cookie": "^8.0.1",
     "vue": "^3.x"
   }
 }

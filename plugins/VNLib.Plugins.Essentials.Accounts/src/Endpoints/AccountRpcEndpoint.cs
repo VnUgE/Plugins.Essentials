@@ -89,7 +89,7 @@ namespace VNLib.Plugins.Essentials.Accounts.Endpoints
         ///<inheritdoc/>
         public ProtectionSettings GetProtectionSettings() => default;
 
-        [HttpStaticRoute("{{path}}", HttpMethod.GET)]
+        [HttpStaticRoute("{{ path }}", HttpMethod.GET)]
         [HttpRouteProtection(AuthorzationCheckLevel.None, AllowNewSession = false, SessionType = SessionType.Web)]
         public async ValueTask<VfReturnType> OnGetAsync(HttpEntity entity)
         {

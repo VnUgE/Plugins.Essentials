@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2024 Vaughn Nugent
+* Copyright (c) 2025 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: SessionProvider
@@ -53,7 +53,7 @@ namespace VNLib.Plugins.Essentials.Sessions
 
             //Get all provider names
             string[] providerAssemblyNames = this.GetConfig("provider_assemblies")
-                .Deserialze<string[]>()
+                .Deserialize<string[]>()
                 .Where(s => s != null)
                 .ToArray();
 

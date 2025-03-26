@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2023 Vaughn Nugent
+* Copyright (c) 2025 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Sessions.OAuth
@@ -62,7 +62,7 @@ namespace VNLib.Plugins.Sessions.OAuth
             OAuth2SessionConfig o2Conf = config.DeserialzeAndValidate<OAuth2SessionConfig>();
 
             //Get global cache
-            IGlobalCacheProvider? cache = plugin.GetDefaultGlobalCache()?
+            ICacheClient? cache = plugin.GetDefaultGlobalCache()?
                 .GetPrefixedCache(o2Conf.CachePrefix, HashAlg.SHA256);
 
             _ = cache ?? throw new MissingDependencyException("A global cache provider is required to store OAuth2 sessions. Please configure a cache provider");
