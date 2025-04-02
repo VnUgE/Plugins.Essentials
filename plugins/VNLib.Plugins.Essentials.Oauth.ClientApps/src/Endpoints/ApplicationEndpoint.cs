@@ -50,8 +50,8 @@ using static VNLib.Plugins.Essentials.Statics;
 namespace VNLib.Plugins.Essentials.Oauth.ClientApps.Endpoints
 {
 
-    [EndpointPath("{{path}}")]
-    [EndpointLogName("Applications")]
+    [EndpointPath("{{ path }}")]
+    [EndpointLogName("{{ log_name }}", DefaultName = "Applications")]
     [ConfigurationName("applications")]
     internal sealed class ApplicationEndpoint : ProtectedWebEndpoint
     {

@@ -25,11 +25,11 @@
   },
   "peerDependencies": {
     "@simplewebauthn/browser": "^10.x.x",
-    "@vueuse/core": "^12.x",
+    "@vueuse/core": "^13.x",
     "axios": "^1.x",
     "jose": "^6.0.8",
     "lodash-es": "^4.x",
-    "universal-cookie": "^7.0.x",
+    "universal-cookie": "^8.0.x",
     "vue": "^3.x"
   },
   "eslintConfig": {

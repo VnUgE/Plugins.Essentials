@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2024 Vaughn Nugent
+* Copyright (c) 2025 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts.AppData
@@ -73,7 +73,7 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores
                 return;
             }
 
-            IGlobalCacheProvider? cache = plugin.GetDefaultGlobalCache();
+            ICacheClient? cache = plugin.GetDefaultGlobalCache();
 
             if (cache is null)
             {

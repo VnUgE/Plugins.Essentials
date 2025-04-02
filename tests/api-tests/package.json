@@ -20,12 +20,12 @@
   "dependencies": {
     "@simplewebauthn/browser": "^10.x.x",
     "@vnuge/vnlib.browser": "../../lib/vnlib.browser",
-    "@vueuse/core": "^12.x",
+    "@vueuse/core": "^13.x",
     "axios": "^1.7.9",
     "axios-cookiejar-support": "^5.0.3",
     "jose": "^6.0.8",
     "lodash-es": "^4.x",
-    "universal-cookie": "^7.0.x",
+    "universal-cookie": "^8.0.1",
     "vue": "^3.x"
   }
 }

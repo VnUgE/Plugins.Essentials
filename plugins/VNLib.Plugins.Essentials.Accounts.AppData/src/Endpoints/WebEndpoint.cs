@@ -58,7 +58,7 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Endpoints
         ///<inheritdoc/>
         public ProtectionSettings GetProtectionSettings() => default;
 
-        [HttpStaticRoute("{{path}}", HttpMethod.GET)]
+        [HttpStaticRoute("{{ path }}", HttpMethod.GET)]
         [HttpRouteProtection(AuthorzationCheckLevel.Critical)]
         public async ValueTask<VfReturnType> GetDataAsync(HttpEntity entity)
         {
@@ -95,7 +95,7 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Endpoints
         }
 
 
-        [HttpStaticRoute("{{path}}", HttpMethod.PUT)]
+        [HttpStaticRoute("{{ path }}", HttpMethod.PUT)]
         [HttpRouteProtection(AuthorzationCheckLevel.Critical)]
         public async ValueTask<VfReturnType> UpdateDataAsync(HttpEntity entity)
         {
@@ -166,7 +166,7 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Endpoints
             return VirtualClose(entity, HttpStatusCode.Accepted);
         }
 
-        [HttpStaticRoute("{{path}}", HttpMethod.DELETE)]
+        [HttpStaticRoute("{{ path }}", HttpMethod.DELETE)]
         [HttpRouteProtection(AuthorzationCheckLevel.Critical)]
         public async ValueTask<VfReturnType> DeleteDataAsync(HttpEntity entity)
         {

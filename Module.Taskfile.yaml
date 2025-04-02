@@ -48,7 +48,7 @@ tasks:
        silent: true
 
     #re-write semver after hard reset
-     - cmd: dotnet-gitversion.exe /updateprojectfiles
+     - cmd: dotnet gitversion /updateprojectfiles
 
      #build debug mode first
      - cmd: dotnet publish -c debug {{ .MS_ARGS }}
@@ -103,3 +103,10 @@ tasks:
     #clean solution
      - cmd: dotnet clean /p:BuildInParallel=true /p:MultiProcessorCompilation=true
      - cmd: powershell rm '{{ .ARCHIVE_FILE_NAME }}' --Force
+
+
+  npm-update:
+    desc: "Updates npm dependencies for all npm projects in the module"
+    cmds:
+     - cmd: cd lib/vnlib.browser && npm update
+     - cmd: cd tests/api-tests && npm update
