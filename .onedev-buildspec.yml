@@ -18,7 +18,9 @@ jobs:
   maxRetries: 3
   retryDelay: 30
   timeout: 3600
+
 - name: Unit Testing
+  jobExecutor: windows
   steps:
   - !CommandStep
     name: Clone local deps
@@ -57,7 +59,9 @@ jobs:
   maxRetries: 3
   retryDelay: 30
   timeout: 14400
+
 - name: Staging build
+  jobExecutor: windows
   steps:
   - !CommandStep
     name: Clone local deps
@@ -76,10 +80,10 @@ jobs:
     runInContainer: false
     interpreter: !DefaultInterpreter
       commands: |
-        dotnet-gitversion.exe core /updateprojectfiles
-        dotnet-gitversion.exe VNLib.Data.Caching /updateprojectfiles
-        dotnet-gitversion.exe Emails.Transactional /updateprojectfiles
-        dotnet-gitversion.exe VNLib.Plugins.Extensions /updateprojectfiles
+        dotnet gitversion core /updateprojectfiles
+        dotnet gitversion VNLib.Data.Caching /updateprojectfiles
+        dotnet gitversion Emails.Transactional /updateprojectfiles
+        dotnet gitversion VNLib.Plugins.Extensions /updateprojectfiles
         vnbuild build --no-delay --include @project_name@ --verbose
     useTTY: true
     condition: ALL_PREVIOUS_STEPS_WERE_SUCCESSFUL
@@ -101,7 +105,9 @@ jobs:
   maxRetries: 3
   retryDelay: 30
   timeout: 14400
+
 - name: Publish master
+  jobExecutor: publish-agents
   steps:
   - !CommandStep
     name: Clone local deps
@@ -120,10 +126,10 @@ jobs:
     runInContainer: false
     interpreter: !DefaultInterpreter
       commands: |
-        dotnet-gitversion.exe core /updateprojectfiles
-        dotnet-gitversion.exe VNLib.Data.Caching /updateprojectfiles
-        dotnet-gitversion.exe Emails.Transactional /updateprojectfiles
-        dotnet-gitversion.exe VNLib.Plugins.Extensions /updateprojectfiles
+        dotnet gitversion core /updateprojectfiles
+        dotnet gitversion VNLib.Data.Caching /updateprojectfiles
+        dotnet gitversion Emails.Transactional /updateprojectfiles
+        dotnet gitversion VNLib.Plugins.Extensions /updateprojectfiles
         vnbuild build --no-delay --include @project_name@
     useTTY: true
     condition: ALL_PREVIOUS_STEPS_WERE_SUCCESSFUL
