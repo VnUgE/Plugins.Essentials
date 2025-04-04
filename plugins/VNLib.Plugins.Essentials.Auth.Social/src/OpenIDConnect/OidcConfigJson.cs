@@ -76,13 +76,6 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
         public string[] RequiredScopes { get; init; } = ["openid"];
 
         /// <summary>
-        /// A value that indicates if the user will be redirected to the method's specific 
-        /// redirect URL after logout
-        /// </summary>
-        [JsonPropertyName("require_logout_redirect")]
-        public bool RequireLogoutRedirect { get; init; }
-
-        /// <summary>
         /// Defines a prefix to add to the user ID when searching for 
         /// or creating a user in the database
         /// </summary>

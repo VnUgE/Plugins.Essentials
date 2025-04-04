@@ -17,7 +17,7 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import { defaultTo, filter } from "lodash-es";
+import { defaultTo, filter, isNil } from "lodash-es";
 import { useAccountRpc, useAccount } from "../account";
 import { useSession, type ITokenResponse } from "../session";
 import type { AccountRpcGetResult, AccountRpcResponse } from "../account/types";
@@ -46,6 +46,15 @@ export interface SocialLoginRpcResponse{
 export type BeginFlowArgs<T = true> = {
     readonly method: SocialOAuthMethod;
     readonly autoRedirect?: T;
+}
+
+export interface LogoutArguments {
+    readonly autoRedirect?: boolean;
+    readonly overrideRedirectUrl?: string;
+}
+
+export interface LogoutResponse {
+    readonly redirect_url?: string;
 }
 
 export interface SocialLoginApi{
@@ -77,7 +86,7 @@ export interface SocialLoginApi{
      * @returns A promise that resolves to true if the logout could be handled by 
      * the current method, otherwise false
      */
-    logout(): Promise<void>;
+    logout(args?: LogoutArguments): Promise<LogoutResponse | undefined>;
     /**
      * Gets a value indicating if this service is enabled on the server
      * @param rpcData The account rpc data returned from a call to getData()
@@ -173,9 +182,24 @@ export const useOauthLogin = (): SocialLoginApi => {
         }
     }
 
-    const logout = async (): Promise<void> => {
-        await exec<void>('logout');
+    const logout = async (args?: LogoutArguments): Promise<LogoutResponse | undefined> => {
+        const response = await exec<LogoutResponse | undefined>('logout');
         clearLoginState();
+
+        // If the server returned a redirect url, redirect the user to it
+        if(args?.autoRedirect === true) {
+
+            // If the user specified an override redirect url, use it 
+            // otherwise use the server provided redirect url
+            if(!isNil(args.overrideRedirectUrl)){
+                window.location.assign(args.overrideRedirectUrl);
+            } 
+            else if (!isNil(response?.redirect_url)){
+                window.location.assign(response.redirect_url);
+            }
+        }
+
+        return response;
     }
 
     const isEnabled = ({ rpc_methods } : Pick<AccountRpcGetResult, 'rpc_methods'>): boolean => {

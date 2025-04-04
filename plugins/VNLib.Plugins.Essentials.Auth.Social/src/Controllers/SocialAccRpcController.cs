@@ -33,6 +33,7 @@ using System.Text.Json.Serialization;
 using FluentValidation;
 
 using RestSharp;
+
 using VNLib.Utils.Logging;
 using VNLib.Net.Http;
 using VNLib.Hashing.IdentityUtility;
@@ -140,15 +141,17 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
             {
                 WebMessage webm = new();
 
-                if(webm.AssertError(IsCorsValid(entity), "Origin is not allowed"))
+                if (webm.AssertError(IsCorsValid(entity), "Origin is not allowed"))
                 {
                     _controller.Log.Debug("Request was denied because it's origin is now allowed");
                     return RpcCommandResult.Error(HttpStatusCode.Forbidden, webm);
                 }
 
                 //Get the procuder name
-                if (!request.TryGetProperty("procedure", out JsonElement procEl)
-                    || procEl.ValueKind != JsonValueKind.String)
+                if (
+                    !request.TryGetProperty("procedure", out JsonElement procEl)
+                    || procEl.ValueKind != JsonValueKind.String
+                )
                 {
                     webm.AssertError(false, "Missing or invalid procedure name");
                     return RpcCommandResult.Error(HttpStatusCode.BadRequest, webm);
@@ -157,13 +160,13 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
 
                 //Try to get procedure arguments from the request
                 if (
-                    !request.TryGetProperty("args", out JsonElement fnArgs) 
+                    !request.TryGetProperty("args", out JsonElement fnArgs)
                     && fnArgs.ValueKind == JsonValueKind.Object
                 )
                 {
                     fnArgs = EmptyDoc.RootElement;
                 }
-                
+
                 ValueTask<RpcCommandResult> result;
 
                 switch (procEl.GetString())
@@ -207,6 +210,8 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
                 {
                     //perform logout for the authenticated method
                     string? methodId = _authUtil.GetAuthenticatedMethod(entity);
+
+                    _controller.Log.Verbose("Logging out of social oauth method {MethodId}", methodId);
 
                     if (!string.IsNullOrWhiteSpace(methodId))
                     {
@@ -401,7 +406,6 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
 
                 return _controller.Config.AllowedCorsOrigins.Contains(originAuthority, StringComparer.OrdinalIgnoreCase);
             }
-
          
 
             private sealed class UpgradeResponse

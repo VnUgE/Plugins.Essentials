@@ -56,6 +56,11 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
                 .WithMessage("JWKS URI must be a valid URL")
                 .When(c => !string.IsNullOrEmpty(c.JwksUri));
 
+            val.RuleFor(c => c.LogoutEndpoint)
+                .Matches(@"^https?://[\w\-.]+(:\d+)?/.*$")
+                .WithMessage("Logout endpoint must be a valid URL")
+                .When(c => !string.IsNullOrEmpty(c.LogoutEndpoint));
+
             return val;
         }
 
@@ -73,5 +78,8 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
 
         [JsonPropertyName("jwks_uri")]
         public string JwksUri { get; set; } = string.Empty;
+
+        [JsonPropertyName("logout_endpoint")]
+        public string? LogoutEndpoint { get; set; }
     }
 }

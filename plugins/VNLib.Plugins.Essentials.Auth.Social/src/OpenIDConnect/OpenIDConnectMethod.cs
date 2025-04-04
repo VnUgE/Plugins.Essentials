@@ -102,6 +102,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
                     Config.AuthorizationEndpoint = serverInfo.AuthorizationEndpoint ?? Config.AuthorizationEndpoint;
                     Config.UserInfoEndpoint = serverInfo.UserInfoEndpoint ?? Config.UserInfoEndpoint;
                     Config.JwksUri = serverInfo.JwksUri ?? Config.JwksUri;
+                    Config.LogoutEndpoint = serverInfo.LogoutEndpoint ?? Config.LogoutEndpoint;
 
                     Error = null;
                     Loaded = true;
@@ -113,6 +114,11 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
                     else
                     {
                         Log.Verbose("OIDC Discovery Document fetched successfully");
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(Config.LogoutEndpoint))
+                    {
+                        Log.Verbose("Logout endpoint has been configured");
                     }
                 }
                 catch (HttpRequestException ex)
@@ -186,7 +192,8 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
                     enabled         = manager.Loaded,
                     friendly_name   = manager.Config.FriendlyName,
                     icon_url        = manager.Config.IconUrl,
-                    error           = sendErrors ? manager.Error : null
+                    error           = sendErrors ? manager.Error : null,
+                    logout_redirect = !string.IsNullOrWhiteSpace(manager.Config.LogoutEndpoint),
                 });
             }
 
@@ -279,8 +286,18 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
             ///<inheritdoc/>
             public ValueTask<object?> OnLogoutAsync(SocialMethodState state, JsonElement args)
             {
-                //TODO Implement logut for OIDC
+                // Always invalidate the session, then continue the optional redirect
                 state.Entity.InvalidateLogin();
+
+                //See if the logout endpoint is set
+                if (!string.IsNullOrWhiteSpace(manager.Config.LogoutEndpoint))
+                {
+                    return ValueTask.FromResult<object?>(new
+                    {
+                        redirect_url = GetLogoutUrl()
+                    });
+                }
+
                 return ValueTask.FromResult<object?>(null);
             }
 
@@ -473,6 +490,21 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
 
                 //Init unique state nonce for this endpoint
                 writer.AppendSmall(nonce);
+
+                return writer.ToString();
+            }
+
+            private string GetLogoutUrl()
+            {
+                using UnsafeMemoryHandle<char> uriBuffer = MemoryUtil.UnsafeAlloc<char>(1024);
+
+                ForwardOnlyWriter<char> writer = new(uriBuffer.Span);
+
+                writer.AppendSmall(manager.Config.LogoutEndpoint);
+                writer.AppendSmall("?client_id=");
+                writer.AppendSmall(manager.Config.ClientId);
+                writer.AppendSmall("&post_logout_redirect_uri=");
+                writer.AppendSmall(manager.Config.RedirectUrl);              
 
                 return writer.ToString();
             }
