@@ -74,6 +74,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
             Client = new OpenIdConnectClient(Config, clientSecret);
             Error = $"OIDC Method {Config.FriendlyName} is not available yet";
 
+            //Currently just oidc, but eventually can be other types that can adapt to other types of OAuth providers
             IdentityAdapter = new GenericOidcIdentityAdapter(Config, Client);
         }
 
@@ -266,9 +267,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
                     manager.Config.TokenEndpoint,
                     accessCode: auth.Code,
                     state.Entity.EventCancellation
-                );
-
-                manager.Log.Verbose("Token response: {token}", token.IdToken);
+                );          
                
                 await AuthorizeClientFromPlatformId(state, secInfo, webm, token);
 
@@ -294,6 +293,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
                 {
                     return ValueTask.FromResult<object?>(new
                     {
+                        //Return the client a logout url to redirect to
                         redirect_url = GetLogoutUrl()
                     });
                 }

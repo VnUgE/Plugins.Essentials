@@ -199,8 +199,10 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
                 /*
                 * If a connection is not properly authorized to modify the session
                 * we can invalidate the client by detaching the session. This 
-                * should cause the session to remain in tact but the client will
-                * be detached.
+                * should cause the session to remain intact but the client will
+                * become detached from the original, authorizaed session. Preventing
+                * those who have stolen session id's from being able to invalidate 
+                * active sessions. 
                 * 
                 * This prevents attacks where connection with just a stolen session 
                 * id can cause the client's session to be invalidated. 
@@ -238,6 +240,8 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
                     //Detatch the session to cause client only invalidation
                     entity.Session.Detach();
                 }
+
+                webm.Success = true;
 
                 return RpcCommandResult.Okay(webm);
             }
