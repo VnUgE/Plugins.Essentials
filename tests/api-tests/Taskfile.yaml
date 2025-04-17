@@ -12,7 +12,7 @@ tasks:
 
   build:
     cmds:
-      - cmd: echo "building project {{ .PROJECT_NAME  }}"
+      - cmd: echo "building project {{ .PROJECT_NAME }}"
 
   test:
     cmds:
