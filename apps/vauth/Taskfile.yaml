@@ -16,17 +16,32 @@ vars:
 tasks:
 
   default:
-    desc: 'Builds the VNLib.WebServer project with defaults'
+    desc: 'Builds the vauth project with defaults'
     vars:
       CONFIGURATION: '{{ .CONFIGURATION | default "release" }}'
     cmds:
      - cmd: cd src/ && dotnet build -c {{ .CONFIGURATION }} {{ .MS_ARGS }} {{ .CLI_ARGS }}
 
   build-debug:
-    desc: 'Builds the VNLib.WebServer project in debug mode'
+    desc: 'Builds the vauth project in debug mode'
     cmds:
      - task: default
        vars: { CONFIGURATION: 'debug' }
+
+  test:
+    desc: 'Runs tests for the vauth project'
+    dir: '{{ .USER_WORKING_DIR }}/src'
+    cmds:
+      - cmd: echo "Running tests for vauth CLI tool"
+        silent: true
+
+      - task: build-debug
+
+      #test help command exits successfully
+      - cmd: cd 'bin/debug/net8.0' && dotnet vauth.dll --help  
+
+      - cmd: echo "vauth tests completed successfully"
+        silent: true
 
   #called by build pipeline to build module
   build:

@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2023 Vaughn Nugent
+* Copyright (c) 2025 Vaughn Nugent
 * 
 * Package: PkiAuthenticator
 * File: Statics.cs 
@@ -217,7 +217,7 @@ namespace PkiAuthenticator
             }
 
             //Write encoded data to writer
-            writer.Append(buffer.Span[..written]);
+            writer.Append<byte>(buffer.Span[..written]);
         }
 
         /// <summary>

@@ -95,6 +95,9 @@ tasks:
         --environment TEST_CONFIG_DIR="{{ .CONFIG_DIR }}"
         --environment VNLIB_ARGON2_DLL_PATH="{{ .ARGON2_LIB_PATH }}"
 
+     #run vauth application tests
+     - cmd: cd apps/vauth && task test -- {{ .CLI_ARGS }}
+
 #called by build pipeline to clean module
   clean:
     desc: "Used by vnbuild to clean the entire module"
