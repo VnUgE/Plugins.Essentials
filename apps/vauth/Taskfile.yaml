@@ -79,10 +79,6 @@ tasks:
   
      - for: { var: TARGET_ARCHES }
        task: postbuild
-       vars: { BUILD_MODE: 'debug', TARGET_OS: '{{ .ITEM }}' }
-
-     - for: { var: TARGET_ARCHES }
-       task: postbuild
        vars: { BUILD_MODE: 'release', TARGET_OS: '{{ .ITEM }}' }
 
   postbuild:
