@@ -47,7 +47,7 @@ namespace PkiAuthenticator
 
     internal static class Statics
     {
-        public static ArgumentList CliArgs { get; } = new ArgumentList(Environment.GetCommandLineArgs());
+        public static ArgumentList CliArgs { get; } = ArgumentList.CaptureCurrentArgs();
 
         public static ILogProvider Log { get; } = GetLog();
 
@@ -56,7 +56,7 @@ namespace PkiAuthenticator
             LoggerConfiguration config = new();
 
             //Set min level from cli flags
-            if(CliArgs.HasArgument("--verbose") || CliArgs.HasArgument("-v"))
+            if (CliArgs.HasArgument("--verbose") || CliArgs.HasArgument("-v"))
             {
                 config.MinimumLevel.Verbose();
             }
@@ -70,7 +70,7 @@ namespace PkiAuthenticator
             }
 
             //Make sure the silent flag is not set
-            if(!CliArgs.HasArgument("--silent") || CliArgs.HasArgument("-s"))
+            if (!CliArgs.HasArgument("--silent") || CliArgs.HasArgument("-s"))
             {
                 //Write to console for now
                 config.WriteTo.Console();
@@ -140,7 +140,7 @@ namespace PkiAuthenticator
             {
                 //Default uid is the subjet name
                 uid ??= cert.SubjectName.Name.AsSpan().SliceAfterParam("=").ToString();
-             
+
                 jwt.InitPayloadClaim()
                   .AddClaim("sub", uid)
                   .AddClaim("n", RandomHash.GetRandomBase32(16))
@@ -211,7 +211,7 @@ namespace PkiAuthenticator
             //Convert the data to base64url safe
             int written = ToBase64Url(data, buffer.Span);
 
-            if(written == ERRNO.E_FAIL)
+            if (written == ERRNO.E_FAIL)
             {
                 throw new Exception($"Failed to encode the binary data due to a base64 encoding failure");
             }
@@ -231,7 +231,7 @@ namespace PkiAuthenticator
         {
             //Encode the data to base64
             OperationStatus status = Base64.EncodeToUtf8(data, buffer, out _, out int written, true);
-            
+
             if (status != OperationStatus.Done)
             {
                 return ERRNO.E_FAIL;
@@ -352,14 +352,10 @@ namespace PkiAuthenticator
             return builder.ToString();
         }
 
-        private sealed class VLogProvider : VnDisposeable, ILogProvider
+        private sealed class VLogProvider(LoggerConfiguration config) : VnDisposeable, ILogProvider
         {
-            private readonly Logger LogCore;
+            private readonly Logger LogCore = config.CreateLogger();
 
-            public VLogProvider(LoggerConfiguration config)
-            {
-                LogCore = config.CreateLogger();
-            }
             public void Flush() { }
 
             public object GetLogProvider() => LogCore;
