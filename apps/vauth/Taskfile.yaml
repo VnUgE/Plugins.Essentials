@@ -30,12 +30,10 @@ tasks:
 
   test:
     desc: 'Runs tests for the vauth project'
-    dir: '{{ .USER_WORKING_DIR }}/src'
+    dir: '{{ .USER_WORKING_DIR }}'
     cmds:
       - cmd: echo "Running tests for vauth CLI tool"
         silent: true
-
-      - task: build-debug
 
       #test help command exits successfully
       - cmd: cd 'bin/debug/net8.0' && dotnet vauth.dll --help  
