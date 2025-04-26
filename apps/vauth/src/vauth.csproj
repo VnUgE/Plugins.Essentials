@@ -1,0 +1,53 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>    
+    <AssemblyName>vauth</AssemblyName>   
+    <RootNamespace>PkiAuthenticator</RootNamespace>
+    <ProduceReferenceAssembly>True</ProduceReferenceAssembly>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PackageId>vauth</PackageId>
+    <Authors>Vaughn Nugent</Authors>
+    <Company>Vaughn Nugent</Company>
+    <Product>vauth aka OTPAuthenticator</Product>
+    <Description>A .NET 8.0 command line tool for generating certificate-based, signed, One-Time-Passwords for web/service authentication, with YubiKey support by default.</Description>
+    <Copyright>Copyright © 2025 Vaughn Nugent</Copyright>
+    <PackageProjectUrl>https://www.vaughnnugent.com/resources/software/modules/Plugins.Essentials</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/VnUgE/Plugins.Essentials/tree/master/apps/vauth</RepositoryUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\LICENSE.txt">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="..\README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+    <None Include="..\Taskfile.yaml">
+      <Pack>false</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
+  
+  <ItemGroup>
+    <PackageReference Include="Serilog" Version="3.1.1" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="5.0.1" />
+    <PackageReference Include="Yubico.YubiKey" Version="1.9.1" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\core\lib\Hashing.Portable\src\VNLib.Hashing.Portable.csproj" />
+    <ProjectReference Include="..\..\..\..\core\lib\Utils\src\VNLib.Utils.csproj" />
+  </ItemGroup>
+
+</Project>
