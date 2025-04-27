@@ -1,0 +1,122 @@
+# https://taskfile.dev
+
+version: '3'
+
+vars:
+  BINARY_DIR: '{{ .BINARY_DIR | default "bin" }}'
+  TARGET_FRAMEWORK: '{{ .TARGET_FRAMEWORK | default "net8.0" }}'
+  MS_ARGS: 
+    /p:RunAnalyzersDuringBuild=false
+    /p:BuildInParallel=true 
+    /p:MultiProcessorCompilation=true 
+    /p:ErrorOnDuplicatePublishOutputFiles=false
+
+  TARGET_ARCHES: [ "linux-x64", "win-x64", "osx-x64", "win-arm64", "linux-arm", "linux-arm64", "osx-arm64" ]
+
+tasks:
+
+  default:
+    desc: 'Builds the vauth project with defaults'
+    vars:
+      CONFIGURATION: '{{ .CONFIGURATION | default "release" }}'
+    cmds:
+     - cmd: cd src/ && dotnet build -c {{ .CONFIGURATION }} {{ .MS_ARGS }} {{ .CLI_ARGS }}
+
+  build-debug:
+    desc: 'Builds the vauth project in debug mode'
+    cmds:
+     - task: default
+       vars: { CONFIGURATION: 'debug' }
+
+  test:
+    desc: 'Runs tests for the vauth project'
+    dir: '{{ .USER_WORKING_DIR }}'
+    cmds:
+      - cmd: echo "Running tests for vauth CLI tool"
+        silent: true
+
+      #test help command exits successfully
+      - cmd: cd 'bin/debug/net8.0' && dotnet vauth.dll --help  
+
+      - cmd: echo "vauth tests completed successfully"
+        silent: true
+
+  #called by build pipeline to build module
+  build:
+    dir: '{{ .USER_WORKING_DIR }}'
+    vars:
+      INT_DIR: '{{ .SCRATCH_DIR | default "." }}/obj/{{ .MODULE_NAME }}/'
+      MS_ARGS: '
+        {{ .BUILD_FLAGS }}
+        --nologo
+        --sc false
+        {{ .MS_ARGS }} 
+        /p:UseCommonOutputDirectory=true 
+        /p:IntermediateOutputPath="{{ .INT_DIR }}"'
+    cmds:
+    
+    #build release mode after all debug builds
+    - for: { var: TARGET_ARCHES }
+      cmd: dotnet publish -c release -r {{ .ITEM }} {{ .MS_ARGS }}
+
+  #when build succeeds, archive the output into a tgz 
+  postbuild_success:
+    dir: '{{ .USER_WORKING_DIR }}'
+    vars:
+      RELEASE_DIR: "{{ .BINARY_DIR }}/release/{{ .TARGET_FRAMEWORK }}"
+    cmds:
+     - cmd: powershell mkdir {{ .BINARY_DIR }} -Force
+
+     #remove uncessary files from the release dir
+     - cmd: powershell -Command "Get-ChildItem -Recurse '{{ .RELEASE_DIR }}/' -Include *.pdb,*.xml | Remove-Item"
+
+     - task: pack_parallel
+
+  pack_parallel:
+    internal: true
+    deps:
+     - task: pack_source
+  
+     - for: { var: TARGET_ARCHES }
+       task: postbuild
+       vars: { BUILD_MODE: 'release', TARGET_OS: '{{ .ITEM }}' }
+
+  postbuild:
+    internal: true
+    dir: '{{ .USER_WORKING_DIR }}'
+    vars:
+      BUILD_DIR: "{{ .BINARY_DIR }}/{{ .BUILD_MODE }}/{{ .TARGET_FRAMEWORK }}/{{ .TARGET_OS }}/publish"
+    cmds:     
+     #copy and readme to target
+     - powershell cp ../build.readme.txt '{{ .BUILD_DIR }}/readme.txt'
+     
+     #tar outputs
+     - cd "{{ .BUILD_DIR }}" && tar -czf "{{ .USER_WORKING_DIR }}/{{ .BINARY_DIR }}/{{ .TARGET_OS }}-{{ .BUILD_MODE }}.tgz" .
+
+  pack_source:
+    internal: true
+    dir: '{{ .USER_WORKING_DIR }}'
+    vars:
+      EXCLUDES:
+        --exclude='src/bin/*'
+        --exclude='src/obj/*'
+      INCLUDES:
+        src/*
+        LICENSE
+        Taskfile.yaml
+        README.md
+
+    cmds:
+      #pack up source code and put in output
+     - cmd: cd .. && tar {{ .EXCLUDES }} -czf '{{ .USER_WORKING_DIR }}/{{ .BINARY_DIR }}/src.tgz' {{ .INCLUDES }}
+
+    #Remove the output dirs on clean
+  clean:
+    dir: '{{ .USER_WORKING_DIR }}'
+    ignore_error: true
+    cmds:
+     - cmd: dotnet clean /p:BuildInParallel=true /p:MultiProcessorCompilation=true
+
+     - for: [ bin/, obj/ ]
+       cmd: powershell Remove-Item -Recurse -Force '{{ .USER_WORKING_DIR }}/{{ .ITEM }}'
+

@@ -36,6 +36,17 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="ErrorProne.NET.CoreAnalyzers" Version="0.7.0-beta.1">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="ErrorProne.NET.Structs" Version="0.6.1-beta.1">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\..\..\VNLib.Data.Caching\lib\VNLib.Plugins.Extensions.VNCache\src\VNLib.Plugins.Extensions.VNCache.csproj" />
     <ProjectReference Include="..\..\..\..\VNLib.Plugins.Extensions\lib\VNLib.Plugins.Extensions.Loading\src\VNLib.Plugins.Extensions.Loading.csproj" />
     <ProjectReference Include="..\..\VNLib.Plugins.Sessions.Cache.Client\src\VNLib.Plugins.Sessions.Cache.Client.csproj" />
