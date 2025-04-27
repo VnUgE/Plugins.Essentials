@@ -30,7 +30,6 @@ jobs:
         git clone @server_url@/@project_name@ --branch @branch@
         git clone @server_url@/VNLib.Core core --branch master
         git clone @server_url@/VNLib.Data.Caching --branch master
-        git clone @server_url@/Emails.Transactional --branch master
         git clone @server_url@/VNLib.Plugins.Extensions --branch master
     useTTY: true
     condition: ALL_PREVIOUS_STEPS_WERE_SUCCESSFUL
@@ -71,7 +70,6 @@ jobs:
         git clone @server_url@/@project_name@ --branch @branch@
         git clone @server_url@/VNLib.Core core --branch master
         git clone @server_url@/VNLib.Data.Caching --branch master
-        git clone @server_url@/Emails.Transactional --branch master
         git clone @server_url@/VNLib.Plugins.Extensions --branch master
     useTTY: true
     condition: ALL_PREVIOUS_STEPS_WERE_SUCCESSFUL
@@ -82,7 +80,6 @@ jobs:
       commands: |
         dotnet gitversion core /updateprojectfiles
         dotnet gitversion VNLib.Data.Caching /updateprojectfiles
-        dotnet gitversion Emails.Transactional /updateprojectfiles
         dotnet gitversion VNLib.Plugins.Extensions /updateprojectfiles
         vnbuild build --no-delay --include @project_name@ --verbose
     useTTY: true
@@ -117,7 +114,6 @@ jobs:
         git clone @server_url@/@project_name@ --branch @branch@
         git clone @server_url@/VNLib.Core core --branch master
         git clone @server_url@/VNLib.Data.Caching --branch master
-        git clone @server_url@/Emails.Transactional --branch master
         git clone @server_url@/VNLib.Plugins.Extensions --branch master
     useTTY: true
     condition: ALL_PREVIOUS_STEPS_WERE_SUCCESSFUL
@@ -128,7 +124,6 @@ jobs:
       commands: |
         dotnet gitversion core /updateprojectfiles
         dotnet gitversion VNLib.Data.Caching /updateprojectfiles
-        dotnet gitversion Emails.Transactional /updateprojectfiles
         dotnet gitversion VNLib.Plugins.Extensions /updateprojectfiles
         vnbuild build --no-delay --include @project_name@
     useTTY: true

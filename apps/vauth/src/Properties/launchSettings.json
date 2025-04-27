@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "PkiHardwareAuthenticator": {
+      "commandName": "Project",
+      "commandLineArgs": "-v"
+    }
+  }
+}
