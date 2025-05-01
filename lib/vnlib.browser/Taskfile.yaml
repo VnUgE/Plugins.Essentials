@@ -13,6 +13,12 @@ vars:
 
 tasks:
 
+  default:
+    cmds:
+      #install dependencies and build
+     - cmd: npm install
+     - cmd: npm run build
+
 #called by build pipeline to build module
   build:
     cmds:
@@ -22,9 +28,7 @@ tasks:
      - cmd: npm version {{ .BUILD_VERSION }}
        ignore_error: true
 
-    #install dependencies and build
-     - cmd: npm install
-     - cmd: npm run build
+     - task: default
 
   postbuild_success:
     vars:
