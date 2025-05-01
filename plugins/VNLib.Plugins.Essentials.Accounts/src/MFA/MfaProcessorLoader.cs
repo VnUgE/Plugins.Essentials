@@ -68,7 +68,7 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA
                 .Where(c => c != null)
                 .ToArray()!;
 
-            plugin.Log.Debug("Loaded {count} MFA processors", procs.Length);
+            plugin.Log.Debug("Loaded {count} MFA processors: {data}", procs.Length, procs.Select(s => s.Type));
 
             return procs;
         }
