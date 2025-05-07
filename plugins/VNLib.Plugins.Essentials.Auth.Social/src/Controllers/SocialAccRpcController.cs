@@ -47,6 +47,16 @@ using VNLib.Plugins.Extensions.Loading.Users;
 
 namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
 {
+    /*
+     * When this assembly file is specified in the Essentials.Accounts configuration 
+     * it will create and load an instance of this class. It will be loaded as an 
+     * rpc controller and exposed on the /account rpc endpoint and capabilities 
+     * exposed to clients. 
+     * 
+     * This class is repsonsible for creating and exposing RPC methods for the account
+     * RPC endpoint. 
+     */
+
     [ServiceExport]
     [ConfigurationName("social_oauth")]
     public sealed class SocialAccRpcController(PluginBase plugin, IConfigScope config) : IAccountRpcController
@@ -78,9 +88,10 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
             FrozenDictionary<string, ISocialOauthMethod> methodMap = methods
                 .ToFrozenDictionary(static m => m.MethodName, static m => m);
 
+            // Only a single method is exposed for all Social OAuth rpc functions.
             return [new OnGetMethods(this, methodMap)];
         }
-        
+
         private sealed class OnGetMethods(
             SocialAccRpcController _controller,
             FrozenDictionary<string, ISocialOauthMethod> _methods
@@ -93,7 +104,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
             private readonly SocialAuthStateManager _authUtil = new(_controller.Config);
 
             private readonly SingleCookieController _upgradeCookie = new (
-                Name: _controller.Config.UpgradeCookieName, 
+                Name: _controller.Config.UpgradeCookieName,
                 TimeSpan.FromSeconds(_controller.Config.UpgradeTimeoutSec)
             )
             {
@@ -219,11 +230,10 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
                     {
                         if (_methods.TryGetValue(methodId, out ISocialOauthMethod? method))
                         {
-                            SocialMethodState state = new()
+                            SocialMethodState state = new(methodId)
                             {
                                 Entity      = entity,
-                                Users       = _controller.Users,
-                                MethodId    = methodId
+                                Users       = _controller.Users
                             };
 
                             webm.Result = await method.OnLogoutAsync(state, EmptyDoc.RootElement);
@@ -258,12 +268,12 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
                 }
 
                 ClientUpgradeJson? upgrade = args.Deserialize<ClientUpgradeJson>();
-                if(webm.AssertError(upgrade is not null, "Missing procedure arguments structure"))
+                if (webm.AssertError(upgrade is not null, "Missing procedure arguments structure"))
                 {
                     return RpcCommandResult.Error(HttpStatusCode.BadRequest, webm);
                 }
 
-                if(!_validator.Validate(upgrade, webm))
+                if (!_validator.Validate(upgrade, webm))
                 {
                     return RpcCommandResult.Error(HttpStatusCode.UnprocessableEntity, webm);
                 }
@@ -277,11 +287,10 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
                 //Invalidate a pre-existing upgrade
                 _authUtil.ClearUpgrade(entity);
 
-                SocialMethodState state = new()
+                SocialMethodState state = new(upgrade.MethodId)
                 {
                     Entity      = entity,
-                    Users       = _controller.Users,
-                    MethodId    = upgrade.MethodId
+                    Users       = _controller.Users
                 };
 
                 SocialUpgradeResult result = await method.OnUpgradeAsync(state, args);
@@ -293,9 +302,9 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
 
                 //Get the upgrade token and set the client's upgrade cookie
                 string upgradeData = _authUtil.CreateClientUpgrade(
-                    entity, 
-                    methodId: method.MethodName, 
-                    secInfo: upgrade, 
+                    entity,
+                    methodId: method.MethodName,
+                    secInfo: upgrade,
                     userData: result.StateData
                 );
 
@@ -337,7 +346,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
                     }
 
                     using JsonDocument upgradeDocument = upgradeJwt.GetPayload();
-                    if(webm.AssertError(_authUtil.IsUpgradeValid(entity, upgradeDocument), "Your authorization token is not valid"))
+                    if (webm.AssertError(_authUtil.IsUpgradeValid(entity, upgradeDocument), "Your authorization token is not valid"))
                     {
                         return RpcCommandResult.Error(HttpStatusCode.BadRequest, webm);
                     }
@@ -353,14 +362,13 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
                         return RpcCommandResult.Error(HttpStatusCode.BadRequest, webm);
                     }
 
-                    SocialMethodState state = new()
+                    SocialMethodState state = new(method.MethodName)
                     {
                         Entity      = entity,
-                        Users       = _controller.Users,
-                        MethodId    = method.MethodName
+                        Users       = _controller.Users
                     };
 
-                    object? result = await method.OnAuthenticateAsync(state, secInfo, args, userStateDatEl);                    
+                    object? result = await method.OnAuthenticateAsync(state, secInfo, args, userStateDatEl);
                     if (webm.AssertError(result is not null, "The authentication request failed"))
                     {
                         return RpcCommandResult.Error(HttpStatusCode.BadRequest, webm);
@@ -371,7 +379,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
 
                     return RpcCommandResult.Okay(result);
                 }
-                catch(FormatException fe)
+                catch (FormatException fe)
                 {
                     _controller.Log.Debug("Failed to parse upgrade token", fe);
                     webm.AssertError(false, "Failed to parse upgrade token");
@@ -410,7 +418,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
 
                 return _controller.Config.AllowedCorsOrigins.Contains(originAuthority, StringComparer.OrdinalIgnoreCase);
             }
-         
+
 
             private sealed class UpgradeResponse
             {
@@ -444,7 +452,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
                 public string ClientId { get; init; } = null!;
             }
 
-            private sealed class UpgradeValidator: AbstractValidator<ClientUpgradeJson>
+            private sealed class UpgradeValidator : AbstractValidator<ClientUpgradeJson>
             {
                 public UpgradeValidator()
                 {

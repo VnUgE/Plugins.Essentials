@@ -29,7 +29,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social
     /// <summary>
     /// The state object for a social method call
     /// </summary>
-    public sealed class SocialMethodState
+    public sealed class SocialMethodState(string MethodId)
     {
         /// <summary>
         /// The user manager for the server
@@ -44,7 +44,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social
         /// <summary>
         /// The unique id of the method being called
         /// </summary>
-        internal string MethodId { get; init; } = null!;
+        internal string MethodId { get; } = MethodId;
 
         /// <summary>
         /// Gets the stored secret data for the current method

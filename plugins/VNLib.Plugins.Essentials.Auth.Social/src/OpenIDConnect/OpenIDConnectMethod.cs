@@ -226,9 +226,9 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
 
             ///<inheritdoc/>
             public async ValueTask<object?> OnAuthenticateAsync(
-                SocialMethodState state, 
-                IClientSecInfo secInfo, 
-                JsonElement requestArgs, 
+                SocialMethodState state,
+                IClientSecInfo secInfo,
+                JsonElement requestArgs,
                 JsonElement stateDataJson
             )
             {
@@ -237,7 +237,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
                 StateData stateData = stateDataJson.Deserialize<StateData>()!;
                 AuthenticateRequestJson? auth = requestArgs.Deserialize<AuthenticateRequestJson>();
 
-                if(webm.AssertError(manager.Loaded, "Server info is not loaded"))
+                if (webm.AssertError(manager.Loaded, "Server info is not loaded"))
                 {
                     return webm;
                 }
@@ -247,7 +247,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
                     return webm;
                 }
 
-                if(!_authReqValidator.Validate(auth, webm))
+                if (!_authReqValidator.Validate(auth, webm))
                 {
                     return webm;
                 }
@@ -263,20 +263,33 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
                     return webm;
                 }
 
-                OpenIdTokenResponse token = await manager.Client.ExchangeCodeForTokenAsync(
-                    manager.Config.TokenEndpoint,
-                    accessCode: auth.Code,
-                    state.Entity.EventCancellation
-                );          
-               
-                await AuthorizeClientFromPlatformId(state, secInfo, webm, token);
-
-                //Store access token info for future use
-                state.SetSecretData(new
+                try
                 {
-                    access_token = token.Token,
-                    refresh_token = token.RefreshToken,
-                });
+                    OpenIdTokenResponse token = await manager.Client.ExchangeCodeForTokenAsync(
+                        manager.Config.TokenEndpoint,
+                        accessCode: auth.Code,
+                        state.Entity.EventCancellation
+                    );
+
+                    await AuthorizeClientFromPlatformId(state, secInfo, webm, token);
+
+                    //Store access token info for future use
+                    state.SetSecretData(new
+                    {
+                        access_token = token.Token,
+                        refresh_token = token.RefreshToken,
+                    });                 
+                }
+                catch (HttpRequestException hre)
+                {
+                    manager.Log.Error("Failed to exchange code for token due to an HTTP error: {error}", hre.Message);
+
+                    webm.Result = null;
+                    webm.AssertError(false, 
+                    [
+                        "Failed to authenticate with service",
+                    ]);
+                }
 
                 return webm;
             }
