@@ -43,7 +43,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
 {
     internal class GenericOidcIdentityAdapter : IOidcIdenityAdapter
     {
-        protected const string AuthErrorString = "An error occurred during authentication";
+        protected static readonly string[] AuthErrorArray = [ "An error occurred during authentication" ];
 
         private readonly OidcConfigJson _config;
         private readonly OpenIdConnectClient _client;
@@ -83,7 +83,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
                 return new OidcLoginDataResult
                 {
                     IsValid = false,
-                    Error = AuthErrorString
+                    Errors = AuthErrorArray 
                 };
             }
 
@@ -94,7 +94,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
                 return new OidcLoginDataResult
                 {
                     IsValid = false,
-                    Error = result.Errors.First().ErrorMessage
+                    Errors = result.Errors.Select(e => e.ErrorMessage).ToArray()
                 };
             }
 
@@ -104,7 +104,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
                 return new OidcLoginDataResult
                 {
                     IsValid = false,
-                    Error = AuthErrorString
+                    Errors = AuthErrorArray
                 };
             }
 
@@ -123,7 +123,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
 
                     return new OidcLoginDataResult
                     {
-                        Error       = userData.Error,
+                        Errors       = userData.Errors,
                         IsValid     = userData.IsValid,
                         Username    = userData.EmailAddress
                     };
@@ -133,7 +133,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
                     return new OidcLoginDataResult
                     {
                         IsValid     = true,
-                        Error       = null,
+                        Errors       = null,
                         Username    = idToken.Email
                     };
                 }
@@ -142,7 +142,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
                     return new OidcLoginDataResult
                     {
                         IsValid = false,
-                        Error   = "Email address is required"
+                        Errors   = ["Email address is required"]
                     };
                 }
             }
@@ -157,7 +157,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
                 return new OidcLoginDataResult
                 {
                     IsValid     = true,
-                    Error       = null,
+                    Errors       = null,
                     Username    = state.Users.ComputeSafeUserId($"{_config.UserIdPrefix}|{idToken.Subject}")
                 };
             }
@@ -166,7 +166,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
                 return new OidcLoginDataResult
                 {
                     IsValid     = true,
-                    Error       = null,
+                    Errors       = null,
                     Username    = state.Users.ComputeSafeUserId(idToken.Subject!)
                 };
             }
@@ -184,7 +184,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
                 return new OidcNewUserDataResult
                 {
                     IsValid         = true,
-                    Error           = null,
+                    Errors           = null,
                     EmailAddress    = email,
                     SafeUserId      = state.Users.ComputeSafeUserId(platformId!) 
                 };
@@ -195,7 +195,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
                 return new OidcNewUserDataResult
                 {
                     IsValid         = false,
-                    Error           = "User info endpoint is not available",
+                    Errors          = ["User info endpoint is not available"],
                     SafeUserId      = null,
                     EmailAddress    = null
                 };
@@ -221,7 +221,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
                     return new OidcNewUserDataResult
                     {
                         IsValid         = false,
-                        Error           = "Failed to fetch user info",
+                        Errors          = ["Failed to fetch user info"],
                         SafeUserId      = null,
                         EmailAddress    = null
                     };
@@ -234,7 +234,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
                     return new OidcNewUserDataResult
                     {
                         IsValid         = false,
-                        Error           = "Failed to fetch user info",
+                        Errors          = ["Failed to fetch user info"],
                         SafeUserId      = null,
                         EmailAddress    = null
                     };
@@ -244,7 +244,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
                     return new OidcNewUserDataResult
                     {
                         IsValid         = true,
-                        Error           = null,
+                        Errors          = null,
                         SafeUserId      = state.Users.ComputeSafeUserId(userInfo.Subject!),
                         EmailAddress    = userInfo.Email,
                         Name            = userInfo.Subject
@@ -255,7 +255,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
             return new OidcNewUserDataResult
             {
                 IsValid         = false,
-                Error           = "Failed to fetch user info",
+                Errors          = ["Failed to fetch user info"],
                 SafeUserId      = null,
                 EmailAddress    = null
             };
@@ -326,6 +326,26 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
                 RuleFor(r => r.Email)
                     .NotEmpty()
                     .EmailAddress();
+            }
+        }
+
+        private sealed class NewUserDataValidator : AbstractValidator<OidcNewUserDataResult>
+        {
+            public NewUserDataValidator()
+            {
+                RuleFor(r => r.SafeUserId)
+                    .NotEmpty()
+                    .Matches(@"^[\w\-.]+$")
+                    .MaximumLength(128);
+
+                RuleFor(r => r.EmailAddress)
+                    .NotEmpty()
+                    .EmailAddress()
+                    .MaximumLength(256);
+
+                RuleFor(r => r.Name)
+                    .Matches(@"^[\w\-. ]+$")
+                    .When(r => r != null);
             }
         }
     }

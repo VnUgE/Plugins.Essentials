@@ -319,7 +319,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
                 //Get the user info from the adapter so we can log the user in
                 OidcLoginDataResult loginData = await manager.IdentityAdapter.GetLoginDataAsync(state, token);
 
-                if (webm.AssertError(loginData.IsValid, loginData.Error!))
+                if (webm.AssertError(loginData.IsValid, loginData.Errors!))
                 {
                     return;
                 }
@@ -418,7 +418,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
                 //Fetch the user data from the adapter for the current user auth token
                 OidcNewUserDataResult userData = await manager.IdentityAdapter.GetNewUserDataAsync(state, token);
 
-                if (webm.AssertError(userData.IsValid, userData.Error!))
+                if (webm.AssertError(userData.IsValid, userData.Errors!))
                 {
                     return null;
                 }

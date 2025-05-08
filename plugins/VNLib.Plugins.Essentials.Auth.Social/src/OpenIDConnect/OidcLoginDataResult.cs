@@ -28,7 +28,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
     {
         public required bool IsValid { get; init; }
 
-        public required string? Error { get; init; }
+        public required string[]? Errors { get; init; }
 
         public string? Username { get; init; }
     }
