@@ -46,7 +46,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.OpenIDConnect
         public string? DiscoveryUrl { get; init; }
 
         [JsonPropertyName("timeout_ms")]
-        public int TimeoutMilliseconds { get; init; } = 1000;
+        public int TimeoutMilliseconds { get; init; } = 5000;
 
         [JsonPropertyName("max_redirects")]
         public int MaxRedirects { get; init; } = 5;
