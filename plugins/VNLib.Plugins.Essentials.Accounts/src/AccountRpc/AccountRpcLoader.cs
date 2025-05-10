@@ -61,7 +61,7 @@ namespace VNLib.Plugins.Essentials.Accounts.AccountRpc
             {
                 //Load an external assembly for the processor
                 case "external":
-                    plugin.Log.Debug("Loading external MFA processor from {asm}", method.ExernAssemblyPath);
+                    plugin.Log.Debug("Loading external rpc controller from {asm}", method.ExernAssemblyPath);
 
                     return plugin.CreateServiceExternal<IAccountRpcController>(method.ExernAssemblyPath!);
 

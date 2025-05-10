@@ -11,19 +11,11 @@
   "typings": "./dist/index.d.ts",
   "output": "bin",
   "scripts": {
-    "lint": "eslint --ext .js,.ts src",
     "build": "tsc",
     "clean": "if exist dist ( rd /S /Q lib)"
   },
   "license": "MIT",
-  "devDependencies": {
-    "@simplewebauthn/types": "^10.0.0",
-    "@types/lodash-es": "^4.14.x",
-    "@types/node": "^22.x",
-    "@typescript-eslint/eslint-plugin": "^8.x.x",
-    "eslint": "^9.7.0"
-  },
-  "peerDependencies": {
+  "dependencies": {
     "@simplewebauthn/browser": "^10.x.x",
     "@vueuse/core": "^13.x",
     "axios": "^1.x",
@@ -32,26 +24,9 @@
     "universal-cookie": "^8.0.x",
     "vue": "^3.x"
   },
-  "eslintConfig": {
-    "root": true,
-    "extends": [
-      "eslint:recommended",
-      "plugin:@typescript-eslint/recommended"
-    ],
-    "parser": "@typescript-eslint/parser",
-    "parserOptions": {
-      "project": []
-    },
-    "plugins": [
-      "@typescript-eslint"
-    ],
-    "rules": {},
-    "ignorePatterns": [
-      "src/**/*.test.ts",
-      "src/frontend/generated/*"
-    ],
-    "env": {
-      "browser": true
-    }
+  "devDependencies": {
+    "@simplewebauthn/types": "^10.0.0",
+    "@types/lodash-es": "^4.14.x",
+    "@types/node": "^22.x"
   }
 }

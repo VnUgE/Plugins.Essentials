@@ -125,9 +125,13 @@ namespace VNLib.Plugins.Essentials.Auth.Social
                 .InclusiveBetween(8, 128);
 
             val.RuleFor(c => c.AllowedCorsOrigins)
-                //May be an origin or a wildcard *
-                .ForEach(r => r.Matches(@"^https?://[\w\-.]+(:\d+)?$"))
-                .When(a => a.AllowedCorsOrigins?.Length > 0);
+                //All elements must be a valid uri, or a single element of "*"
+                // With regex
+                .ForEach(c => c
+                    .Matches(@"^https?://[a-zA-Z0-9\-._~:/?#\[\]@!$&'()*+,;=]+$|^\*$")
+                    .WithMessage("{PropertyValue} is not a valid origin")
+                )
+                .When(c => c.AllowedCorsOrigins?.Length > 0);
 
             val.RuleFor(c => c.PasswordSize)
                 .InclusiveBetween(8, 128)
