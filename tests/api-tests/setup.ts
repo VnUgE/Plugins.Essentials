@@ -3,7 +3,7 @@ import { afterAll, beforeAll } from 'vitest';
 
 configureApi({
   account:{
-      endpointUrl: '/account'
+      endpointUrl: '/api/account'
   },
   axios:{
       baseURL:"/api", //Matches vitest.config.ts proxy target to route api requests to the test server
