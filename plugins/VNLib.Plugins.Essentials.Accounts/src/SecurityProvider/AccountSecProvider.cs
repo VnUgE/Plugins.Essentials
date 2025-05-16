@@ -120,7 +120,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                 else if (ClientWebAuthManager.IsSessionElevated(in session))
                 {
                     //If the session stored a user-agent, make sure it matches the connection
-                    if (_config.StrictUserAgent && !string.Equals(session.UserAgent, entity.Server.UserAgent, StringComparison.Ordinal))
+                    if (_config.SessionStrictUserAgent && !string.Equals(session.UserAgent, entity.Server.UserAgent, StringComparison.Ordinal))
                     {
                         _logger.Debug("Denied authorized connection from {ip} because user-agent changed", entity.TrustedRemoteIp);
                         return ValueTask.FromResult(FileProcessArgs.Deny);

@@ -18,6 +18,6 @@ export default defineWorkspace([
                 { browser: 'firefox' },
             ]
         },
-    },
+    }
   },
 ])

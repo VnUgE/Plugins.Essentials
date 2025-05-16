@@ -2,9 +2,10 @@
   "debug": false,
 
   "rpc": {
-    "path": "/account",
+    "path": "/api/account",
 
     "methods": [
+      // built-in services
       {
         "type": "login",
         "enabled": true
@@ -25,6 +26,13 @@
         "type": "heartbeat",
         "enabled": true
       },
+
+      // External services
+      {
+        "type": "external",
+        "enabled": false,
+        "assembly_path": "VNLib.Plugins.Essentials.Auth.Social.dll"
+      },
       {
         "type": "external",
         "enabled": false,
@@ -39,6 +47,7 @@
     "upgrade_expires_secs": 180,
 
     "processors": [
+      // built-in processor types
       {
         "type": "totp",
         "enabled": true
@@ -51,6 +60,8 @@
         "type": "pkotp",
         "enabled": true
       },
+
+      // Optionally load any of your custom MFA processors
       {
         "type": "external",
         "enabled": false,
@@ -63,7 +74,7 @@
     "enforce_email_address": true,    //If true, requires username's to be email addresses
     "username_max_chars": 64,         //Max length of a username
     "token_refresh_sec": 600,         //10 minute refresh
-    "max_login_attempts": 10,         //10 failed attempts in 10 minutes
+    "max_login_attempts": 10,         //10 max failed attempts within the timeout period
     "failed_attempt_timeout_sec": 600 //10 minutes
   },
 
@@ -103,6 +114,7 @@
   "account_security": {
     //Time in seconds before a session is considered expired
     "session_valid_for_sec": 3600,
+    "session_strict_user_agent": true,
 
     //Path/domain for all security cookies
     "cookie_domain": "",
@@ -110,17 +122,15 @@
 
     "status_cookie_name": "li",
 
-    "otp_header_name": "X-Web-Token",
-    "otp_time_diff_sec": 30,    //Time difference allowed between server and client
-    "otp_key_size": 64,         //Size of the OTP security key (bytes)
-
     "pubkey_cookie_name": "client-id",
     "pubkey_signing_key_size": 32,
 
-    "strict_origin": false,     //requires the client's OTP signature origin to match the server address
-    "strict_path": false,       //requires the client's OTP signature path to match the server path
-
+    "otp_header_name": "X-Web-Token",
+    "otp_time_diff_sec": 30,        //Time difference allowed between server and client
+    "otp_key_size": 64,             //Size of the OTP security key (bytes)
+    "otp_strict_origin": false,     //requires the client's OTP signature origin to match the server address
+    "otp_strict_path": false,       //requires the client's OTP signature path to match the server path
     //An optional list of allowed origins for the client's OTP signature
-    //"allowed_origins": [ ]
+    "allowed_origins": [ "*" ]
   }
 }

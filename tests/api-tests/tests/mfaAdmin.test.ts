@@ -25,6 +25,12 @@ describe('Before a user modifes their profile', () => {
         expect(isEnabled({ rpc_methods }))
           .toBe(true)
     })
+
+    it('Ensures the server supports mfa', async () => {
+       const { rpc_methods } = await getAccStatus();
+        expect(isEnabled({rpc_methods}))
+          .toBe(true);
+    })
 })
 
 describe('When a user wants to add a totp key', () => {
