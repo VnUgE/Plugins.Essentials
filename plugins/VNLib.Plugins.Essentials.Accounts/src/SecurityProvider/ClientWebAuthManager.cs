@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2024 Vaughn Nugent
+* Copyright (c) 2025 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
@@ -541,16 +541,23 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
         public static bool IsSessionElevated(ref readonly SessionInfo session) 
             => string.IsNullOrWhiteSpace(GetLoginToken(in session)) == false;
 
-        private void SetPubkeyCookie(HttpEntity entity, string value) => _pubkeyCookie.SetCookie(entity, value);
-        private string? GetOTPHeaderValue(HttpEntity entity) => entity.Server.Headers[_config.TokenHeaderName];
+        private void SetPubkeyCookie(HttpEntity entity, string value) 
+            => _pubkeyCookie.SetCookie(entity, value);
+        private string? GetOTPHeaderValue(HttpEntity entity) 
+            => entity.Server.Headers[_config.TokenHeaderName];
 
-        private static void SetSigningKey(ref readonly SessionInfo session, string? value) => session[PUBLIC_KEY_SIG_KEY_ENTRY] = value!;
-        private static void SetLoginToken(ref readonly SessionInfo session, string? value) => session[LOGIN_TOKEN_ENTRY] = value!;
+        private static void SetSigningKey(ref readonly SessionInfo session, string? value) 
+            => session[PUBLIC_KEY_SIG_KEY_ENTRY] = value!;
+        private static void SetLoginToken(ref readonly SessionInfo session, string? value) 
+            => session[LOGIN_TOKEN_ENTRY] = value!;
 
-        private static string? GetSigningKey(ref readonly SessionInfo session) => session[PUBLIC_KEY_SIG_KEY_ENTRY];
-        private static string? GetLoginToken(ref readonly SessionInfo session) => session[LOGIN_TOKEN_ENTRY];
+        private static string? GetSigningKey(ref readonly SessionInfo session) 
+            => session[PUBLIC_KEY_SIG_KEY_ENTRY];
+        private static string? GetLoginToken(ref readonly SessionInfo session) 
+            => session[LOGIN_TOKEN_ENTRY];
 
-        private static bool IsSessionValid(ref readonly SessionInfo session) => session.IsSet && !session.IsNew && session.SessionType == SessionType.Web;
+        private static bool IsSessionValid(ref readonly SessionInfo session) 
+            => session.IsSet && !session.IsNew && session.SessionType == SessionType.Web;
 
         #endregion
     }

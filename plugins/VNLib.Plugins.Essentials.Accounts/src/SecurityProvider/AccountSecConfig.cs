@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2024 Vaughn Nugent
+* Copyright (c) 2025 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
@@ -82,6 +82,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
 
             val.RuleForEach(c => c.AllowedOrigins)
                 .Matches(@"^https?://[a-z0-9\-\.]+$")
+                .When(r => r.AllowedOrigins?.Length > 0 && r.AllowedOrigins[0] != "*")
                 .WithMessage("The allowed origins must be valid http(s) urls");
 
             return val;
@@ -110,21 +111,7 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
         /// The name of the cookie used to set the client's login status message
         /// </summary>
         [JsonPropertyName("status_cookie_name")]
-        public string ClientStatusCookieName { get; set; } = "li";
-
-        /// <summary>
-        /// The name of the header used by the client to send the one-time use
-        /// authorization token
-        /// </summary>
-        [JsonPropertyName("otp_header_name")]
-        public string TokenHeaderName { get; set; } = "X-Web-Token";
-
-        /// <summary>
-        /// The size (in bytes) of the symmetric key used
-        /// by the client to sign token messages
-        /// </summary>
-        [JsonPropertyName("otp_key_size")]
-        public int TokenKeySize { get; set; } = 64;
+        public string ClientStatusCookieName { get; set; } = "li";      
 
         /// <summary>
         /// The name of the cookie that stores the user's signed public encryption key
@@ -152,6 +139,26 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
         [JsonPropertyName("session_valid_for_sec")]
         public uint WebSessionValidForSeconds { get; set; } = 3600;
 
+        /// <summary>
+        /// Enforce strict user-agent strings for authorized users
+        /// </summary>
+        [JsonPropertyName("session_strict_user_agent")]
+        public bool SessionStrictUserAgent { get; set; } = true;
+
+        /// <summary>
+        /// The name of the header used by the client to send the one-time use
+        /// authorization token
+        /// </summary>
+        [JsonPropertyName("otp_header_name")]
+        public string TokenHeaderName { get; set; } = "X-Web-Token";
+
+        /// <summary>
+        /// The size (in bytes) of the symmetric key used
+        /// by the client to sign token messages
+        /// </summary>
+        [JsonPropertyName("otp_key_size")]
+        public int TokenKeySize { get; set; } = 64;
+
         [JsonPropertyName("otp_time_diff_sec")]
         public uint SigTokenTimeDifSeconds
         {
@@ -163,32 +170,26 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
         /// Enforce that the client's token is only valid for the origin 
         /// it was read from. Will break sites hosted from multiple origins
         /// </summary>
-        [JsonPropertyName("strict_origin")]
+        [JsonPropertyName("otp_strict_origin")]
         public bool EnforceSameOriginToken { get; set; } = true;
+
+        /// <summary>
+        /// Enforce strict path checking for the client's token
+        /// </summary>
+        [JsonPropertyName("otp_strict_path")]
+        public bool VerifyPath { get; set; } = true;
 
         /// <summary>
         /// Enable/disable origin verification for the client's token
         /// </summary>
         [JsonIgnore]
-        public bool VerifyOrigin => AllowedOrigins != null && AllowedOrigins.Length > 0;
+        public bool VerifyOrigin => AllowedOrigins != null && AllowedOrigins.Length > 0 && AllowedOrigins[0] != "*";
 
         /// <summary>
         /// The list of origins that are allowed to send requests to the server
         /// </summary>
         [JsonPropertyName("allowed_origins")]
-        public string[]? AllowedOrigins { get; set; }
-
-        /// <summary>
-        /// Enforce strict path checking for the client's token
-        /// </summary>
-        [JsonPropertyName("strict_path")]
-        public bool VerifyPath { get; set; } = true;
-
-        /// <summary>
-        /// Enforce strict user-agent strings for authorized users
-        /// </summary>
-        [JsonPropertyName("strict_user_agent")]
-        public bool StrictUserAgent { get; set; } = true;
+        public string[]? AllowedOrigins { get; set; }       
 
         void IOnConfigValidation.OnValidate()
         {
