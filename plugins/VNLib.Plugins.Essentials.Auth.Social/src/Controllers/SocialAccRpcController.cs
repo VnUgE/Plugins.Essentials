@@ -89,10 +89,10 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
                 .ToFrozenDictionary(static m => m.MethodName, static m => m);
 
             // Only a single method is exposed for all Social OAuth rpc functions.
-            return [new OnGetMethods(this, methodMap)];
+            return [new SocialOauthMethod(this, methodMap)];
         }
 
-        private sealed class OnGetMethods(
+        private sealed class SocialOauthMethod(
             SocialAccRpcController _controller,
             FrozenDictionary<string, ISocialOauthMethod> _methods
         ) : IAccountRpcMethod
@@ -105,7 +105,7 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
 
             private readonly SingleCookieController _upgradeCookie = new (
                 Name: _controller.Config.UpgradeCookieName,
-                TimeSpan.FromSeconds(_controller.Config.UpgradeTimeoutSec)
+                ValidFor: TimeSpan.FromSeconds(_controller.Config.UpgradeTimeoutSec)
             )
             {
                 Path        = "/",
@@ -141,8 +141,8 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
 
                 return new
                 {
-                    type = "social_oauth",
-                    methods = mData,
+                    type        = "social_oauth",
+                    methods     = mData,
                     supported_procedures
                 };
             }
