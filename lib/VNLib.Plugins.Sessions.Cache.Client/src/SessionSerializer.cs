@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2023 Vaughn Nugent
+* Copyright (c) 2025 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Sessions.Cache.Client
@@ -24,6 +24,7 @@
 
 using System;
 using System.Threading;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
@@ -38,7 +39,13 @@ namespace VNLib.Plugins.Sessions.Cache.Client
     /// access serialization for session types
     /// </summary>
     /// <typeparam name="TSession">The session type</typeparam>
-    public class SessionSerializer<TSession> : AsyncAccessSerializer<TSession>, ISessionSerialzer<TSession> where TSession : IRemoteSession
+    /// <remarks>
+    /// Initializes a new <see cref="SessionSerializer{TSession}"/>
+    /// </remarks>
+    /// <param name="poolCapacity">The maximum number of wait entry instances to hold in memory cache</param>
+    public class SessionSerializer<TSession>(int poolCapacity) 
+        : AsyncAccessSerializer<TSession>(poolCapacity, initialCapacity: 0, null),
+        ISessionSerialzer<TSession> where TSession : IRemoteSession
     {
         /*
          * This implementation uses an internal store for wait entires
@@ -54,18 +61,7 @@ namespace VNLib.Plugins.Sessions.Cache.Client
          * are intercepted and routed to the internal wait table
          */
 
-        private readonly Dictionary<string, WaitEntry> _waitTable;
-
-
-        /// <summary>
-        /// Initializes a new <see cref="SessionSerializer{TSession}"/>
-        /// </summary>
-        /// <param name="poolCapacity">The maximum number of wait entry instances to hold in memory cache</param>
-        public SessionSerializer(int poolCapacity) : base(poolCapacity, 0, null)
-        {
-            //Session-ids are security senstive, we must use ordinal(binary) string comparison
-            _waitTable = new Dictionary<string, WaitEntry>(poolCapacity, StringComparer.Ordinal);
-        }
+        private readonly Dictionary<string, WaitEntry> _waitTable = new(poolCapacity, StringComparer.Ordinal);
 
         ///<inheritdoc/>
         public virtual bool TryGetSession(string sessionId, [NotNullWhen(true)] out TSession? session)
@@ -151,7 +147,8 @@ namespace VNLib.Plugins.Sessions.Cache.Client
                          * We must release the semaphore before returning to pool, 
                          * its safe because there are no more waiters
                          */
-                        releaser.Release();
+                        bool result = releaser.Release();
+                        Debug.Assert(result, "Expected a wait token to return true when released with 0 waiting threads");
 
                         ReturnEntry(entry);
 
