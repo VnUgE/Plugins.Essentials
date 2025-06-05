@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2024 Vaughn Nugent
+* Copyright (c) 2025 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Users
@@ -23,14 +23,14 @@
 */
 
 using System;
-using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Collections;
 using System.Collections.Generic;
-using System.Text.Json.Serialization;
+using System.Runtime.CompilerServices;
 
-using VNLib.Utils.Async;
+using VNLib.Utils.Resources;
 using VNLib.Plugins.Essentials.Users.Model;
-using static VNLib.Plugins.Essentials.Statics;
 
 namespace VNLib.Plugins.Essentials.Users
 {
@@ -38,130 +38,114 @@ namespace VNLib.Plugins.Essentials.Users
     /// <summary>
     /// Represents a user and its entry in the primary user table
     /// </summary>
-    public sealed class UserData : AsyncUpdatableResource, IUser
+    public sealed class UserData : ExternalResourceBase, IUser
     {
-        private sealed class UserDataObj
-        {
-            [JsonPropertyName("la")]
-            public long? LastActive { get; set; }
-
-            [JsonPropertyName("st")]
-            public UserStatus? Status { get; set; }
-
-            [JsonPropertyName("lo")]
-            public bool? LocalOnly { get; set; }
-
-            [JsonPropertyName("us")]
-            public Dictionary<string, string>? UserStorage { get; set; }
-        }
-
-        private readonly Lazy<UserDataObj> Properties;
-        internal readonly UserEntry Entry;
-
-        ///<inheritdoc/>
-        protected override IAsyncResourceStateHandler AsyncHandler { get; }
+        private readonly UserEntityConfig _userConfig;
+        private readonly LazyInitializer<UserExtendedFields> _properties;
+        private readonly UserEntry _entry;
 
         private bool Disposed;
 
-        internal UserData(IAsyncResourceStateHandler handler, UserEntry entry)
+        internal UserData(UserEntityConfig handler, UserEntry entry)
         {
-            //Init the callbacks in async mode
-            Entry = entry;
-            AsyncHandler = handler;
-           
-            //Undef the password hash in the entry
+            _entry = entry;
+            _userConfig = handler;
+            _properties = new(LoadData);
+
+            //Always undef the password hash in the entry
             entry.PassHash = null;
-            
-            //Lazy properties
-            Properties = new(LoadData, false);
         }
 
-        private UserDataObj LoadData()
+        private UserExtendedFields LoadData()
         {
-            UserDataObj? props = null;
-            try
+            //Recover properties from stored entity data
+            UserExtendedFields? props = _userConfig.FieldSerializer.GetFields(_entry);
+
+            if (props is null)
             {
-                //Recover properties from stream
-                props = JsonSerializer.Deserialize<UserDataObj>(Entry.UserData, SR_OPTIONS) ?? new UserDataObj();
-            }
-            //Catch json exception for invalid data, propagate other exceptions
-            catch (JsonException)
-            {
-                //If an exception was thrown reading back the data object, set modified flag to overwrite on release
+                // Assign new object so it's never null and set the modified flag so props are written when released.
+                props = new UserExtendedFields();
                 Modified = true;
             }
-            //If props is null (or an exception is thrown, 
-            return props ?? new();
-        }      
+
+            return props;
+        }
+
+        /// <summary>
+        /// Gets the internal user entry object for the current 
+        /// user data instance.
+        /// </summary>
+        /// <returns></returns>
+        internal UserEntry GetEntryInternal() => _entry;
 
         ///<inheritdoc/>
-        public string UserID => Entry.Id!;
+        public string UserID => _entry.Id!;
 
         ///<inheritdoc/>
         public string EmailAddress
         {
-            get => Entry.EmailAddress!;
+            get => _entry.EmailAddress!;
             set
             {
                 Check();
                 ArgumentException.ThrowIfNullOrEmpty(value, nameof(EmailAddress));
 
                 //Set modified flag if changed
-                Modified |= Entry.EmailAddress!.Equals(value, StringComparison.OrdinalIgnoreCase);
-                Entry.EmailAddress = value;
+                Modified |= _entry.EmailAddress!.Equals(value, StringComparison.OrdinalIgnoreCase);
+                _entry.EmailAddress = value;
             }
         }
 
         ///<inheritdoc/>
         public ulong Privileges
         {
-            get => (ulong)Entry.PrivilegeLevel;
+            get => (ulong)_entry.PrivilegeLevel;
             set
             {
                 Check();
                 //Set modified flag if changed
-                Modified |= (ulong)Entry.PrivilegeLevel != value;
-                Entry.PrivilegeLevel = unchecked((long)value);
+                Modified |= (ulong)_entry.PrivilegeLevel != value;
+                _entry.PrivilegeLevel = unchecked((long)value);
             }
         }
 
         ///<inheritdoc/>
-        public DateTimeOffset Created => Entry.Created;
+        public DateTimeOffset Created => _entry.Created;
 
         ///<inheritdoc/>
         public DateTimeOffset LastActive
         {
-            get => DateTimeOffset.FromUnixTimeMilliseconds(Properties.Value.LastActive ?? 0);
+            get => DateTimeOffset.FromUnixTimeMilliseconds(_properties.Instance.LastActive ?? 0);
             set
             {
                 long unixMs = value.ToUnixTimeMilliseconds();
-                Modified |= Properties.Value.LastActive != unixMs;
-                Properties.Value.LastActive = unixMs;
+                Modified |= _properties.Instance.LastActive != unixMs;
+                _properties.Instance.LastActive = unixMs;
             }
         }
 
         ///<inheritdoc/>
         public UserStatus Status
         {
-            get => (Properties.Value.Status ?? UserStatus.Unverified);
+            get => (_properties.Instance.Status ?? UserStatus.Unverified);
             set
             {
-                Modified |= Properties.Value.Status != value;
-                Properties.Value.Status = value;
+                Modified |= _properties.Instance.Status != value;
+                _properties.Instance.Status = value;
             }
         }
 
         ///<inheritdoc/>
         public bool LocalOnly
         {
-            get => Properties.Value.LocalOnly ?? false;
+            get => _properties.Instance.LocalOnly ?? false;
             set
             {
-                Modified |= Properties.Value.LocalOnly != value;
-                Properties.Value.LocalOnly = value ? true : null;
+                Modified |= _properties.Instance.LocalOnly != value;
+                _properties.Instance.LocalOnly = value ? true : null;
             }
         }
-        
+
 
         /// <summary>
         /// Users datastore of key-value string pairs 
@@ -173,29 +157,27 @@ namespace VNLib.Plugins.Essentials.Users
             get
             {
                 Check();
-                string? val = null;
-                Properties.Value.UserStorage?.TryGetValue(key, out val);
-                return val ?? "";
+                return (_properties.Instance.UserStorage?.GetValueOrDefault(key)) ?? "";
             }
             set
             {
                 Check();
-                //If the value is null, see if the the properties are null
+                //If the value is null, see if the properties are null
                 if (string.IsNullOrWhiteSpace(value))
                 {
                     //If properties are null exit
-                    if (Properties.Value.UserStorage != null)
+                    if (_properties.Instance.UserStorage != null)
                     {
-                        //If the value is null and properies exist, remove the entry
-                        Properties.Value.UserStorage.Remove(key);
+                        //If the value is null and properties exist, remove the entry
+                        _properties.Instance.UserStorage.Remove(key);
                         Modified = true;
                     }
                 }
                 else
                 {
-                    Properties.Value.UserStorage ??= new();
+                    _properties.Instance.UserStorage ??= new();
                     //Set the value
-                    Properties.Value.UserStorage[key] = value;
+                    _properties.Instance.UserStorage[key] = value;
                     //Set modified flag
                     Modified = true;
                 }
@@ -210,17 +192,19 @@ namespace VNLib.Plugins.Essentials.Users
             Check();
 
             //If user storage has been definied, then try to get the value
-            return Properties.Value.UserStorage?.TryGetValue(key, out string prop) == true 
-                ? JsonSerializer.Deserialize<T>(prop, SR_OPTIONS) 
+            return _properties.Instance.UserStorage?.TryGetValue(key, out string prop) == true
+                ? _userConfig.ObjectSerializer.Deserialize<T>(prop)
                 : default;
         }
-        
+
         ///<inheritdoc/>
         public void SetObject<T>(string key, T obj)
         {
             Check();
 
-            this[key] = obj == null ? null : JsonSerializer.Serialize(obj, SR_OPTIONS);
+            this[key] = obj is not null
+                ? _userConfig.ObjectSerializer.Serialize(obj)
+                : null;
         }
 
 #nullable enable
@@ -230,30 +214,66 @@ namespace VNLib.Plugins.Essentials.Users
         {
             Check();
 
-            return Properties.Value.UserStorage != null 
-                ? Properties.Value.UserStorage.GetEnumerator() 
-                : (IEnumerator<KeyValuePair<string, string>>)new Dictionary<string, string>.Enumerator();
+            return _properties.Instance.UserStorage != null
+                ? _properties.Instance.UserStorage.GetEnumerator()
+                : new List<KeyValuePair<string, string>>().GetEnumerator();
         }
 
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
-       
+
         ///<inheritdoc/>
         public void Dispose()
         {
             if (!Disposed)
             {
-                Properties.Value.UserStorage?.Clear();
+                _properties.Instance.UserStorage?.Clear();
                 GC.SuppressFinalize(this);
                 Disposed = true;
             }
         }
 
         ///<inheritdoc/>
-        protected override object GetResource()
+        public async ValueTask ReleaseAsync(CancellationToken cancellation = default)
         {
-            //Update user-data
-            Entry.UserData = JsonSerializer.SerializeToUtf8Bytes(Properties.Value, SR_OPTIONS);
-            return Entry;
+            //If resource has already been realeased, return
+            if (IsReleased)
+            {
+                return;
+            }
+
+            //If deleted flag is set, invoke the delete callback
+            if (Deleted)
+            {
+                await _userConfig.OnUserDelete
+                    .Invoke(_entry, cancellation)
+                    .ConfigureAwait(continueOnCapturedContext: true);
+            }
+            //If the state has been modifed, flush changes to the store
+            else if (Modified)
+            {
+                //Update user-data
+                _userConfig.FieldSerializer.StoreFields(_entry, _properties.Instance);
+
+                await _userConfig.OnUserUpdate
+                    .Invoke(_entry, cancellation)
+                    .ConfigureAwait(continueOnCapturedContext: true);
+            }
+
+            //Set the released value
+            IsReleased = true;
+        }
+
+        /// <summary>
+        /// Checks if the resouce has been disposed and raises an exception if it is
+        /// </summary>
+        /// <exception cref="ObjectDisposedException"></exception>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void Check()
+        {
+            if (IsReleased || Disposed)
+            {
+                throw new ObjectDisposedException(nameof(UserData), "This user data has already been released and cannot be used anymore.");
+            }
         }
     }
 }

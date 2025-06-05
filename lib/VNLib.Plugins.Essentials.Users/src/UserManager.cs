@@ -36,7 +36,6 @@ using Microsoft.EntityFrameworkCore;
 
 using VNLib.Hashing;
 using VNLib.Utils;
-using VNLib.Utils.Async;
 using VNLib.Utils.Memory;
 using VNLib.Plugins.Essentials.Accounts;
 using VNLib.Plugins.Essentials.Users.Model;
@@ -53,17 +52,32 @@ namespace VNLib.Plugins.Essentials.Users
     /// </summary>
     [ServiceExport]
     [ConfigurationName("users", Required = false)]
-    public sealed class UserManager(PluginBase plugin) : IUserManager, IAsyncResourceStateHandler, IAsyncConfigurable
+    public sealed class UserManager : IUserManager, IAsyncConfigurable
     {
         private const int DefaultRandomPasswordLength = 128;
 
-        private readonly IAsyncLazy<DbContextOptions> _dbOptions = plugin.GetContextOptionsAsync();
-        private readonly IPasswordHashingProvider _passwords = plugin.GetOrCreateSingleton<ManagedPasswordHashing>();
+        private readonly IAsyncLazy<DbContextOptions> _dbOptions;
+        private readonly IPasswordHashingProvider _passwords;
         private readonly UserConfigurationJson _config = new();
+        private readonly UserEntityConfig _userEntityConfig;
+
+        public UserManager(PluginBase plugin)
+        {
+            _dbOptions = plugin.GetContextOptionsAsync();
+            _passwords = plugin.GetOrCreateSingleton<ManagedPasswordHashing>();
+
+            _userEntityConfig = new()
+            {
+                OnUserDelete = OnDeleteAsync,
+                OnUserUpdate = OnUpdateAsync,
+                FieldSerializer = new UserFieldSerializer(),
+                ObjectSerializer = new UserObjectSerializer()
+            };
+        }
 
         public UserManager(PluginBase plugin, IConfigScope config) : this(plugin)
         {
-            _config = config.DeserialzeAndValidate<UserConfigurationJson>();
+            _config = config.DeserialzeAndValidate<UserConfigurationJson>();           
         }
 
         ///<inheritdoc/>
@@ -172,7 +186,7 @@ namespace VNLib.Plugins.Essentials.Users
 
             if (count)
             {
-                return new UserData(this, user)
+                return new UserData(_userEntityConfig, user)
                 {
                     Status = initStatus
                 };
@@ -372,9 +386,10 @@ namespace VNLib.Plugins.Essentials.Users
                 throw new ArgumentNullException(nameof(newPass));
             }
 
-
             //Get the entry back from the user data object
-            UserEntry entry = user is UserData ue ? ue.Entry : throw new ArgumentException("User must be a UserData object", nameof(user));
+            UserEntry entry = user is UserData ue 
+                ? ue.GetEntryInternal() 
+                : throw new ArgumentException("User must be a UserData object", nameof(user));
 
             await using UsersContext db = new(_dbOptions.Value);
 
@@ -448,7 +463,7 @@ namespace VNLib.Plugins.Essentials.Users
             //Close transactions and return
             _ = await db.SaveAndCloseAsync(commit: true, cancellationToken);
 
-            return usr == null ? null : new UserData(this, usr);
+            return usr == null ? null : new UserData(_userEntityConfig, usr);
         }
 
         ///<inheritdoc/>
@@ -480,28 +495,26 @@ namespace VNLib.Plugins.Essentials.Users
 
             return usr == null
                 ? null
-                : new UserData(this, usr);
+                : new UserData(_userEntityConfig, usr);
         }
 
         ///<inheritdoc/>
-        async Task IAsyncResourceStateHandler.UpdateAsync(AsyncUpdatableResource resource, object state, CancellationToken cancellation)
-        {
-            //recover user-data object
-            UserEntry entry = (state as UserEntry)!;
+        private async Task OnUpdateAsync(UserEntry user, CancellationToken cancellation)
+        {            
             ERRNO result;
             try
             {
                 await using UsersContext db = new(_dbOptions.Value);
 
                 //Track the entry again
-                _ = db.Users.Attach(entry);
+                _ = db.Users.Attach(user);
 
                 //Set all mutable entry modified flags
-                db.Entry(entry).Property(x => x.UserData).IsModified = true;
-                db.Entry(entry).Property(x => x.PrivilegeLevel).IsModified = true;
+                db.Entry(user).Property(x => x.UserData).IsModified = true;
+                db.Entry(user).Property(x => x.PrivilegeLevel).IsModified = true;
 
                 //Update modified time
-                entry.LastModified = DateTime.UtcNow;
+                user.LastModified = DateTime.UtcNow;
 
                 result = await db.SaveAndCloseAsync(true, cancellation);
             }
@@ -516,17 +529,15 @@ namespace VNLib.Plugins.Essentials.Users
         }
 
         ///<inheritdoc/>
-        async Task IAsyncResourceStateHandler.DeleteAsync(AsyncUpdatableResource resource, CancellationToken cancellation)
-        {
-            //recover user-data object
-            UserData user = (resource as UserData)!;
+        private async Task OnDeleteAsync(UserEntry user, CancellationToken cancellation)
+        {                
             ERRNO result;
             try
             {
                 await using UsersContext db = new(_dbOptions.Value);
 
                 //Delete the user from the database
-                _ = db.Users.Remove(user.Entry);
+                _ = db.Users.Remove(user);
 
                 result = await db.SaveAndCloseAsync(true, cancellation);
             }
