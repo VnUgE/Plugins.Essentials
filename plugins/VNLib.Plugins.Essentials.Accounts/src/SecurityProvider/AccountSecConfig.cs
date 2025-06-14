@@ -44,7 +44,9 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
             val.RuleFor(c => c.CookieDomain);
 
             //Cookie path may be empty or null
-            val.RuleFor(c => c.CookiePath);
+            val.RuleFor(c => c.CookiePath)
+                .Matches(@"^(/.*)?$")
+                .WithMessage("The cookie path must be a valid path");
 
             val.RuleFor(c => c.AuthorizationValidFor)
                .GreaterThan(TimeSpan.FromMinutes(1))
@@ -54,10 +56,12 @@ namespace VNLib.Plugins.Essentials.Accounts.SecurityProvider
                .Length(1, 50)
                .AlphaNumericOnly();
 
-            //header name is required, but not allowed to contain "illegal" chars
+            //header name is required, but must be a valid http header
             val.RuleFor(c => c.TokenHeaderName)
                 .NotEmpty()
-                .IllegalCharacters();
+                .WithMessage("The token header name must be set")
+                .Matches(@"^[a-zA-Z0-9\-]+$")
+                .WithMessage("The token header name must be a valid http header name");
 
 
             val.RuleFor(c => c.PubKeyCookieName)

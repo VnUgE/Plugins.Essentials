@@ -148,14 +148,14 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
             }
 
             ///<inheritdoc/>
-            public async ValueTask<RpcCommandResult> InvokeAsync(HttpEntity entity, AccountJRpcRequest message, JsonElement request)
+            public ValueTask<RpcCommandResult> InvokeAsync(HttpEntity entity, AccountJRpcRequest message, JsonElement request)
             {
                 WebMessage webm = new();
 
                 if (webm.AssertError(IsCorsValid(entity), "Origin is not allowed"))
                 {
                     _controller.Log.Debug("Request was denied because it's origin is now allowed");
-                    return RpcCommandResult.Error(HttpStatusCode.Forbidden, webm);
+                    return new (RpcCommandResult.Error(HttpStatusCode.Forbidden, webm));
                 }
 
                 //Get the procuder name
@@ -165,14 +165,13 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
                 )
                 {
                     webm.AssertError(false, "Missing or invalid procedure name");
-                    return RpcCommandResult.Error(HttpStatusCode.BadRequest, webm);
+                    return new(RpcCommandResult.Error(HttpStatusCode.BadRequest, webm));
                 }
-
 
                 //Try to get procedure arguments from the request
                 if (
                     !request.TryGetProperty("args", out JsonElement fnArgs)
-                    && fnArgs.ValueKind == JsonValueKind.Object
+                    || fnArgs.ValueKind != JsonValueKind.Object
                 )
                 {
                     fnArgs = EmptyDoc.RootElement;
@@ -196,11 +195,12 @@ namespace VNLib.Plugins.Essentials.Auth.Social.Controllers
 
                     default:
                         webm.AssertError(false, "The selected method does not support the requested procedure");
-                        return RpcCommandResult.Error(HttpStatusCode.BadRequest, webm);
+                        result = new(RpcCommandResult.Error(HttpStatusCode.BadRequest, webm));
+                        break;
                 }
 
                 //Invoke method and return the result
-                return await result.ConfigureAwait(false);
+                return result;
             }
 
             private async ValueTask<RpcCommandResult> LogoutAsync(HttpEntity entity)
