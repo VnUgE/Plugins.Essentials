@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2024 Vaughn Nugent
+* Copyright (c) 2025 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Sessions.Cache.Client
@@ -24,6 +24,7 @@
 
 using System;
 using System.Text;
+using System.IO;
 using System.Buffers;
 using System.Diagnostics;
 using System.Collections.Generic;
@@ -35,7 +36,7 @@ using VNLib.Data.Caching;
 
 namespace VNLib.Plugins.Sessions.Cache.Client
 {
-    
+
     /// <summary>
     /// Very basic session data serializer memory optimized for key-value
     /// string pairs
@@ -144,18 +145,46 @@ namespace VNLib.Plugins.Sessions.Cache.Client
             return (T?)(output as object);
         }
 
-        private static int GetNextToken(ref ForwardOnlyReader<char> reader) => reader.Window.IndexOf(KV_DELIMITER);
+        private static int GetNextToken(ref ForwardOnlyReader<char> reader)
+            => reader.Window.IndexOf(KV_DELIMITER);
 
-        void ICacheObjectSerializer.Serialize<T>(T obj, IBufferWriter<byte> finiteWriter)
+        void ICacheObjectSerializer.Serialize<T>(T obj, Stream finiteStream)
         {
-            if(obj is not Dictionary<string, string> dict)
+            if (obj is not Dictionary<string, string> dict)
             {
                 throw new NotSupportedException("Data type is not supported by this serializer");
             }
 
-            //Write debug info
+            // Write debug info
             DebugSessionItems(dict, true);
 
+            // In some instance (such as FBM) a buffer writer may be on the stream interface
+            // so we can use it to write the serialized data if we have access to it.
+            if (finiteStream is IBufferWriter<byte> bufferWriter)
+            {                
+                WriteToOutput(
+                    dict,
+                    bufferWriter: bufferWriter,
+                    stream: null,
+                    streamBuffer: default
+                );
+            }
+            else
+            {
+                // Only allocate the stream buffer if we're working with a Stream
+                using UnsafeMemoryHandle<byte> streamBuffer = MemoryUtil.UnsafeAllocNearestPage<byte>(CharBufferSize, true);
+
+                WriteToOutput(
+                    dict,
+                    bufferWriter: null,
+                    stream: finiteStream,
+                    streamBuffer.Span
+                );
+            }
+        }
+
+        private void WriteToOutput(Dictionary<string, string> dict, IBufferWriter<byte>? bufferWriter, Stream? stream, Span<byte> streamBuffer)
+        {
             //Alloc char buffer, sessions should be under 16k 
             using UnsafeMemoryHandle<char> charBuffer = MemoryUtil.UnsafeAllocNearestPage<char>(CharBufferSize);
 
@@ -169,12 +198,11 @@ namespace VNLib.Plugins.Sessions.Cache.Client
 
                 /*
                  * confim there is enough room in the writer, if there is not
-                 * flush to the buffer writer
+                 * flush to the buffer writer or stream
                  */
-                if(element.Key.Length + element.Value.Length + 4 > writer.RemainingSize)
+                if (element.Key.Length + element.Value.Length + 4 > writer.RemainingSize)
                 {
-                    //Flush to the output
-                    Encoding.UTF8.GetBytes(writer.AsSpan(), finiteWriter);
+                    FlushWriter(in writer, bufferWriter, stream, streamBuffer);
 
                     //Reset the writer
                     writer.Reset();
@@ -184,11 +212,36 @@ namespace VNLib.Plugins.Sessions.Cache.Client
                 writer.AppendSmall(element.Key);
                 writer.AppendSmall(KV_DELIMITER);
                 writer.Append(element.Value);
-                writer.AppendSmall(KV_DELIMITER);               
+                writer.AppendSmall(KV_DELIMITER);
             }
 
             //encode remaining data
-            Encoding.UTF8.GetBytes(writer.AsSpan(), finiteWriter);
+            FlushWriter(in writer, bufferWriter, stream, streamBuffer);
+        }
+
+        private static void FlushWriter(
+            in ForwardOnlyWriter<char> writer,
+            IBufferWriter<byte>? bufferWriter,
+            Stream? stream,
+            Span<byte> streamBuffer
+        )
+        {
+            if (bufferWriter != null)
+            {
+                Encoding.UTF8.GetBytes(writer.AsSpan(), bufferWriter);
+            }
+            else if (stream != null)
+            {
+                Debug.Assert(!streamBuffer.IsEmpty, "Stream buffer should be allocated and have a length greater than 0");
+
+                int bytesEncoded = Encoding.UTF8.GetBytes(writer.AsSpan(), streamBuffer);
+                stream.Write(streamBuffer[..bytesEncoded]);
+            }
+            else
+            {
+                Debug.Fail("No stream or buffer is an undefined condition that should never happen");
+                throw new InvalidOperationException("No output stream or buffer writer provided for serialization.");
+            }
         }
     }
 }
