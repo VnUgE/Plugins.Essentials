@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Vaughn Nugent
+// Copyright (c) 2025 Vaughn Nugent
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -21,7 +21,7 @@ import { isArrayBuffer, isPlainObject, isString } from 'lodash-es';
 import { ArrayBuffToBase64, Base64ToUint8Array, ArrayToHexString } from './binhelpers';
 
 export const isCryptoSupported = () : boolean => {
-    return !!(window.isSecureContext && window.crypto && window.crypto.subtle);
+    return !!(window?.isSecureContext && window?.crypto && window?.crypto.subtle);
 }
 
 export const getCryptoOrThrow = () => {
