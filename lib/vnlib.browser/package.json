@@ -17,12 +17,14 @@
   "license": "MIT",
   "dependencies": {
     "@simplewebauthn/browser": "^10.x.x",
-    "@vueuse/core": "^13.x",
+    "@vue/reactivity": "^3.x",
     "axios": "^1.x",
     "jose": "^6.0.8",
     "lodash-es": "^4.x",
-    "universal-cookie": "^8.0.x",
-    "vue": "^3.x"
+    "universal-cookie": "^8.0.x"
+  },
+  "peerDependencies": {
+    "@vueuse/core": "^13.x"
   },
   "devDependencies": {
     "@simplewebauthn/types": "^10.0.0",
