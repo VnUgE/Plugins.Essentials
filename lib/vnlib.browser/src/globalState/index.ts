@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Vaughn Nugent
+// Copyright (c) 2025 Vaughn Nugent
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -18,33 +18,19 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import { merge } from "lodash-es";
-import { type StorageLikeAsync } from "@vueuse/core";
-import type { SessionConfig } from "../session";
-import type { AccountRpcApiConfig } from "../account/types";
-import type { AxiosInstance, AxiosRequestConfig } from "axios";
-import { manualComputed, ReadonlyManualRef } from "../storage";
+import { manualComputed, type ReadonlyManualRef } from '../helpers/reactivity';
+import type { 
+    SessionConfig, 
+    AccountRpcApiConfig, 
+    GlobalAxiosConfig, 
+    GlobalSessionConfig, 
+    GlobalApiConfig, 
+    GlobalConfigUpdate
+} from "./configs";
+import { StorageLikeAsync } from "../types";
 
-export interface GlobalSessionConfig extends SessionConfig  {
-}
-
-export interface GlobalAxiosConfig extends AxiosRequestConfig {
-    tokenHeader: string;
-    configureAxios?: (axios: AxiosInstance) => AxiosInstance;
-}
-
-export interface GlobalApiConfig {
-    readonly session: GlobalSessionConfig;
-    readonly axios: GlobalAxiosConfig;
-    readonly account: AccountRpcApiConfig;
-    readonly storage: StorageLikeAsync;
-}
-
-export interface GlobalConfigUpdate {
-    readonly session?: Partial<GlobalSessionConfig>;
-    readonly axios?: Partial<GlobalAxiosConfig>;
-    readonly account?: Partial<AccountRpcApiConfig>;
-    readonly storage?: StorageLikeAsync;
-} 
+// Export all types
+export type * from './configs';
 
 export type StorageKey = '_vn-session' | '_vn-keys';
 
@@ -69,9 +55,6 @@ const getDefaultSessionConfig = (): GlobalSessionConfig & SessionConfig => {
         browserIdSize: 32,
         signatureAlgorithm: 'HS256',
 
-        cookiesEnabled: navigator?.cookieEnabled === true,
-        loginCookieName: 'li',
-
         keyAlgorithm: {
             name: 'RSA-OAEP',
             modulusLength: 4096,
@@ -91,15 +74,43 @@ const getDefaultUserConfig = (): AccountRpcApiConfig => {
     }
 };
 
+/**
+ * Gets the default/fallback storage configuration
+ * @returns The default storage configuration
+ */
+const getDefaultStorage = (): StorageLikeAsync => {
+    if (window?.localStorage) {
+        return window.localStorage;
+    }
+
+    // If localStorage is not available, return a simple in-memory storage
+    const storageRef: Record<string, string | null> = {};
+
+    return {
+        getItem: (key: string) => {
+            const value = storageRef[key];
+            return Promise.resolve(value !== undefined ? value : null);
+        },
+        setItem: (key: string, value: string | null) => {
+            storageRef[key] = value;
+            return Promise.resolve();
+        },
+        removeItem: (key: string) => {
+            delete storageRef[key];
+            return Promise.resolve();
+        },
+    };
+}
+
 const _globalState: GlobalApiConfig = {
     axios: getDefaultAxiosConfig(),
     session: getDefaultSessionConfig(),
     account: getDefaultUserConfig(),
-    storage: localStorage
+    storage: getDefaultStorage()
 };
 
-export const getGlobalStateInternal = (): ReadonlyManualRef<GlobalApiConfig> => {
-    return manualComputed(() =>_globalState);
+export const useLibraryStateInternal = (): ReadonlyManualRef<GlobalApiConfig> => {
+    return manualComputed(() => _globalState);
 }
 
 /**
