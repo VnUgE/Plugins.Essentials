@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Vaughn Nugent
+// Copyright (c) 2025 Vaughn Nugent
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -22,7 +22,7 @@
  * Writes logs to the console if the environment is set to development
  */
 export const debugLog = function (...args : unknown[]) {
-  if (process.env.NODE_ENV === 'development') {
-    console.log(...args)
+    if (process.env.NODE_ENV === 'development') {
+      console.log(...args)
+    }
   }
-}
