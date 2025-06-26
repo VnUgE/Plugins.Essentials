@@ -18,13 +18,12 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import { useConfirmDialog } from "@vueuse/core"
+import { memoize } from "lodash-es";
+
+//Store a global confirm dialog singleton to share across components
 
 /**
  * Gets the global confirm dialog interface for building application wide 
  * confirm dialog state
  */
-export const useConfirm = (() => {
-    //Store a global confirm dialog singleton to share across components
-    const globalConfirm = useConfirmDialog()
-    return () => globalConfirm;
-})()
+export const useConfirm = memoize(useConfirmDialog);
