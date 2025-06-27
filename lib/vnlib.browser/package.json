@@ -2,14 +2,24 @@
   "name": "@vnuge/vnlib.browser",
   "version": "0.1.13",
   "author": "Vaughn Nugent",
-  "description": "Client JavaScript helper library for vuejs3 web-apps for connecting with Essentials.Accounts plugin and vuejs helpers.",
+  "description": "Framework-agnostic JavaScript library for connecting with VNLib Essentials plugins. Optional Vue and VueUse integrations available.",
   "repository": "https://github.com/VnUgE/Plugins.Essentials/tree/master/lib/vnlib.browser",
-  "copyright":"Copyright \u00A9 2025 Vaughn Nugent",
+  "copyright": "Copyright © 2025 Vaughn Nugent",
+  "output": "bin",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "typings": "./dist/index.d.ts",
-  "output": "bin",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./vue": {
+      "types": "./dist/vue.d.ts",
+      "default": "./dist/vue.js"
+    }
+  },
   "scripts": {
     "build": "tsc",
     "clean": "if exist dist ( rd /S /Q lib)"
@@ -17,14 +27,22 @@
   "license": "MIT",
   "dependencies": {
     "@simplewebauthn/browser": "^10.x.x",
-    "@vue/reactivity": "^3.x",
     "axios": "^1.x",
     "jose": "^6.0.8",
     "lodash-es": "^4.x",
     "universal-cookie": "^8.0.x"
   },
   "peerDependencies": {
+    "@vue/reactivity": "^3.x",
     "@vueuse/core": "^13.x"
+  },
+  "peerDependenciesMeta": {
+    "@vue/reactivity": {
+      "optional": true
+    },
+    "@vueuse/core": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@simplewebauthn/types": "^10.0.0",
