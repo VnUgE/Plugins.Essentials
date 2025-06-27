@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Vaughn Nugent
+// Copyright (c) 2025 Vaughn Nugent
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -17,8 +17,9 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import { defaultsDeep, mapValues, memoize, get as getAt, set as setAt, isEqual } from 'lodash-es';
-import { getGlobalStateInternal } from './globalState/index'
+import { defaultsDeep, mapValues, memoize, get as getAt, set as setAt } from 'lodash-es';
+import { manualComputed, type ReadonlyManualRef } from './reactivity';
+import type { GlobalApiConfig } from '../globalState/configs'
 
 export type AsyncStorageItem<T> = {
     [K in keyof T]: {
@@ -35,38 +36,17 @@ export type AsyncStorageItem<T> = {
     };
 };
 
+/**
+ * Creates a context-persistent storage slot that can be used to store
+ * and retrieve values asynchronously.
+ */
+export const useStorageSlot = <T extends object>(
+    globalState: ReadonlyManualRef<Pick<GlobalApiConfig, 'storage'>>, 
+    key: string, 
+    defaultValue: T
+): AsyncStorageItem<T> => {
 
-
-export interface ReadonlyManualRef<T> {
-    get(): T;
-    get<K extends keyof T>(propName: K): T[K]; 
-    changed(): boolean;
-}
-
-export const manualComputed = <T extends object>(getter: () => T): ReadonlyManualRef<T>=> {
-    
-    let lastValue: T | undefined = undefined;
-
-    return {
-        get: <K extends keyof T>(propName?: K): T | T[K] => {
-            //Get an update the cached value
-            lastValue = getter();
-          
-            return propName 
-              ? getAt(lastValue, propName) 
-              : lastValue;
-        },
-        changed: () => {
-            const latest = getter();
-            return isEqual(lastValue, latest);
-        }
-    }
-}
-
-export const createStorageSlot = <T extends object>(key: string, defaultValue: T): AsyncStorageItem<T> => {
-
-    const config = getGlobalStateInternal()
-    const backend = manualComputed(() => config.get('storage'));
+    const backend = manualComputed(() => globalState.get('storage'));
 
     const writeObj = (value: T) => {
         const val = JSON.stringify(value);
