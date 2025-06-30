@@ -107,7 +107,9 @@ export const useAppDataApi = (endpoint: string, axios?: Axios): UserAppDataApi =
     }
 
     return {
-        get: async <T>(scope: string, { noCache }: AppDataGetOptions = {}): Promise<T | undefined> => {
+        get: async <T>(scope: string, options?:AppDataGetOptions): Promise<T | undefined> => {
+            const { noCache } = options || {};
+
             const url = getUrl({
                 scope,
                 noCache: (noCache || false), 
@@ -138,7 +140,8 @@ export const useAppDataApi = (endpoint: string, axios?: Axios): UserAppDataApi =
             return response.data;
         },
 
-        set: async <T>(scope: string, data: T, { wait }: AppDataSetOptions = {}) => {
+        set: async <T>(scope: string, data: T, options?: AppDataSetOptions) => {
+            const { wait } = options || {};
            
             const url = getUrl({ 
                 scope,

@@ -35,29 +35,115 @@ export type * from './default/session'
 export { useSession } from './default/session'
 
 //App-data
-export * from './default/app-data'
+export type { 
+    AppDataGetOptions,
+    AppDataSetOptions, 
+    UserAppDataApi, 
+    ScopedUserAppDataApi
+} from './default/app-data'
+export { useAppDataApi, useScopedAppDataApi } from './default/app-data'
 
 //Axios exports
 export { useAxios } from './default/axios'
 
 //User exports
-export * from './default/account'
+export type * from './default/account/types'
+export { 
+    useAccountRpc, 
+    useAccount, 
+    useProfile, 
+    isLoggedIn, 
+    isLocalAccount 
+} from './default/account'
 
 //Mfa exports
-export * from './default/mfa/login'
-export * from './default/mfa/pki'
-export * from './default/mfa/config'
-export * from './default/mfa/fido'
-export * from './default/mfa/totp'
+// Config exports
+export type { 
+    UserArg, 
+    MfaMethodResponse,
+    MfaGetResponse, 
+    MfaRequestJson, 
+    MfaApi 
+} from './default/mfa/config'
+export { useMfaApi, mfaGetDataFor } from './default/mfa/config'
+
+// Login exports  
+export type { 
+    MfaMethod, 
+    IMfaSubmission, 
+    IMfaMessage, 
+    IMfaFlow, 
+    IMfaContinuation, 
+    MfaUpgradeState, 
+    IMfaTypeProcessor, 
+    IMfaLoginManager 
+} from './default/mfa/login'
+export { useMfaLogin } from './default/mfa/login'
+
+// PKI exports
+export type { 
+    PkOtpLogin, 
+    PkiLogin, 
+    PkiPublicKey, 
+    OtpRpcGetData, 
+    IOtpRequestOptions, 
+    OtpApi 
+} from './default/mfa/pki'
+export { useOtpAuth, useOtpApi, otpGetMfaData } from './default/mfa/pki'
+
+// FIDO exports
+export type { 
+    IFidoServerOptions, 
+    IFidoRequestOptions, 
+    IFidoDevice, 
+    FidoRpcGetData, 
+    IFidoApi, 
+    UseFidoApi, 
+    FidoAuthenticateOptions 
+} from './default/mfa/fido'
+export { useFidoApi, fidoMfaProcessor, fidoMfaAuthenticate, fidoGetMfaData } from './default/mfa/fido'
+
+// TOTP exports
+export type { TotpRequestOptions, TotpUpdateResponse, ITotpApi, TotpSubmitCodeOptions } from './default/mfa/totp'
+export { useTotpApi, totpMfaProcessor, totpSubmitCode } from './default/mfa/totp'
 
 //Social exports
-export * from './default/social'
+export type { 
+    SocialOAuthMethod, 
+    SocialLoginRpcResponse, 
+    BeginFlowArgs, 
+    LogoutArguments, 
+    LogoutResponse, 
+    SocialLoginApi 
+} from './default/social'
+export { useOauthLogin } from './default/social'
 
 //Export helpers
 export { debugLog } from './default/helpers/debugLog'
-export * from './default/helpers/binhelpers'
-export * from './default/helpers/webcrypto'
-export * from './default/helpers/jrpc'
+
+// Binary helpers
+export { 
+    LongToArray, 
+    IntToArray, 
+    Base64ToArray, 
+    Base64ToUint8Array, 
+    Utf8StringToBuffer, 
+    ArrayBuffToBase64, 
+    ArrayToHexString 
+} from './default/helpers/binhelpers'
+
+// Webcrypto helpers
+export { 
+    isCryptoSupported, 
+    getCryptoOrThrow, 
+    hmacSignAsync, 
+    decryptAsync, 
+    getRandomHex 
+} from './default/helpers/webcrypto'
+
+// JRPC helpers  
+export type { RpcMethodArgs, RpcClient } from './default/helpers/jrpc'
+export { useJrpc } from './default/helpers/jrpc'
 
 /*************************
     SETUP/LOCALS
