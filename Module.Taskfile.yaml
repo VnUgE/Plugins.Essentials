@@ -126,3 +126,11 @@ tasks:
      - cmd: cd lib/vnlib.browser && npm update
      - cmd: cd tests/api-tests && npm update
   
+  write-changelog:
+    cmds:
+     - cmd: git-cliff
+         --verbose
+         --config ci/cliff.toml
+         --output 'CHANGELOG.md'
+         --tag v{{ .VERSION }}
+         {{ .CLI_ARGS }}
