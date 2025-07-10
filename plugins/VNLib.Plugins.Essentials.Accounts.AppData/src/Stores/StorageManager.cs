@@ -23,6 +23,8 @@
 */
 
 using System;
+using System.IO;
+using System.Diagnostics;
 using System.Buffers;
 using System.Threading;
 using System.Threading.Tasks;
@@ -38,7 +40,6 @@ using VNLib.Plugins.Essentials.Accounts.AppData.Model;
 using VNLib.Plugins.Essentials.Accounts.AppData.Stores.Sql;
 using VNLib.Plugins.Extensions.VNCache;
 using VNLib.Plugins.Extensions.VNCache.DataModel;
-
 
 namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores
 {
@@ -200,12 +201,49 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores
         {
 
             ///<inheritdoc/>
-            public T? Deserialize<T>(ReadOnlySpan<byte> objectData) 
+            public T? Deserialize<T>(ReadOnlySpan<byte> objectData)
                 => MemoryPackSerializer.Deserialize<T>(objectData);
 
             ///<inheritdoc/>
-            public void Serialize<T>(T obj, IBufferWriter<byte> finiteWriter)
-                => MemoryPackSerializer.Serialize(finiteWriter, obj);
+            public void Serialize<T>(T obj, Stream outputStream)
+            {
+                /*
+                 * When FBM is used, the output stream is a specialized stream that
+                 * implements IBufferWriter<byte> to allow for more efficient buffer
+                 * access. This is ideally a temporary solution until a better 
+                 * serializer interface can be implemented in the client libraries.
+                 */
+                if (outputStream is IBufferWriter<byte> writer)
+                {
+                    MemoryPackSerializer.Serialize(in writer, in obj);
+                }
+                else
+                {
+                    /*
+                     * The stream passed should be a MemoryStream or similar that supports
+                     * synchronous writes. So it should be safe to synchronously wait on 
+                     * the returned task. Ideally this funciton should never block and 
+                     * always return IsCompleted. If were wrong, then converting it to 
+                     * as Task and awaiting it will work for now.
+                     */
+
+                    ValueTask asAsync = MemoryPackSerializer.SerializeAsync(outputStream, obj);
+
+                    if (asAsync.IsCompleted)
+                    {
+                        asAsync.GetAwaiter()
+                            .GetResult();
+                    }
+                    else
+                    {
+                        Trace.WriteLine("Blocking on async serialize operation, this should not happen in production code");
+
+                        asAsync.AsTask()
+                            .GetAwaiter()
+                            .GetResult();
+                    }
+                }
+            }
         }
 
         private sealed class MpCachePolicy(TimeSpan CacheTTL) : ICacheExpirationPolicy<UserRecordData>
