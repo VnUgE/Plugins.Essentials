@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2024 Vaughn Nugent
+* Copyright (c) 2025 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Content.Routing
@@ -28,7 +28,6 @@ using System.Collections.Generic;
 
 using VNLib.Utils.Logging;
 using VNLib.Plugins.Extensions.Loading;
-using VNLib.Plugins.Extensions.Loading.Sql;
 using VNLib.Plugins.Essentials.Content.Routing.Model;
 using VNLib.Plugins.Essentials.Content.Routing.stores;
 
@@ -42,27 +41,27 @@ namespace VNLib.Plugins.Essentials.Content.Routing
         //empty constructor for 
         public ManagedRouteStore(PluginBase plugin) 
         {
-            plugin.Log.Warn("Page router loaded but no route store was loaded. Routing funtionality is disabled.");
+            plugin.Log.Warn("Page router loaded but no route store was loaded. Routing functionality is disabled.");
         }
 
         public ManagedRouteStore(PluginBase plugin, IConfigScope config)
         {
-            //Load managed store, see if we're using the xml file or the database
-            if(config.ContainsKey("route_file"))
-            {
-                //Load xml route store
-                _routeStore = plugin.GetOrCreateSingleton<XmlRouteStore>();
-            }
-            else
-            {
-                //Load the database backed store
-                _routeStore = plugin.GetOrCreateSingleton<DbRouteStore>();
+            string? store = config.GetValueOrDefault("type", "xml");
+            ILogProvider logger = plugin.Log.CreateScope("Router");
 
-                //Ensure the database is created
-                _ = plugin.ObserveWork(() => plugin.EnsureDbCreatedAsync<RoutingContext>(plugin), 1000);
+            switch (store)
+            {
+                case "xml":
+                    logger.Information("Using XML route store.");
+                    _routeStore = plugin.GetOrCreateSingleton<XmlRouteStore>();
+                    break;
+                default:
+                    plugin.Log.Warn("Unknown route store type '{storeName}', defaulting to XML route store.", store);
+                    goto case "xml";
             }
         }
 
+        ///<inheritdoc/>
         public Task GetAllRoutesAsync(ICollection<Route> routes, CancellationToken cancellation)
         {
             return _routeStore.GetAllRoutesAsync(routes, cancellation);
