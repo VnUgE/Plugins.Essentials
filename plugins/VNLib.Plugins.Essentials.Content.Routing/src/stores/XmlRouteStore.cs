@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2023 Vaughn Nugent
+* Copyright (c) 2025 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Content.Routing
@@ -90,69 +90,62 @@ namespace VNLib.Plugins.Essentials.Content.Routing.stores
 
             foreach (XmlNode routeEl in routeElements)
             {
-                Route route = new();
+                if (routeEl.Attributes is null)
+                {
+                    continue;
+                }
 
                 //See if route is disabled
-                string? disabledAtr = routeEl.Attributes["disabled"]?.Value;
-                //If disabled, skip route
+                string? disabledAtr = routeEl.Attributes["disabled"]?.Value;              
                 if (disabledAtr != null)
                 {
                     continue;
                 }
 
-                //Get the route routine value
-                string? routineAtr = routeEl.Attributes["routine"]?.Value;
-                _ = routineAtr ?? throw new XmlException("Missing required attribute 'routine' in route element");
-
-                //Try to get the routime enum value
-                if (uint.TryParse(routineAtr, out uint r))
+                try
                 {
-                    route.Routine = (FpRoutine)r;
+                    //Get the route routine value              
+                    Validate.Assert(
+                        Enum.TryParse(routeEl.Attributes["routine"]?.Value, ignoreCase: true, out ProcessRoutine routine),
+                        "The value of the 'routine' attribute is not a valid ProcessRoutine enum value"
+                    );
+
+                    string? privilege = routeEl.Attributes["privilege"]?.Value;
+                    if (string.IsNullOrEmpty(privilege))
+                    {
+                        privilege = 0.ToString(); //default privilege level
+                    }
+
+                    Validate.Assert(
+                        ulong.TryParse(privilege, out ulong privLevel),
+                        "The value of the 'privilege' attribute is not a valid unsigned 64-bit integer"
+                    );
+
+                    Route route = new()
+                    {
+                        Hostname        = routeEl["hostname"]?.InnerText!,
+                        MatchPath       = routeEl["path"]?.InnerText ?? string.Empty,
+                        RewriteSearch   = routeEl["search"]?.InnerText,
+                        Alternate       = routeEl["alternate"]?.InnerText,
+                        Replace         = routeEl["replace"]?.InnerText,
+                        Routine         = routine,
+                        Privilege       = privLevel
+                    };
+
+                    route.OnValidate();
+
+                    //add route to the collection
+                    routes.Add(route);
                 }
-                else
+                catch (ConfigurationException ce)
                 {
-                    throw new XmlException("The value of the 'routine' attribute is not a valid FpRoutine enum value");
+                    string? hostname = routeEl["hostname"]?.InnerText;
+
+                    throw new ConfigurationException(  
+                        $"Error parsing route element for hostname '{hostname}'",
+                        ce
+                    );
                 }
-
-                //read priv level attribute
-                string? privAtr = routeEl.Attributes["privilege"]?.Value;
-                _ = privAtr ?? throw new XmlException("Missing required attribute 'privilege' in route element");
-
-                //Try to get the priv level enum value
-                if (ulong.TryParse(privAtr, out ulong priv))
-                {
-                    route.Privilege = priv;
-                }
-                else
-                {
-                    throw new XmlException("The value of the 'priv' attribute is not a valid unsigned 64-bit integer");
-                }
-
-                //Get hostname element value
-                string? hostEl = routeEl["hostname"]?.InnerText;
-                route.Hostname = hostEl ?? throw new XmlException("Missing required element 'hostname' in route element");
-
-                //Get the path element value
-                string? pathEl = routeEl["path"]?.InnerText;
-                route.MatchPath = pathEl ?? throw new XmlException("Missing required element 'path' in route element");
-
-                //Get the optional alternate path element value
-                route.Alternate = routeEl["alternate"]?.InnerText;
-
-                //Check for rewrite routine, if rewrite, get rewrite and replace elements
-                if (route.Routine == Route.RewriteRoutine)
-                {
-                    //Get the rewrite element value
-                    string? rewriteEl = routeEl["rewrite"]?.InnerText;
-                    route.RewriteSearch = rewriteEl ?? throw new XmlException("Missing required element 'rewrite' in route element");
-
-                    //Get the rewrite element value
-                    string? replaceEl = routeEl["replace"]?.InnerText;
-                    route.Alternate = replaceEl ?? throw new XmlException("Missing required element 'replace' in route element");
-                }
-
-                //add route to the collection
-                routes.Add(route);
             }
         }
     }

@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2024 Vaughn Nugent
+* Copyright (c) 2025 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Content.Routing
@@ -47,11 +47,9 @@ namespace VNLib.Plugins.Essentials.Content.Routing
 
         private readonly ManagedRouteStore Store = plugin.GetOrCreateSingleton<ManagedRouteStore>();
         private readonly ILogProvider Logger = plugin.Log;
+        private readonly bool _debug = plugin.IsDebug();
 
         private readonly ConcurrentDictionary<IWebProcessor, Task<ReadOnlyCollection<Route>>> RouteTable = new();
-
-        public Router(PluginBase plugin, IConfigScope config):this(plugin)
-        { }
 
         ///<inheritdoc/>
         public async ValueTask<FileProcessArgs> RouteAsync(HttpEntity entity)
@@ -69,7 +67,20 @@ namespace VNLib.Plugins.Essentials.Content.Routing
             ReadOnlyCollection<Route> routes = await RouteTable.GetOrAdd(entity.RequestedRoot, LoadRoutesAsync);
 
             //Find the proper routine for the connection
-            Route? selected = SelectBestRoute(routes, entity.RequestedRoot.Hostname, entity.Server.Path, privileges);
+            Route? selected = SelectBestRoute(
+                routes, 
+                entity.RequestedRoot.Hostname, 
+                entity.Server.Path, 
+                privileges
+            );
+
+            if (_debug)
+            {
+                Logger.Debug(
+                    "Routing request for {hostname} {path} with privileges {privileges} to {routine}",
+                    entity.RequestedRoot.Hostname, entity.Server.Path, privileges, selected?.Routine
+                );
+            }
 
             //Get the arguments for the selected route, if not found allow the connection to continue
             return selected?.GetArgs(entity) ?? FileProcessArgs.Continue;
@@ -197,13 +208,11 @@ namespace VNLib.Plugins.Essentials.Content.Routing
                 || routinePath.Equals(path, StringComparison.OrdinalIgnoreCase)
                 || (routinePath.Length > 1 && routinePath[^1] == '*' && path.StartsWith(routinePath[..^1], StringComparison.OrdinalIgnoreCase));
 
-            if (!pathMatch)
-            {
-                return false;
-            }
-
             //Test if the level and group privilages match for the current routine
-            return (privileges & AccountUtil.LEVEL_MSK) >= (route.Privilege & AccountUtil.LEVEL_MSK) && (route.Privilege & AccountUtil.GROUP_MSK) == (privileges & AccountUtil.GROUP_MSK);
+
+            return pathMatch 
+                && (privileges & AccountUtil.LEVEL_MSK) >= (route.Privilege & AccountUtil.LEVEL_MSK)
+                && (route.Privilege & AccountUtil.GROUP_MSK) == (privileges & AccountUtil.GROUP_MSK);
         }
     }
 }
