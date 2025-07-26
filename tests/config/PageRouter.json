@@ -2,6 +2,7 @@
   "debug": true,
 
   "store": {
+    "type": "xml",
     "route_file": "../../../../config/test-routes.xml"
   }
 }
