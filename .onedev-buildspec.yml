@@ -11,7 +11,7 @@ properties:
   archived: false
 
 jobs:
-- name: GitHub Push
+- name: Git Mirror Push
   steps:
   - !PushRepository
     name: Github push sync
@@ -30,10 +30,8 @@ jobs:
     condition: SUCCESSFUL
     optional: false
   triggers:
-  - !TagCreateTrigger
-    projects: Plugins.Essentials
-  - !BranchUpdateTrigger
-    projects: Plugins.Essentials
+   - !TagCreateTrigger {}
+   - !BranchUpdateTrigger {}
   retryCondition: never
   maxRetries: 3
   retryDelay: 30
