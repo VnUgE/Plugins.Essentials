@@ -5,24 +5,41 @@ This repo will be used a small "mono-repo" for essential runtime loadable plugin
 
 This repo also now contains the [vnlib.browser](lib/vnlib.browser) TypeScript library, which is a collection of TypeScript classes and functions that are used to provide a consistent and easy to use interface for common web-site functionality.
 
-## Builds
-Debug build w/ symbols & xml docs, release builds, NuGet packages, and individually packaged source code are available on my website (link below). All tar-gzip (.tgz) files will have an associated .sha256 appended checksum of the desired download file.
+## Project Information & Resources
 
-## Docs and Guides
-Documentation, specifications, and setup guides are available on my website.  
+#### Quick Links
+The easiest way to access the .NET libraries is by adding the [VNLib NuGet feed](https://www.vaughnnugent.com/resources/software/modules#support-info-title) to your project.
 
-[Docs and Articles](https://www.vaughnnugent.com/resources/software/articles?tags=docs,_plugins.essentials)  
-[Builds and Source](https://www.vaughnnugent.com/resources/software/modules/Plugins.Essentials)  
-[Nuget Feeds](https://www.vaughnnugent.com/resources/software/modules)  
+- [Project Homepage](https://www.vaughnnugent.com/resources/software/modules/plugins.essentials)
+- [Issue Tracker](https://www.vaughnnugent.com/resources/software/modules/plugins.essentials-issues) (GitHub issues are disabled)
+- [Package Downloads](https://www.vaughnnugent.com/resources/software/modules/plugins.essentials?tab=downloads)
+- [Documentation and Guides](https://www.vaughnnugent.com/resources/software/articles?tags=docs,_plugins.essentials)
 
-## License
-The vnlib.browser project is licensed under the MIT license. See the LICENSE file for more information.
+#### Release Cycle & Distribution
+VNLib follows a Continuous Delivery model, which allows for rapid and incremental development, aiming for small weekly releases. Projects are distributed as individual packages, and official distributions include:
+- Pre-built binaries for most platforms that support Ahead-of-Time (AOT) compilation.
+- Component-level source code and build scripts.
+- SHA256 checksums and PGP cryptographic signatures for all packages.
 
-Unless otherwise stated, all other software in this repository is licensed under the GNU Affero General Public License (or any later version). See the LICENSE files for more information.
+#### API Stability & Versioning
+As a fast-moving project, VNLib is effectively in a pre-release state.
+- **Public APIs are subject to change**, potentially with little warning in any given release.
+- Notable and breaking changes will be recorded in the [changelog](CHANGELOG.md) and commit messages.
+- Obsoleted APIs will be marked with the `[Obsolete]` attribute where possible and are expected to be removed in a future release. While advance warning will be given, a strict API stability guarantee cannot be provided at this time.
+
+#### Runtime Stability & Cross-Platform Support
+A core pillar of VNLib is runtime stability. Great care is taken to ensure that components are reliable and that functionality, once working, continues to work as expected.
+
+VNLib is designed to be cross-platform. Components should work on any platform that supports a C compiler or a modern .NET runtime. While integration testing is not performed on all operating systems, the architecture is platform-agnostic by design.
+
+#### Contributing
+Note that GitHub and Codeberg integrations are disabled. VNLib takes its independence seriously and does not use third-party platforms for development, issue tracking, or pull requests. Information about contributing to the project can be found on the official website. While the reach of free platforms is respected, project independence is a core value.
+
+The project is, however, very interested in seeing what is built with VNLib! If you have created a plugin or a project you would like to share, please get in touch via the contact information on the official website.
 
 ## Donations
-If you like this project and want to support it or motivate me for faster development you can donate with fiat or on-chain BTC for now.  
+If you find VNLib valuable and wish to support its development, please consider making a donation. Your support helps fund the ongoing work and maintenance of the ecosystem.
 
-On-Chain Bitcoin: `bc1qgj4fk6gdu8lnhd4zqzgxgcts0vlwcv3rqznxn9`
-
-Fiat: [Paypal](https://www.paypal.com/donate/?business=VKEDFD74QAQ72&no_recurring=0&item_name=By+donating+you+are+funding+my+love+for+producing+free+software+for+my+community.+&currency_code=USD)
+**Fiat:** [PayPal](https://www.paypal.com/donate/?business=VKEDFD74QAQ72&no_recurring=0&item_name=By+donating+you+are+funding+my+love+for+producing+free+software+for+my+community.+&currency_code=USD)  
+**On-Chain Bitcoin:** `bc1qgj4fk6gdu8lnhd4zqzgxgcts0vlwcv3rqznxn9`  
+**LNURL:** `ChipTuner@coinos.io`
