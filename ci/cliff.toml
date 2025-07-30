@@ -41,11 +41,11 @@ footer = """
     {% if release.version -%}
         {% if release.previous.version -%}
             [{{ release.version | trim_start_matches(pat="v") }}]: \
-                https://git.vaughnnugent.com/cgit/vnuge/vnlib-core.git\
+                https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git\
                     /diff?id={{ release.version }}&id2={{ release.previous.version }}
         {% endif -%}
     {% else -%}
-        [unreleased]: https://git.vaughnnugent.com/cgit/vnuge/vnlib-core.git\
+        [unreleased]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git\
                     /diff?id=HEAD&id2={{ release.previous.version }}
     {% endif -%}
 {% endfor %}
@@ -88,6 +88,7 @@ commit_parsers = [
     # Changes
     { message = "^refactor(:|\\(.*\\):).*", group = "Changed" },
     { message = "^chore\\(deps\\):", group = "Changed" },
+    { message = "^chore\\(.*\\): update( |d|s)?\\b.*", group = "Changed" },
 
     # Removals
     { message = "^remove(\\(.*\\))?:", group = "Removed" },
@@ -103,6 +104,7 @@ commit_parsers = [
     { message = "^review:", skip = true },
     { message = "^ci(:|\\(.*\\):| )", skip = true },
     { message = "update changelog", skip = true },
+    { message = "chore(changelog)", skip = true },
     { message = "^chore.*", skip = true },
     { message = "^style.*", skip = true },
 
