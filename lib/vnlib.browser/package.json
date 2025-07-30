@@ -1,15 +1,16 @@
 {
   "name": "@vnuge/vnlib.browser",
-  "version": "0.1.13",
+  "version": "0.1.2",
   "author": "Vaughn Nugent",
   "description": "Client JavaScript helper library for vuejs3 web-apps for connecting with Essentials.Accounts plugin and vuejs helpers.",
   "repository": "https://github.com/VnUgE/Plugins.Essentials/tree/master/lib/vnlib.browser",
   "copyright":"Copyright \u00A9 2025 Vaughn Nugent",
+  "output": "bin",
+  "artifacts": "release.tgz",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "typings": "./dist/index.d.ts",
-  "output": "bin",
   "scripts": {
     "build": "tsc",
     "clean": "if exist dist ( rd /S /Q lib)"
