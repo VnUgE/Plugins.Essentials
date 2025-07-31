@@ -14,6 +14,7 @@ vars:
 tasks:
 
   default:
+    desc: 'Builds the vnlib.browser npm library'
     cmds:
       #install dependencies and build
      - cmd: npm install
@@ -21,9 +22,10 @@ tasks:
 
 #called by build pipeline to build module
   build:
+    desc: 'DO NOT RUN, called by the build pipeline to build the module'
     cmds:
-     - echo "building module {{ .PROJECT_NAME  }}" 
-
+     - cmd: echo "building module {{ .PROJECT_NAME }}" 
+       silent: true
     #update internal package version
      - cmd: npm version {{ .BUILD_VERSION }}
        ignore_error: true
@@ -31,19 +33,13 @@ tasks:
      - task: default
 
   postbuild_success:
-    vars:
-      TAR_FILES:
-        dist
-        LICENSE.txt
-        README.md
-        package.json
-        package-lock.json
-        tsconfig.json
-
+    desc: 'DO NOT RUN, called by the build pipeline after a successful build'
     cmds:
     - cmd: powershell mkdir {{ .BINARY_DIR }} -Force
-    #tgz the dist folder
-    - cmd: tar -czf {{ .BINARY_DIR }}/release.tgz {{ .TAR_FILES }}
+    #use npm pack to create a tarball of the package
+    - cmd: npm pack --pack-destination {{ .BINARY_DIR }}
+    #rename the output to release.tgz file
+    - cmd: cd {{ .BINARY_DIR }} && powershell mv "*.tgz" "release.tgz"
 
 #called by build pipeline to clean module
   clean:

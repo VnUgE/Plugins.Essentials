@@ -5,102 +5,70 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2-rc.5] - 2025-07-30
+
+### Changed
+
+- Update vnlib.core to v0.1.2-rc.7 - (deps)
+- Update vnlib.plugins.extensions to v0.1.2-rc.5 - (deps)
+- Update and audit vnlib.browser npm dependencies - (deps)
+- Update vnlib.data.caching to v0.1.2-rc.5 - (deps)
+- Update library readme to include latest vnlib information - (readme)
+
+### Fixed
+
+- Fix vnlib.browser distribution package using npm pack 
+
 ## [0.1.2-rc.3] - 2025-07-10
 
 ### Changed
 
-- Use properties to explicitly set dependency versions
-
-### Updated
-
-- Update Yubico.YubiKey to 1.13.2
-- Update MSTest packages to 3.9.3
-- Update ErrorProne.NET.CoreAnalyzers to 0.8.0-beta.1
-- Update ErrorProne.NET.CoreAnalyzers to 0.8.0-beta.1
-- Update vnlib.browser typescript dendencies
+- Update Yubico.YubiKey to 1.13.2 - (vauth)
+- Update MSTest packages to 3.9.3 - (tests)
+- Update ErrorProne.NET.CoreAnalyzers to 0.8.0-beta.1 - (libs)
+- Update ErrorProne.NET.CoreAnalyzers to 0.8.0-beta.1 - (plugins)
+- Update vnlib.browser typescript dendencies - (vnlib.browser)
 
 ## [0.1.2-rc.2] - 2025-06-14
 
-### Added
-
-- Add config parsing corrections, fix social oauth argument parsing.
-- Add codeberg remote sync
-- Add tag existence check and update dependencies
-
 ### Changed
 
-- Updated nuget dpendencies and add changelog
-- Set versioning & update ts packages
-- [no ci] add tag auto creation to master build task
+- Update npm dependencies for vnlib.browser library - (deps)
 
 ### Fixed
 
-- Fixes #13 refactor the user state management systeem for pending vnlib.core changes
-- Integrate pending vnlib.data.caching upgrades
-
-### Updated
-
-- Update npm dependencies for vnlib.browser library
+- Integrate pending vnlib.data.caching upgrades - (plugins)
 
 ## [0.1.1] - 2025-05-16
 
 ### Added
 
-- Add project level build default ( >task ) from a project level and fix test project
-- Add isEnabled methods to built-in rpc types
-- Add vauth tests to module tests
-- Add default build task for vnlib.browser
-- Add basic validation to OIDC server response and allow string array in oidc errors
-- Add missing ts dev dependency and update again
+- Add optional svg base64 icons for social OAuth2 connections 
+- Add AppData client plugin and browser library updated - (app)
+- Allow config to toggle strict user-agent checking 
+- Adding fido as an mfa type 
+- Update caching with new helpers 
+- 4 WIP expand oidc using the new Account rpc api 
+- Add session status to account rpc document 
 
 ### Changed
 
-- Build vnlib.browser before running api tests
-- **Breaking Change:** Disable users auto "migrate" & add json config type
-- Move config files for future api tests, rename session provider project file
-- Split build and test commands and update for new shared config directory
-- Integrate dev changes and update api tests
-- Update packages and fix api tests
-- Project update and versioning fix
-- Update npm packages
-- Extension package updates
-- Frontend package updates
-- Integrate extensions changes
-- Slightly more platform build support, explicit build executors
-- Update npm dependencies
-- Backend package updates
-- Frontend package updates
-- Begin vauth integration
-- Update vauth build taskfile
-- Include changes to solution file to inclue vauth project
-- Update args list api
-- Package updates
-- Js dependency updates
-- Some light cleanup on first pass review
-- Increase oidc client timeout to 5000ms
-- Update js deps
-- Update packages and push updates test configs
-- Update gitversion config for latest vnbuild
-- Update version mode and second pass review changes
-- Adjustments to account configuration for v0.1.1
+- Pull apart session authorization for future dev 
+- Preparing for WebAuthn and core updates 
+- Massive jrpc migration and overhaul 
 
 ### Fixed
 
-- Closes #6 partially finish the logout oidc method
-- Fix vauth unit testing
-- Fix license file for vauth package
-- Fix vauth project license update
-- Fixes #11 fido base64 fields were not being correctly validated for base64url.
-- Clearify log, fix package.json and origin validation
+- #1 logout redirection updated to support social methods 
+- Dangling/expired session security check and cookie cleanup 
+- Missing cookie set on cred regen 
+- Clearify log, fix package.json and origin validation 
 
-### Removed
+### Refactor
 
-- Remove no-restore msbuild flag for testing build, yeah it needs to be there.
-- Remove token log dump, add some clarifying comments
-- Remove bad debug postbuild step
-- Remove email git repo from ci dependencies list
-- Remove final github legacy endpoint
+- **Breaking Change:** Disable users auto "migrate" & add json config type 
 
+[0.1.2-rc.5]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.2-rc.5&id2=v0.1.2-rc.3
 [0.1.2-rc.3]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.2-rc.3&id2=v0.1.2-rc.2
 [0.1.2-rc.2]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.2-rc.2&id2=v0.1.1
 

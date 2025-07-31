@@ -1,17 +1,17 @@
 version: 40
 properties:
 - name: deps_core_version
-  value: v0.1.2-rc.6
+  value: v0.1.2-rc.7
   archived: false
 - name: deps_extensions_version
-  value: v0.1.2-rc.4
+  value: v0.1.2-rc.5
   archived: false
 - name: deps_caching_version
-  value: v0.1.2-rc.4
+  value: v0.1.2-rc.5
   archived: false
 
 jobs:
-- name: GitHub Push
+- name: Git Mirror Push
   steps:
   - !PushRepository
     name: Github push sync
@@ -30,10 +30,8 @@ jobs:
     condition: SUCCESSFUL
     optional: false
   triggers:
-  - !TagCreateTrigger
-    projects: Plugins.Essentials
-  - !BranchUpdateTrigger
-    projects: Plugins.Essentials
+   - !TagCreateTrigger {}
+   - !BranchUpdateTrigger {}
   retryCondition: never
   maxRetries: 3
   retryDelay: 30
@@ -47,10 +45,10 @@ jobs:
     runInContainer: false
     interpreter: !DefaultInterpreter
       commands: |
-        git clone @server_url@/@project_name@ --branch @branch@
-        git clone @server_url@/VNLib.Core core --branch @property:deps_core_version@
-        git clone @server_url@/VNLib.Data.Caching --branch @property:deps_caching_version@
-        git clone @server_url@/VNLib.Plugins.Extensions --branch @property:deps_extensions_version@
+        git clone @server_url@/@project_path@ --branch @branch@ @project_name@
+        git clone @server_url@/vnuge/vnlib/VNLib.Core core --branch @property:deps_core_version@
+        git clone @server_url@/vnuge/vnlib/VNLib.Data.Caching --branch @property:deps_caching_version@
+        git clone @server_url@/vnuge/vnlib/VNLib.Plugins.Extensions --branch @property:deps_extensions_version@
     useTTY: true
     condition: SUCCESSFUL
     optional: false
@@ -90,10 +88,10 @@ jobs:
     runInContainer: false
     interpreter: !DefaultInterpreter
       commands: |
-        git clone @server_url@/@project_name@ --branch @branch@
-        git clone @server_url@/VNLib.Core core --branch @property:deps_core_version@
-        git clone @server_url@/VNLib.Data.Caching --branch @property:deps_caching_version@
-        git clone @server_url@/VNLib.Plugins.Extensions --branch @property:deps_extensions_version@
+        git clone @server_url@/@project_path@ --branch @branch@ @project_name@
+        git clone @server_url@/vnuge/vnlib/VNLib.Core core --branch @property:deps_core_version@
+        git clone @server_url@/vnuge/vnlib/VNLib.Data.Caching --branch @property:deps_caching_version@
+        git clone @server_url@/vnuge/vnlib/VNLib.Plugins.Extensions --branch @property:deps_extensions_version@
     useTTY: true
     condition: SUCCESSFUL
     optional: false
@@ -137,10 +135,10 @@ jobs:
     runInContainer: false
     interpreter: !DefaultInterpreter
       commands: |
-        git clone @server_url@/@project_name@ --branch @branch@
-        git clone @server_url@/VNLib.Core core --branch @property:deps_core_version@
-        git clone @server_url@/VNLib.Data.Caching --branch @property:deps_caching_version@
-        git clone @server_url@/VNLib.Plugins.Extensions --branch @property:deps_extensions_version@
+        git clone @server_url@/@project_path@ --branch @branch@ @project_name@
+        git clone @server_url@/vnuge/vnlib/VNLib.Core core --branch @property:deps_core_version@
+        git clone @server_url@/vnuge/vnlib/VNLib.Data.Caching --branch @property:deps_caching_version@
+        git clone @server_url@/vnuge/vnlib/VNLib.Plugins.Extensions --branch @property:deps_extensions_version@
     useTTY: true
     condition: SUCCESSFUL
     optional: false
