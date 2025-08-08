@@ -59,7 +59,7 @@ namespace VNLib.Plugins.Essentials.Content.Routing.stores
             {
                 FileWatcher.Subscribe(_config.RouteFile, this);
                 _log.Warn("Watching for changes to route file: {file}. This is not recommended for production use", _config.RouteFile);
-        }
+            }
         }
 
         public void OnFileChanged(FileSystemEventArgs e)
@@ -87,7 +87,7 @@ namespace VNLib.Plugins.Essentials.Content.Routing.stores
 
             //Parse elements into routes
             ParseElements(memStream, routes);
-        }
+        }       
 
         private void ParseElements(VnMemoryStream ms, ICollection<Route> routes)
         {
@@ -159,9 +159,9 @@ namespace VNLib.Plugins.Essentials.Content.Routing.stores
 
                     //add route to the collection
                     routes.Add(route);
-                }
+                }               
                 catch(Exception ex)
-                {
+                {                    
                     if (_config.IgnoreErrors)
                     {
                         const string errTemplate =@"
@@ -183,18 +183,18 @@ Error: {err}
                     }
                     else if(ex is ConfigurationValidationException ce)
                     {
-                    throw new ConfigurationException(  
+                        throw new ConfigurationException(
                             message: $"Error parsing route element for hostname '{hostname}', route {count}",
-                        ce
-                    );
-                }
+                            ce
+                        );
+                    }
                     else
                     {
                         throw;
                     }
                 }
             }
-            }
+        }
 
         private sealed record class XmlStoreConfigJson : IOnConfigValidation
         {
@@ -203,6 +203,13 @@ Error: {err}
             /// </summary>
             [JsonPropertyName("route_file")]
             public string RouteFile { get; init; } = string.Empty;
+
+            /// <summary>
+            /// When true, ignores xml errors and continues loading routes. When false, throws an 
+            /// exception if an error is encountered.
+            /// </summary>
+            [JsonPropertyName("ignore_errors")]
+            public bool IgnoreErrors { get; init; } = true;
 
             /// <summary>
             /// Watches for changes to the route file and reloads routes when changes are detected.
