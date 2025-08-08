@@ -49,6 +49,7 @@ tasks:
   
   configure-dep:
     desc: 'CI task to clone a dependency repo at a specific branch and version and initialzies it'
+    dir: '{{ .USER_WORKING_DIR }}'
     requires:
       vars: [DEP_REPO, DEP_REVISION]
     vars:
