@@ -41,15 +41,28 @@ using VNLib.Plugins.Essentials.Content.Routing.Model;
 namespace VNLib.Plugins.Essentials.Content.Routing
 {
 
-    internal sealed class Router(PluginBase plugin) : IPageRouter
+    internal sealed class Router : IPageRouter
     {
         private static readonly RouteComparer Comparer = new();
 
-        private readonly ManagedRouteStore Store = plugin.GetOrCreateSingleton<ManagedRouteStore>();
-        private readonly ILogProvider Logger = plugin.Log;
-        private readonly bool _debug = plugin.IsDebug();
+        private readonly ManagedRouteStore Store;
+        private readonly ILogProvider Logger;
+        private readonly bool _debug;
 
         private readonly ConcurrentDictionary<IWebProcessor, Task<ReadOnlyCollection<Route>>> RouteTable = new();
+
+        public Router(PluginBase plugin)
+        {
+            Store = plugin.GetOrCreateSingleton<ManagedRouteStore>();
+            Logger = plugin.Log;
+            _debug = plugin.IsDebug();
+
+            //Subscribe to the store change event
+            Store.RoutesChanged += OnHandleChanged;
+
+            //Unsubscribe from the store change event
+            _ = plugin.RegisterForUnload(() => Store.RoutesChanged -= OnHandleChanged);
+        }       
 
         ///<inheritdoc/>
         public async ValueTask<FileProcessArgs> RouteAsync(HttpEntity entity)
@@ -86,15 +99,20 @@ namespace VNLib.Plugins.Essentials.Content.Routing
             return selected?.GetArgs(entity) ?? FileProcessArgs.Continue;
         }
 
+        private void OnHandleChanged(object? evnt, IRouteStore store)
+        {
+            ResetRoutes();
+            Logger.Debug("Route store changed, resetting route cache");
+        }
+
         /// <summary>
         /// Clears all cached routines from the database
         /// </summary>
         public void ResetRoutes() => RouteTable.Clear();
 
-
         private async Task<ReadOnlyCollection<Route>> LoadRoutesAsync(IWebProcessor root)
         {
-            List<Route> collection = new();
+            List<Route> collection = [];
 
             //Load all routes from the backing store and filter them
             await Store.GetAllRoutesAsync(collection, CancellationToken.None);
@@ -213,6 +231,6 @@ namespace VNLib.Plugins.Essentials.Content.Routing
             return pathMatch 
                 && (privileges & AccountUtil.LEVEL_MSK) >= (route.Privilege & AccountUtil.LEVEL_MSK)
                 && (route.Privilege & AccountUtil.GROUP_MSK) == (privileges & AccountUtil.GROUP_MSK);
-        }
+        }        
     }
 }

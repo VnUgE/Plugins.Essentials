@@ -22,6 +22,7 @@
 * along with this program.  If not, see https://www.gnu.org/licenses/.
 */
 
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
@@ -61,6 +62,12 @@ namespace VNLib.Plugins.Essentials.Content.Routing
             }
         }
 
+        public event EventHandler<IRouteStore>? RoutesChanged
+        {
+            add => _routeStore.RoutesChanged += value;
+            remove => _routeStore.RoutesChanged -= value;
+        }
+
         ///<inheritdoc/>
         public Task GetAllRoutesAsync(ICollection<Route> routes, CancellationToken cancellation)
         {
@@ -69,6 +76,8 @@ namespace VNLib.Plugins.Essentials.Content.Routing
 
         private sealed class DummyRouteStore : IRouteStore
         {
+            public event EventHandler<IRouteStore>? RoutesChanged;
+
             public Task GetAllRoutesAsync(ICollection<Route> routes, CancellationToken cancellation) 
                 => Task.CompletedTask;
         }
