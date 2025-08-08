@@ -85,7 +85,7 @@ namespace VNLib.Plugins.Essentials.Content.Routing.stores
             ParseElements(memStream, routes);
         }
 
-        private static void ParseElements(VnMemoryStream ms, ICollection<Route> routes)
+        private void ParseElements(VnMemoryStream ms, ICollection<Route> routes)
         {
             //Read contents into xml doc for reading
             XmlDocument xmlDoc = new();
@@ -100,8 +100,13 @@ namespace VNLib.Plugins.Essentials.Content.Routing.stores
                 return;
             }
 
+            int count = 0;
+
             foreach (XmlNode routeEl in routeElements)
             {
+                // Always increment count to keep track of route number for logging
+                count++;
+
                 if (routeEl.Attributes is null)
                 {
                     continue;
@@ -113,6 +118,8 @@ namespace VNLib.Plugins.Essentials.Content.Routing.stores
                 {
                     continue;
                 }
+
+                string? hostname = routeEl["hostname"]?.InnerText;
 
                 try
                 {
@@ -135,7 +142,7 @@ namespace VNLib.Plugins.Essentials.Content.Routing.stores
 
                     Route route = new()
                     {
-                        Hostname        = routeEl["hostname"]?.InnerText!,
+                        Hostname        = hostname!,
                         MatchPath       = routeEl["path"]?.InnerText ?? string.Empty,
                         RewriteSearch   = routeEl["search"]?.InnerText,
                         Alternate       = routeEl["alternate"]?.InnerText,
@@ -149,15 +156,40 @@ namespace VNLib.Plugins.Essentials.Content.Routing.stores
                     //add route to the collection
                     routes.Add(route);
                 }
-                catch (ConfigurationException ce)
+                catch(Exception ex)
                 {
-                    string? hostname = routeEl["hostname"]?.InnerText;
+                    if (_config.IgnoreErrors)
+                    {
+                        const string errTemplate =@"
+Error parsing route element for hostname '{hostname}', route {count}:
+  In File: {file}
+    XML: {xml}
 
+Error: {err}
+";
+
+                        _log.Warn(
+                            errTemplate,
+                            hostname,
+                            count,
+                            _config.RouteFile,
+                            routeEl.OuterXml,
+                            ex
+                        );
+                    }
+                    else if(ex is ConfigurationValidationException ce)
+                    {
                     throw new ConfigurationException(  
-                        $"Error parsing route element for hostname '{hostname}'",
+                            message: $"Error parsing route element for hostname '{hostname}', route {count}",
                         ce
                     );
                 }
+                    else
+                    {
+                        throw;
+                    }
+                }
+            }
             }
         }
     }
