@@ -23,33 +23,37 @@
 */
 
 using System;
+using System.Collections.Generic;
 using System.IO;
-using System.Xml;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Collections.Generic;
+using System.Xml;
 
-using VNLib.Utils.IO;
-using VNLib.Utils.Memory;
-using VNLib.Utils.Logging;
-using VNLib.Utils.Extensions;
 using VNLib.Plugins.Extensions.Loading;
-using VNLib.Plugins.Essentials.Content.Routing.Model;
 using VNLib.Plugins.Extensions.Loading.Configuration;
+using VNLib.Utils.Extensions;
+using VNLib.Utils.IO;
+using VNLib.Utils.Logging;
+using VNLib.Utils.Memory;
+
+using VNLib.Plugins.Essentials.Content.Routing.Model;
 
 namespace VNLib.Plugins.Essentials.Content.Routing.stores
 {
     [ConfigurationName("store")]
-    internal sealed class XmlRouteStore : IRouteStore
+    internal sealed class XmlRouteStore : IRouteStore, IFSChangeHandler
     {
-        private readonly string _routeFile;
+        private readonly XmlStoreConfigJson _config;
+        private readonly ILogProvider _log;
 
         public XmlRouteStore(PluginBase plugin, IConfigScope config)
         {
             //Get the route file path
-            _routeFile = config.GetRequiredProperty<string>("route_file");
+            _config = config.DeserialzeAndValidate<XmlStoreConfigJson>();
+            _log = plugin.Log.CreateScope("XmlRouteStore");
 
-            Validate.FileExists(_routeFile);
+            _log.Verbose("Router config: {config}", _config);
 
             if (_config.WatchForChanges)
             {
@@ -72,7 +76,7 @@ namespace VNLib.Plugins.Essentials.Content.Routing.stores
             using VnMemoryStream memStream = new();
 
             //Load the route file
-            await using (FileStream routeFile = new(_routeFile, FileMode.Open, FileAccess.Read, FileShare.Read))
+            await using (FileStream routeFile = new(_config.RouteFile, FileMode.Open, FileAccess.Read, FileShare.Read))
             {
                 //Read the route file into memory
                 await routeFile.CopyToAsync(memStream, 8192, MemoryUtil.Shared, cancellation);
@@ -190,6 +194,26 @@ Error: {err}
                     }
                 }
             }
+            }
+
+        private sealed record class XmlStoreConfigJson : IOnConfigValidation
+        {
+            /// <summary>
+            /// The router XML file path to load routes from.
+            /// </summary>
+            [JsonPropertyName("route_file")]
+            public string RouteFile { get; init; } = string.Empty;
+
+            /// <summary>
+            /// Watches for changes to the route file and reloads routes when changes are detected.
+            /// </summary>
+            [JsonPropertyName("watch_for_changes")]
+            public bool WatchForChanges { get; init; } = false;
+
+            public void OnValidate()
+            {
+                Validate.NotNull(RouteFile, "You must specify a route xml file path to 'route_file' configuration.");
+                Validate.FileExists(RouteFile);
             }
         }
     }
