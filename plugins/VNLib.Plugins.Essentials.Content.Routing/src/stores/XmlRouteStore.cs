@@ -51,8 +51,20 @@ namespace VNLib.Plugins.Essentials.Content.Routing.stores
 
             Validate.FileExists(_routeFile);
 
-            plugin.Log.Debug("Loading routes from {0}", _routeFile);
+            if (_config.WatchForChanges)
+            {
+                FileWatcher.Subscribe(_config.RouteFile, this);
+                _log.Warn("Watching for changes to route file: {file}. This is not recommended for production use", _config.RouteFile);
         }
+        }
+
+        public void OnFileChanged(FileSystemEventArgs e)
+        {
+            RoutesChanged?.Invoke(this, this);
+        }
+
+        ///<inheritdoc/>
+        public event EventHandler<IRouteStore>? RoutesChanged;
 
         ///<inheritdoc/>
         public async Task GetAllRoutesAsync(ICollection<Route> routes, CancellationToken cancellation)
