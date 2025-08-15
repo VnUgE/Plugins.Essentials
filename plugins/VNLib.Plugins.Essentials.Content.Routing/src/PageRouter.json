@@ -1,0 +1,10 @@
+﻿{
+  "debug": false,
+
+  "store": {
+    "type": "",                          // The type of store to use  (xml, default: off) setting null, "", "off", or "none" disables the store
+    "route_file": "routes.xml",          // The file to read routes from
+    "ignore_errors": false,              // Log errors but continue loading routes
+    "watch_for_changes": false           // Watch for changes in the route file to trigger reloads
+  }
+}

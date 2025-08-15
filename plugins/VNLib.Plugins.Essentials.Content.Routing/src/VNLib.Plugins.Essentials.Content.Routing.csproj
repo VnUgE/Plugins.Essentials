@@ -50,8 +50,11 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\VNLib.Plugins.Extensions\lib\VNLib.Plugins.Extensions.Loading\src\VNLib.Plugins.Extensions.Loading.csproj" />
   </ItemGroup>
-  
-  <ItemGroup>    
+
+  <ItemGroup>
+    <None Update="PageRouter.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="sample-routes.xml">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
