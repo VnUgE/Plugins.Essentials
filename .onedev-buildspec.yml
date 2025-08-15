@@ -1,13 +1,13 @@
 version: 40
 properties:
 - name: deps_core_version
-  value: v0.1.2-rc.7
+  value: master/v0.1.2-rc.8
   archived: false
 - name: deps_extensions_version
-  value: v0.1.2-rc.5
+  value: master/v0.1.2-rc.6
   archived: false
 - name: deps_caching_version
-  value: v0.1.2-rc.5
+  value: master/v0.1.2-rc.6
   archived: false
 
 jobs:
@@ -30,8 +30,8 @@ jobs:
     condition: SUCCESSFUL
     optional: false
   triggers:
-   - !TagCreateTrigger {}
-   - !BranchUpdateTrigger {}
+  - !TagCreateTrigger {}
+  - !BranchUpdateTrigger {}
   retryCondition: never
   maxRetries: 3
   retryDelay: 30
@@ -40,16 +40,9 @@ jobs:
 - name: Unit Testing
   jobExecutor: windows
   steps:
-  - !CommandStep
-    name: Clone local deps
-    runInContainer: false
-    interpreter: !DefaultInterpreter
-      commands: |
-        git clone @server_url@/@project_path@ --branch @branch@ @project_name@
-        git clone @server_url@/vnuge/vnlib/VNLib.Core core --branch @property:deps_core_version@
-        git clone @server_url@/vnuge/vnlib/VNLib.Data.Caching --branch @property:deps_caching_version@
-        git clone @server_url@/vnuge/vnlib/VNLib.Plugins.Extensions --branch @property:deps_extensions_version@
-    useTTY: true
+  - !UseTemplateStep
+    name: checkout deps
+    templateName: checkout deps
     condition: SUCCESSFUL
     optional: false
   - !CommandStep
@@ -83,26 +76,16 @@ jobs:
 - name: Staging build
   jobExecutor: windows
   steps:
-  - !CommandStep
-    name: Clone local deps
-    runInContainer: false
-    interpreter: !DefaultInterpreter
-      commands: |
-        git clone @server_url@/@project_path@ --branch @branch@ @project_name@
-        git clone @server_url@/vnuge/vnlib/VNLib.Core core --branch @property:deps_core_version@
-        git clone @server_url@/vnuge/vnlib/VNLib.Data.Caching --branch @property:deps_caching_version@
-        git clone @server_url@/vnuge/vnlib/VNLib.Plugins.Extensions --branch @property:deps_extensions_version@
-    useTTY: true
+  - !UseTemplateStep
+    name: checkout deps
+    templateName: checkout deps
     condition: SUCCESSFUL
     optional: false
   - !CommandStep
-    name: VNBuild build
+    name: mock build
     runInContainer: false
     interpreter: !DefaultInterpreter
       commands: |
-        dotnet gitversion core /updateprojectfiles
-        dotnet gitversion VNLib.Data.Caching /updateprojectfiles
-        dotnet gitversion VNLib.Plugins.Extensions /updateprojectfiles
         vnbuild build --no-delay --include @project_name@ --verbose
     useTTY: true
     condition: SUCCESSFUL
@@ -130,20 +113,13 @@ jobs:
 - name: Publish master
   jobExecutor: publish-agents
   steps:
-  - !CommandStep
-    name: Clone local deps
-    runInContainer: false
-    interpreter: !DefaultInterpreter
-      commands: |
-        git clone @server_url@/@project_path@ --branch @branch@ @project_name@
-        git clone @server_url@/vnuge/vnlib/VNLib.Core core --branch @property:deps_core_version@
-        git clone @server_url@/vnuge/vnlib/VNLib.Data.Caching --branch @property:deps_caching_version@
-        git clone @server_url@/vnuge/vnlib/VNLib.Plugins.Extensions --branch @property:deps_extensions_version@
-    useTTY: true
+  - !UseTemplateStep
+    name: checkout deps
+    templateName: checkout deps
     condition: SUCCESSFUL
     optional: false
   - !CommandStep
-    name: Create git tag
+    name: create git tag
     runInContainer: false
     interpreter: !DefaultInterpreter
       commands: |
@@ -157,9 +133,6 @@ jobs:
     runInContainer: false
     interpreter: !DefaultInterpreter
       commands: |
-        dotnet gitversion core /updateprojectfiles
-        dotnet gitversion VNLib.Data.Caching /updateprojectfiles
-        dotnet gitversion VNLib.Plugins.Extensions /updateprojectfiles
         vnbuild build --no-delay --include @project_name@
     useTTY: true
     condition: SUCCESSFUL
@@ -185,3 +158,18 @@ jobs:
   maxRetries: 3
   retryDelay: 30
   timeout: 14400
+stepTemplates:
+- name: checkout deps
+  steps:
+  - !CommandStep
+    name: checkout local deps
+    runInContainer: false
+    interpreter: !DefaultInterpreter
+      commands: |
+        git clone @server_url@/@project_path@ --branch @branch@ @project_name@
+        task -t @project_name@/Module.Taskfile.yaml configure-dep "DEP_REPO=@server_url@/vnuge/vnlib/VNLib.Core" "DEP_REVISION=@property:deps_core_version@" "DEP_DIR=core"
+        task -t @project_name@/Module.Taskfile.yaml configure-dep "DEP_REPO=@server_url@/vnuge/vnlib/VNLib.Data.Caching" "DEP_REVISION=@property:deps_caching_version@"
+        task -t @project_name@/Module.Taskfile.yaml configure-dep "DEP_REPO=@server_url@/vnuge/vnlib/VNLib.Plugins.Extensions" "DEP_REVISION=@property:deps_extensions_version@"       
+    useTTY: true
+    condition: SUCCESSFUL
+    optional: false

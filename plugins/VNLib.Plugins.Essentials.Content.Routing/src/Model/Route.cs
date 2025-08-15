@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2023 Vaughn Nugent
+* Copyright (c) 2025 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Content.Routing
@@ -23,44 +23,27 @@
 */
 
 using System;
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 
-using Microsoft.EntityFrameworkCore;
-
-using VNLib.Plugins.Extensions.Data;
+using VNLib.Plugins.Extensions.Loading;
+using VNLib.Plugins.Extensions.Loading.Configuration;
 
 namespace VNLib.Plugins.Essentials.Content.Routing.Model
 {
-    [Index(nameof(Id), IsUnique = true)]
-    internal sealed class Route : DbModelBase
-    {
-        public const FpRoutine RewriteRoutine = (FpRoutine)50;
+    internal sealed class Route : IOnConfigValidation
+    {        
+        public required ProcessRoutine Routine { get; init; }
+       
+        public ulong Privilege { get; init; } = 0;
+       
+        public required string Hostname { get; init; }
+       
+        public required string MatchPath { get; init; } = string.Empty;
 
-        [Key]
-        public override string Id { get; set; }
-        public override DateTime Created { get; set; }
-        public override DateTime LastModified { get; set; }
-
-        public string Hostname { get; set; }
-
-        public string MatchPath { get; set; }
-
-        [Column("Privilege")]
-        public long _privilege
-        {
-            get => (long)Privilege;
-            set => Privilege = (ulong)value;
-        }
-
-        [NotMapped]
-        public ulong Privilege { get; set; }
-
-        public string? Alternate { get; set; } = string.Empty;
-
-        public FpRoutine Routine { get; set; }
-
-        public string? RewriteSearch { get; set; }
+        public string? RewriteSearch { get; init; }
+      
+        public string? Alternate { get; init; }
+      
+        public string? Replace { get; init; }
 
         /// <summary>
         /// Creates the <see cref="FileProcessArgs"/> to return to the processor 
@@ -71,18 +54,49 @@ namespace VNLib.Plugins.Essentials.Content.Routing.Model
         public FileProcessArgs GetArgs(HttpEntity entity)
         {
             //Check for rewrite routine
-            if (Routine == RewriteRoutine)
+            if (Routine == ProcessRoutine.Rewrite)
             {
                 //Rewrite the request url and return the args, processor will clean and parse url
-                string rewritten = entity.Server.Path.Replace(RewriteSearch!, Alternate!, StringComparison.OrdinalIgnoreCase);
+                string rewritten = entity.Server.Path.Replace(RewriteSearch!, Replace!, StringComparison.OrdinalIgnoreCase);
 
                 //Set to rewrite args
                 return new FileProcessArgs(FpRoutine.ServeOther, rewritten);
             }
             else
             {
-                return new FileProcessArgs(Routine, Alternate!);
+                return new FileProcessArgs((FpRoutine) Routine, Alternate!);
             }
+        }
+
+        ///<inheritdoc/>
+        public void OnValidate()
+        {
+            Validate.NotNull(Hostname, "Hostname cannot be null or empty in route element");            
+
+            switch (Routine)
+            {
+                case ProcessRoutine.Redirect:
+                    Validate.NotNull(Alternate, "Alternate cannot be null or empty in route element for redirect routine");
+                    Validate.NotNull(MatchPath, "Match path cannot be null or empty in route element");
+                    break;
+
+                case ProcessRoutine.ServeOther:
+                    Validate.NotNull(Alternate, "Alternate cannot be null or empty in route element for serve other routine");
+                    Validate.NotNull(MatchPath, "Match path cannot be null or empty in route element");
+                    break;
+
+                case ProcessRoutine.ServeOtherFQ:
+                    Validate.NotNull(Alternate, "Alternate cannot be null or empty in route element for serve other FQ routine");
+                    Validate.NotNull(MatchPath, "Match path cannot be null or empty in route element");
+                    break;
+
+                case ProcessRoutine.Rewrite:
+                    Validate.NotNull(RewriteSearch, "Rewrite search cannot be null or empty in route element for rewrite routine");
+                    Validate.NotNull(Replace, "Replace cannot be null or empty in route element for rewrite routine");
+
+                    Validate.Assert(MatchPath != null, "You must not assign a null value to the 'path' paramter in a rewrite routine");
+                    break;
+            }                  
         }
     }
 }

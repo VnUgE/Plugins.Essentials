@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2023 Vaughn Nugent
+* Copyright (c) 2025 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Content.Routing
@@ -21,7 +21,7 @@
 * You should have received a copy of the GNU Affero General Public License
 * along with this program.  If not, see https://www.gnu.org/licenses/.
 */
-
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
@@ -32,6 +32,11 @@ namespace VNLib.Plugins.Essentials.Content.Routing
 {
     internal interface IRouteStore
     {
+        /// <summary>
+        /// Event that is raised when the routes in the store change.
+        /// </summary>
+        event EventHandler<IRouteStore>? RoutesChanged;
+
         /// <summary>
         /// Loads all routes from the backing storage element asynchronously
         /// </summary>

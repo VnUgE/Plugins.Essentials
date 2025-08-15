@@ -477,5 +477,7 @@ FodyWeavers.xsd
 /plugins/**/*.json
 /lib/vnlib.browser/dist
 
-#allow essentails.accounts.json config file to be public
+# allow essentials.accounts.json config file to be public
 !/plugins/VNLib.Plugins.Essentials.Accounts/src/essentials.accounts.json
+# allow PageRouter.json config file to be public
+!/plugins/VNLib.Plugins.Essentials.Content.Routing/src/PageRouter.json
