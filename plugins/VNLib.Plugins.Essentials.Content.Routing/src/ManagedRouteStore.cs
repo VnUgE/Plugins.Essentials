@@ -56,9 +56,17 @@ namespace VNLib.Plugins.Essentials.Content.Routing
                     logger.Information("Using XML route store.");
                     _routeStore = plugin.GetOrCreateSingleton<XmlRouteStore>();
                     break;
+
                 default:
-                    plugin.Log.Warn("Unknown route store type '{storeName}', defaulting to XML route store.", store);
-                    goto case "xml";
+                    plugin.Log.Warn("Unknown route store type '{storeName}'.", store);
+                    goto case "none";
+
+                case null:
+                case "":
+                case "off":
+                case "none":
+                    logger.Information("No route store configured, routing functionality is disabled.");
+                    break;
             }
         }
 
