@@ -33,13 +33,13 @@ namespace VNLib.Plugins.Essentials.Content.Routing
     {
         public override string PluginName => "Essentials.Router";
 
-        private Router? Router;
+        private Router? _router;
 
         protected override void OnLoad()
         {
             //Init router and export it as a service
-            Router = this.GetOrCreateSingleton<Router>();
-            this.ExportService<IPageRouter>(Router);
+            _router = this.GetOrCreateSingleton<Router>();
+            this.ExportService<IPageRouter>(_router);
 
             Log.Information("Plugin loaded");
         }
@@ -53,7 +53,7 @@ namespace VNLib.Plugins.Essentials.Content.Routing
         {
             if (cmd.Contains("reset", StringComparison.OrdinalIgnoreCase))
             {
-                Router?.ResetRoutes();
+                _router?.ResetRoutes();
                 Log.Information("Routing table reset");
             }
         }
