@@ -59,6 +59,13 @@ namespace VNLib.Plugins.Essentials.Content.Routing.stores
             {
                 FileWatcher.Subscribe(_config.RouteFile, this);
                 _log.Warn("Watching for changes to route file: {file}. This is not recommended for production use", _config.RouteFile);
+
+                // Unsubscribe from file watcher on plugin unload
+                _ = plugin.RegisterForUnload(() =>
+                {
+                    _log.Verbose("Unsubscribing from file watcher for route file: {file}", _config.RouteFile);
+                    FileWatcher.Unsubscribe(_config.RouteFile, this);
+                });            
             }
         }
 
