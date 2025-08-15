@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Vaughn Nugent
+// Copyright (c) 2025 Vaughn Nugent
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -47,7 +47,7 @@ export const Base64ToArray = function (b64string : string) : Array<number> {
   return Array.from(decData, c => c.charCodeAt(0))
 }
 
-export const Base64ToUint8Array = function (b64string : string) : Uint8Array {
+export const Base64ToUint8Array = function (b64string : string) : Uint8Array<ArrayBuffer> {
   // Recover the encoded data
   const decData = atob(b64string)
   // Convert to array
@@ -65,7 +65,7 @@ export const ArrayBuffToBase64 = function(e : ArrayBuffer) : string {
   return btoa(String.fromCharCode.apply(null, arr))
 }
 
-export const ArrayToHexString = function(buffer : Array<number> | ArrayBuffer) : string {
+export const ArrayToHexString = function(buffer : Array<number> | BufferSource) : string {
   return Array.prototype.map.call(buffer, function (byte : number) {
     return ('0' + (byte & 0xFF).toString(16)).slice(-2)
   }).join('')
