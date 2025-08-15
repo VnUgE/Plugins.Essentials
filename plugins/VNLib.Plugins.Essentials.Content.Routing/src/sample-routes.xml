@@ -17,7 +17,7 @@
     Because this route has a more specific path than the catch all route
     it will be processed first
   -->
-  <route routine="1" privilege="0">
+  <route routine="continue" privilege="0">
     
     <!--Wildcard host-->
     <hostname>*</hostname>
@@ -26,8 +26,8 @@
     <path>/assets/*</path>
   </route>
   
-  <!--Overwrite all other requests to the index file (catch all) using the ServeOther routine (4)-->
-  <route routine="4" privilege="0">
+  <!--Overwrite all other requests to the index file (catch all) using the ServeOther routine (serveOther)-->
+  <route routine="serveOther" privilege="0">
     
     <!--Wildcard hostname-->
     <hostname>*</hostname>    

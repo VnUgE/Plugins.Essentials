@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2024 Vaughn Nugent
+* Copyright (c) 2025 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Content.Routing
@@ -33,7 +33,7 @@ namespace VNLib.Plugins.Essentials.Content.Routing
     {
         public override string PluginName => "Essentials.Router";
 
-        private Router Router;
+        private Router? Router;
 
         protected override void OnLoad()
         {
@@ -51,7 +51,7 @@ namespace VNLib.Plugins.Essentials.Content.Routing
 
         protected override void ProcessHostCommand(string cmd)
         {
-            if(cmd.Contains("reset", StringComparison.OrdinalIgnoreCase))
+            if (cmd.Contains("reset", StringComparison.OrdinalIgnoreCase))
             {
                 Router?.ResetRoutes();
                 Log.Information("Routing table reset");
