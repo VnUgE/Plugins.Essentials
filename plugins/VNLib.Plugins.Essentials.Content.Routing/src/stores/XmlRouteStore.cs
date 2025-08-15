@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2023 Vaughn Nugent
+* Copyright (c) 2025 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Content.Routing
@@ -23,36 +23,52 @@
 */
 
 using System;
+using System.Collections.Generic;
 using System.IO;
-using System.Xml;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Collections.Generic;
+using System.Xml;
 
-using VNLib.Utils.IO;
-using VNLib.Utils.Memory;
-using VNLib.Utils.Logging;
-using VNLib.Utils.Extensions;
 using VNLib.Plugins.Extensions.Loading;
-using VNLib.Plugins.Essentials.Content.Routing.Model;
 using VNLib.Plugins.Extensions.Loading.Configuration;
+using VNLib.Utils.Extensions;
+using VNLib.Utils.IO;
+using VNLib.Utils.Logging;
+using VNLib.Utils.Memory;
+
+using VNLib.Plugins.Essentials.Content.Routing.Model;
 
 namespace VNLib.Plugins.Essentials.Content.Routing.stores
 {
     [ConfigurationName("store")]
-    internal sealed class XmlRouteStore : IRouteStore
+    internal sealed class XmlRouteStore : IRouteStore, IFSChangeHandler
     {
-        private readonly string _routeFile;
+        private readonly XmlStoreConfigJson _config;
+        private readonly ILogProvider _log;
 
         public XmlRouteStore(PluginBase plugin, IConfigScope config)
         {
             //Get the route file path
-            _routeFile = config.GetRequiredProperty<string>("route_file");
+            _config = config.DeserialzeAndValidate<XmlStoreConfigJson>();
+            _log = plugin.Log.CreateScope("XmlRouteStore");
 
-            Validate.FileExists(_routeFile);
+            _log.Verbose("Router config: {config}", _config);
 
-            plugin.Log.Debug("Loading routes from {0}", _routeFile);
+            if (_config.WatchForChanges)
+            {
+                FileWatcher.Subscribe(_config.RouteFile, this);
+                _log.Warn("Watching for changes to route file: {file}. This is not recommended for production use", _config.RouteFile);
+            }
         }
+
+        public void OnFileChanged(FileSystemEventArgs e)
+        {
+            RoutesChanged?.Invoke(this, this);
+        }
+
+        ///<inheritdoc/>
+        public event EventHandler<IRouteStore>? RoutesChanged;
 
         ///<inheritdoc/>
         public async Task GetAllRoutesAsync(ICollection<Route> routes, CancellationToken cancellation)
@@ -60,7 +76,7 @@ namespace VNLib.Plugins.Essentials.Content.Routing.stores
             using VnMemoryStream memStream = new();
 
             //Load the route file
-            await using (FileStream routeFile = new(_routeFile, FileMode.Open, FileAccess.Read, FileShare.Read))
+            await using (FileStream routeFile = new(_config.RouteFile, FileMode.Open, FileAccess.Read, FileShare.Read))
             {
                 //Read the route file into memory
                 await routeFile.CopyToAsync(memStream, 8192, MemoryUtil.Shared, cancellation);
@@ -71,9 +87,9 @@ namespace VNLib.Plugins.Essentials.Content.Routing.stores
 
             //Parse elements into routes
             ParseElements(memStream, routes);
-        }
+        }       
 
-        private static void ParseElements(VnMemoryStream ms, ICollection<Route> routes)
+        private void ParseElements(VnMemoryStream ms, ICollection<Route> routes)
         {
             //Read contents into xml doc for reading
             XmlDocument xmlDoc = new();
@@ -88,71 +104,123 @@ namespace VNLib.Plugins.Essentials.Content.Routing.stores
                 return;
             }
 
+            int count = 0;
+
             foreach (XmlNode routeEl in routeElements)
             {
-                Route route = new();
+                // Always increment count to keep track of route number for logging
+                count++;
+
+                if (routeEl.Attributes is null)
+                {
+                    continue;
+                }
 
                 //See if route is disabled
-                string? disabledAtr = routeEl.Attributes["disabled"]?.Value;
-                //If disabled, skip route
+                string? disabledAtr = routeEl.Attributes["disabled"]?.Value;              
                 if (disabledAtr != null)
                 {
                     continue;
                 }
 
-                //Get the route routine value
-                string? routineAtr = routeEl.Attributes["routine"]?.Value;
-                _ = routineAtr ?? throw new XmlException("Missing required attribute 'routine' in route element");
+                string? hostname = routeEl["hostname"]?.InnerText;
 
-                //Try to get the routime enum value
-                if (uint.TryParse(routineAtr, out uint r))
+                try
                 {
-                    route.Routine = (FpRoutine)r;
+                    //Get the route routine value              
+                    Validate.Assert(
+                        Enum.TryParse(routeEl.Attributes["routine"]?.Value, ignoreCase: true, out ProcessRoutine routine),
+                        "The value of the 'routine' attribute is not a valid ProcessRoutine enum value"
+                    );
+
+                    string? privilege = routeEl.Attributes["privilege"]?.Value;
+                    if (string.IsNullOrEmpty(privilege))
+                    {
+                        privilege = 0.ToString(); //default privilege level
+                    }
+
+                    Validate.Assert(
+                        ulong.TryParse(privilege, out ulong privLevel),
+                        "The value of the 'privilege' attribute is not a valid unsigned 64-bit integer"
+                    );
+
+                    Route route = new()
+                    {
+                        Hostname        = hostname!,
+                        MatchPath       = routeEl["path"]?.InnerText ?? string.Empty,
+                        RewriteSearch   = routeEl["search"]?.InnerText,
+                        Alternate       = routeEl["alternate"]?.InnerText,
+                        Replace         = routeEl["replace"]?.InnerText,
+                        Routine         = routine,
+                        Privilege       = privLevel
+                    };
+
+                    route.OnValidate();
+
+                    //add route to the collection
+                    routes.Add(route);
+                }               
+                catch(Exception ex)
+                {                    
+                    if (_config.IgnoreErrors)
+                    {
+                        const string errTemplate =@"
+Error parsing route element for hostname '{hostname}', route {count}:
+  In File: {file}
+    XML: {xml}
+
+Error: {err}
+";
+
+                        _log.Warn(
+                            errTemplate,
+                            hostname,
+                            count,
+                            _config.RouteFile,
+                            routeEl.OuterXml,
+                            ex
+                        );
+                    }
+                    else if(ex is ConfigurationValidationException ce)
+                    {
+                        throw new ConfigurationException(
+                            message: $"Error parsing route element for hostname '{hostname}', route {count}",
+                            ce
+                        );
+                    }
+                    else
+                    {
+                        throw;
+                    }
                 }
-                else
-                {
-                    throw new XmlException("The value of the 'routine' attribute is not a valid FpRoutine enum value");
-                }
+            }
+        }
 
-                //read priv level attribute
-                string? privAtr = routeEl.Attributes["privilege"]?.Value;
-                _ = privAtr ?? throw new XmlException("Missing required attribute 'privilege' in route element");
+        private sealed record class XmlStoreConfigJson : IOnConfigValidation
+        {
+            /// <summary>
+            /// The router XML file path to load routes from.
+            /// </summary>
+            [JsonPropertyName("route_file")]
+            public string RouteFile { get; init; } = string.Empty;
 
-                //Try to get the priv level enum value
-                if (ulong.TryParse(privAtr, out ulong priv))
-                {
-                    route.Privilege = priv;
-                }
-                else
-                {
-                    throw new XmlException("The value of the 'priv' attribute is not a valid unsigned 64-bit integer");
-                }
+            /// <summary>
+            /// When true, ignores xml errors and continues loading routes. When false, throws an 
+            /// exception if an error is encountered.
+            /// </summary>
+            [JsonPropertyName("ignore_errors")]
+            public bool IgnoreErrors { get; init; } = true;
 
-                //Get hostname element value
-                string? hostEl = routeEl["hostname"]?.InnerText;
-                route.Hostname = hostEl ?? throw new XmlException("Missing required element 'hostname' in route element");
+            /// <summary>
+            /// Watches for changes to the route file and reloads routes when changes are detected.
+            /// </summary>
+            [JsonPropertyName("watch_for_changes")]
+            public bool WatchForChanges { get; init; } = false;
 
-                //Get the path element value
-                string? pathEl = routeEl["path"]?.InnerText;
-                route.MatchPath = pathEl ?? throw new XmlException("Missing required element 'path' in route element");
-
-                //Get the optional alternate path element value
-                route.Alternate = routeEl["alternate"]?.InnerText;
-
-                //Check for rewrite routine, if rewrite, get rewrite and replace elements
-                if (route.Routine == Route.RewriteRoutine)
-                {
-                    //Get the rewrite element value
-                    string? rewriteEl = routeEl["rewrite"]?.InnerText;
-                    route.RewriteSearch = rewriteEl ?? throw new XmlException("Missing required element 'rewrite' in route element");
-
-                    //Get the rewrite element value
-                    string? replaceEl = routeEl["replace"]?.InnerText;
-                    route.Alternate = replaceEl ?? throw new XmlException("Missing required element 'replace' in route element");
-                }
-
-                //add route to the collection
-                routes.Add(route);
+            public void OnValidate()
+            {
+                Validate.NotNull(RouteFile, "You must specify a route xml file path to 'route_file' configuration.");
+                Validate.FileExists(RouteFile);
             }
         }
     }

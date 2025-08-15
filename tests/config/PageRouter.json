@@ -2,6 +2,9 @@
   "debug": true,
 
   "store": {
-    "route_file": "../../../../config/test-routes.xml"
+    "type": "xml",
+    "route_file": "../../../../config/test-routes.xml",
+    "ignore_errors": false,         // Always fail on errors in test
+    "watch_for_changes": false      // Watching isnt possible to test right now
   }
 }
