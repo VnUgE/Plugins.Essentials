@@ -7,7 +7,7 @@ properties:
   value: master/v0.1.2-rc.7
   archived: false
 - name: deps_caching_version
-  value: master/v0.1.2-rc.6
+  value: master/v0.1.2-rc.7
   archived: false
 
 jobs:
