@@ -40,9 +40,11 @@ using VNLib.Plugins.Essentials.Accounts.AppData.Model;
 using VNLib.Plugins.Essentials.Accounts.AppData.Stores.Sql;
 using VNLib.Plugins.Extensions.VNCache;
 using VNLib.Plugins.Extensions.VNCache.DataModel;
+using VNLib.Plugins.Extensions.Loading.Configuration;
 
 namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores
 {
+
     [ConfigurationName("storage")]
     internal sealed class StorageManager : IAppDataStore
     {
@@ -52,21 +54,23 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores
 
         public StorageManager(PluginBase plugin, IConfigScope config)
         {
-            string storeType = config.GetRequiredProperty<string>("type").ToLower(null);
+            StorageConfigJson conf = config.DeserialzeAndValidate<StorageConfigJson>();
 
             _logger = plugin.Log.CreateScope("STORE");
 
-            switch (storeType)
+            switch (conf.Type.ToLower(null))
             {
                 case "sql":
                     _backingStore = plugin.GetOrCreateSingleton<SqlBackingStore>();
                     plugin.Log.Information("Using SQL based backing store");
                     break;
+
                 default:
-                    throw new NotSupportedException($"Storage type {storeType} is not supported");
+                    throw new ConfigurationException($"Storage 'type': '{conf.Type}' is not supported");
             }
 
             CacheConfig? cConfig = config.GetValueOrDefault<CacheConfig?>("cache", defaultValue: null);
+            cConfig?.OnValidate();
 
             if (cConfig is null || !cConfig.Enabled)
             {
@@ -75,10 +79,9 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores
             }
 
             ICacheClient? cache = plugin.GetDefaultGlobalCache();
-
             if (cache is null)
             {
-                _logger.Warn("Cache was enabled, but no global cache library was loaded. Caching disabled");
+                _logger.Warn("Cache was enabled, but no global cache library was loaded. Continuing without cache");
                 return;
             }
 
@@ -264,19 +267,29 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores
             }
         }
 
-        private sealed class CacheConfig
+        private sealed class CacheConfig : IOnConfigValidation
         {
             [JsonPropertyName("enabled")]
-            public bool Enabled { get; set; } = true;
+            public bool Enabled { get; init; } = true;
 
             [JsonPropertyName("ttl")]
-            public long CacheTTL { get; set; } = 120;    //max age in seconds
+            public long CacheTTL { get; init; } = 120;    //max age in seconds
 
             [JsonPropertyName("force_write_back")]
-            public bool WriteBack { get; set; } = false;
+            public bool WriteBack { get; init; } = false;
 
             [JsonPropertyName("prefix")]
             public string? Prefix { get; set; }
+
+            public void OnValidate()
+            {
+                if (!Enabled)
+                {
+                    return;
+                }
+
+                Validate.Range2(CacheTTL, 1, 86400, "Cache TTL must be between 1 seconds and 24 hours");
+            }
         }
     }
 }
