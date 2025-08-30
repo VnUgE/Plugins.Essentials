@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2024 Vaughn Nugent
+* Copyright (c) 2025 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts.AppData
@@ -26,6 +26,7 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Text.Json.Serialization;
 
 using Microsoft.EntityFrameworkCore;
 
@@ -39,20 +40,26 @@ using VNLib.Plugins.Extensions.VNCache.DataModel;
 
 using VNLib.Plugins.Essentials.Accounts.AppData.Model;
 
+
 namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores.Sql
 {
 
-    internal sealed class SqlBackingStore(PluginBase plugin)
+    [ConfigurationName("storage")] // Use the global storage config section
+    internal sealed class SqlBackingStore(PluginBase plugin, IConfigScope config)
         : IEntityStore<UserRecordData, AppDataRequest>, IAsyncConfigurable
     {
         private readonly DbRecordStore _store = new(plugin.GetContextOptionsAsync());
+        private readonly SqlStorageConfigJson _config = config.DeserialzeAndValidate<SqlStorageConfigJson>();
 
         ///<inheritdoc/>
         async Task IAsyncConfigurable.ConfigureServiceAsync(PluginBase plugin)
         {
-            //Add startup delay
-            await Task.Delay(2000);
-            await plugin.EnsureDbCreatedAsync<UserRecordDbContext>(plugin);
+            if (_config.RunDbInit)
+            {
+                //Add startup delay
+                await Task.Delay(2000);
+                await plugin.EnsureDbCreatedAsync<UserRecordDbContext>(plugin);
+            }
         }
 
         ///<inheritdoc/>
@@ -92,7 +99,8 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores.Sql
         ///<inheritdoc/>
         public async Task<bool> RemoveAsync(AppDataRequest request, CancellationToken cancellation = default)
         {
-            ERRNO result = await _store.DeleteAsync([request.UserId, request.RecordKey], cancellation)
+            ERRNO result = await _store
+                .DeleteAsync([request.UserId, request.RecordKey], cancellation)
                 .ConfigureAwait(false);
 
             return result > 0;
@@ -115,11 +123,11 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores.Sql
             ///<inheritdoc/>
             public override void OnRecordUpdate(DataRecord newRecord, DataRecord existing)
             {
-                existing.Data = newRecord.Data;
-                existing.Checksum = newRecord.Checksum;
-                existing.RecordKey = newRecord.RecordKey;
-                existing.UserId = newRecord.UserId;
-                existing.Created = newRecord.Created;
+                existing.Data       = newRecord.Data;
+                existing.Checksum   = newRecord.Checksum;
+                existing.RecordKey  = newRecord.RecordKey;
+                existing.UserId     = newRecord.UserId;
+                existing.Created    = newRecord.Created;
             }
 
             private sealed class DbQueries : IDbQueryLookup<DataRecord>
@@ -144,6 +152,16 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores.Sql
                     return GetSingleQueryBuilder(context, record.UserId!, record.RecordKey!);
                 }
             }
+        }
+
+        private sealed class SqlStorageConfigJson : StorageConfigJson
+        {
+            /// <summary>
+            /// Gets or sets a value indicating whether the database should be initialized
+            /// on startup. Defaults to true.
+            /// </summary>
+            [JsonPropertyName("run_db_init")]
+            public bool RunDbInit { get; init; } = true;        
         }
     }
 }
