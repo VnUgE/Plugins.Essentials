@@ -1,11 +1,11 @@
 ﻿/*
-* Copyright (c) 2024 Vaughn Nugent
+* Copyright (c) 2025 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts.AppData
-* File: IAppDataStore.cs 
+* File: AppDataRequest.cs 
 *
-* IAppDataStore.cs is part of VNLib.Plugins.Essentials.Accounts.AppData which 
+* AppDataRequest.cs is part of VNLib.Plugins.Essentials.Accounts.AppData which 
 * is part of the larger VNLib collection of libraries and utilities.
 *
 * VNLib.Plugins.Essentials.Accounts is free software: you can redistribute it and/or modify 

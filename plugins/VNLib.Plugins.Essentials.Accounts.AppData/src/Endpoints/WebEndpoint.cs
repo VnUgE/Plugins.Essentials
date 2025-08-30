@@ -27,6 +27,7 @@ using System.Net;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 using VNLib.Net.Http;
 using VNLib.Hashing.Checksums;
@@ -36,6 +37,7 @@ using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Validation;
 using VNLib.Plugins.Extensions.Loading.Routing;
 using VNLib.Plugins.Extensions.Loading.Routing.Mvc;
+using VNLib.Plugins.Extensions.Loading.Configuration;
 
 using VNLib.Plugins.Essentials.Accounts.AppData.Model;
 using VNLib.Plugins.Essentials.Accounts.AppData.Stores;
@@ -48,12 +50,9 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Endpoints
     [EndpointLogName("Endpoint")]
     [ConfigurationName("web_endpoint")]
     internal sealed class WebEndpoint(PluginBase plugin, IConfigScope config) : IHttpController
-    {
-        private const int DefaultMaxDataSize = 8 * 1024;
-
+    {    
         private readonly StorageManager _store = plugin.GetOrCreateSingleton<StorageManager>();
-        private readonly int MaxDataSize = config.GetValueOrDefault("max_data_size", DefaultMaxDataSize);
-        private readonly string[] AllowedScopes = config.GetRequiredProperty<string[]>("allowed_scopes");
+        private readonly EndpointConfigJson _confg = config.DeserialzeAndValidate<EndpointConfigJson>();      
 
         ///<inheritdoc/>
         public ProtectionSettings GetProtectionSettings() => default;
@@ -120,7 +119,7 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Endpoints
 
             FileUpload data = entity.Files[0];
 
-            if (webm.AssertError(data.Length <= MaxDataSize, ["Data too large"]))
+            if (webm.AssertError(data.Length <= _confg.MaxDataSize, ["Data too large"]))
             {
                 return VirtualClose(entity, webm, HttpStatusCode.RequestEntityTooLarge);
             }
@@ -193,15 +192,30 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Endpoints
             return VirtualClose(entity, HttpStatusCode.Accepted);
         }
 
-        private bool IsScopeAllowed(string scopeId)
-        {
-            return AllowedScopes.Contains(scopeId, StringComparer.OrdinalIgnoreCase);
-        }
+        private bool IsScopeAllowed(string scopeId) 
+            => _confg.AllowedScopes.Contains(scopeId, StringComparer.OrdinalIgnoreCase);
 
         private static string? GetScopeId(HttpEntity entity)
             => entity.QueryArgs.GetValueOrDefault("scope");
 
         private static bool NoCacheQuery(HttpEntity entity)
             => entity.QueryArgs.ContainsKey("no_cache");
+
+        private sealed class EndpointConfigJson : IOnConfigValidation
+        {
+            [JsonPropertyName("max_data_size")]
+            public int MaxDataSize { get; set; } = 8 * 1024;
+
+            [JsonPropertyName("allowed_scopes")]
+            public string[] AllowedScopes { get; set; } = [];
+
+            public void OnValidate()
+            {
+                Validate.Range(MaxDataSize, 1, 64 * 1024);
+
+                Validate.NotNull(AllowedScopes, "Config property 'allowed_scopes' must not be empty");
+                Validate.Assert(AllowedScopes.Any(string.IsNullOrWhiteSpace), "Config property 'allowed_scopes' contains a null or empty string");
+            }
+        }
     }
 }
