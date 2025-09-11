@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2-rc.7] - 2025-09-11
+
+### Changed
+
+- Update vnlib.core to `v0.1.2-rc.10` - (deps) [5a68c23](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=5a68c236115c69debb3357f2279d8d781d02dfe5)
+- Update vnlib.plugins.extensions to `v0.1.2-rc.8` - (deps) [9955bc9](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=9955bc9e6287181a64f055387907f905bcfcc3b3)
+- Update vnlib.data.caching to `v0.1.2-rc.8` - (deps) [98321df](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=98321dfa70c159c5b5f048c9578e911025d44f33)
+- Update npm library packages - (deps) [62272c3](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=62272c3b5b2a13b8fb91537f533ec9740f2c7852)
+
 ## [0.1.2-rc.6] - 2025-08-30
 
 ### Changed
@@ -117,7 +126,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Breaking Change:** Disable users auto "migrate" & add json config type - [a5fa032](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=a5fa032810c4f5e4afde43cea157e28fa1547561)
 
-[0.1.2-rc.6]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=vv0.1.2-rc.6&id2=v0.1.2-rc.5
+[0.1.2-rc.7]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.2-rc.7&id2=v0.1.2-rc.6
+[0.1.2-rc.6]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.2-rc.6&id2=v0.1.2-rc.5
 [0.1.2-rc.5]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.2-rc.5&id2=v0.1.2-rc.4
 [0.1.2-rc.4]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.2-rc.4&id2=v0.1.2-rc.3
 [0.1.2-rc.3]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.2-rc.3&id2=v0.1.2-rc.2
