@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2025-09-21
+
+### Changed
+
+- Update npm depdendencies for vnlib.browser - (deps) [64d34f0](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=64d34f02d55803dc6e019f3fe5998ab327b0f84d)
+- Update vnlib.core to v0.1.2 - (deps) [2b96707](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=2b9670749624610708303053011dad66dfdde3d2)
+- Update vnlib.plugins.extensions to v0.1.2 - (deps) [903edfb](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=903edfba877a049452cb6fccbbf2fb3e5da8d60a)
+- Update vnlib.data.caching to v0.1.2 - (deps) [5b0f45c](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=5b0f45c6c56e588a9910ebbc51bf5e8c3a163e42)
+
 ## [0.1.2-rc.7] - 2025-09-11
 
 ### Changed
@@ -126,6 +135,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Breaking Change:** Disable users auto "migrate" & add json config type - [a5fa032](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=a5fa032810c4f5e4afde43cea157e28fa1547561)
 
+[0.1.2]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.2&id2=v0.1.2-rc.7
 [0.1.2-rc.7]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.2-rc.7&id2=v0.1.2-rc.6
 [0.1.2-rc.6]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.2-rc.6&id2=v0.1.2-rc.5
 [0.1.2-rc.5]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.2-rc.5&id2=v0.1.2-rc.4
