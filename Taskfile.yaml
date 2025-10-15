@@ -76,8 +76,9 @@ tasks:
         --exclude="bin"
         --exclude="obj"
     cmds:
-    #copy source code to target
-    - cmd: tar {{ .EXCLUDES }} -czf '{{ .BINARY_DIR }}/src.tgz' .
+      #pack up source code and put in output
+     - cmd: tar{{ if eq OS "windows" }}.exe{{ end }}
+         {{ .EXCLUDES }} -czf '{{ .USER_WORKING_DIR }}/{{ .BINARY_DIR }}/src.tgz' .
 
 #Remove the output dirs on clean
   clean:
