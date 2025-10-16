@@ -61,7 +61,7 @@ tasks:
     cmds:
      - cmd: mkdir -p {{ .BINARY_DIR }}
 
-     #remove uncessary files from the release dir
+     #remove unnecessary files from the release dir
      - cmd: powershell -Command "Get-ChildItem -Recurse '{{ .RELEASE_DIR }}/' -Include *.pdb,*.xml | Remove-Item"
        platforms: [ "windows" ]
      - cmd: cd '{{ .RELEASE_DIR }}' && rm -f *.xml *.pdb

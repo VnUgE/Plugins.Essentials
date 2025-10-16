@@ -36,6 +36,9 @@ tasks:
     cmds:
      #remove unnecessary files from the release dir
      - cmd: powershell -Command "Get-ChildItem -Recurse '{{ .RELEASE_DIR }}/' -Include *.pdb,*.xml | Remove-Item"
+       platforms: [ "windows" ]
+     - cmd: cd '{{ .RELEASE_DIR }}' && rm -f *.pdb *.xml
+       platforms: [ "linux", "darwin" ]
 
      - task: pack-parallel
 
