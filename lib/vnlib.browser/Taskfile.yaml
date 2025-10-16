@@ -35,7 +35,7 @@ tasks:
   postbuild_success:
     desc: 'DO NOT RUN, called by the build pipeline after a successful build'
     cmds:
-    - cmd: powershell mkdir {{ .BINARY_DIR }} -Force
+    - cmd: mkdir -p {{ .BINARY_DIR }}
     #use npm pack to create a tarball of the package
     - cmd: npm pack --pack-destination {{ .BINARY_DIR }}
     #rename the output to release.tgz file
@@ -47,4 +47,4 @@ tasks:
     cmds:
      #delete dist folder
     - for: ['bin/', 'dist/', 'node_modules/']
-      cmd: powershell rm -Recurse -Force "{{ .ITEM_NAME }}"
+      cmd: rm -rf "{{ .ITEM_NAME }}"
