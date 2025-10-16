@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2025-10-16
+
+### Changed
+
+- Update vnlib.core to v0.1.3 - (deps) [477c291](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=477c291649dbb04e06d375d278c6adc95b509a14)
+- Update vnlib.plugins.extensions to v0.1.3 - (deps) [c6a2a00](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=c6a2a009c0a516c666c734bc07da918674c2d03b)
+- Update vnlib.data.caching to v0.1.3 - (deps) [26501dc](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=26501dc029eacaeeac9040126fdae7800fc1aa26)
+- Update npm dependencies - (deps) [3af4f7d](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=3af4f7db9290c41cebfe3e918c0b057dfb44d0b1)
+- Update build scripts to support Task v3.45 cross platform syntax - [a40ecff](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=a40ecffcf39cc0e9eee4864e0434f88c3683da31)
+
 ## [0.1.2] - 2025-09-21
 
 ### Changed
@@ -135,6 +145,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Breaking Change:** Disable users auto "migrate" & add json config type - [a5fa032](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=a5fa032810c4f5e4afde43cea157e28fa1547561)
 
+[0.1.3]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.3&id2=v0.1.2
 [0.1.2]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.2&id2=v0.1.2-rc.7
 [0.1.2-rc.7]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.2-rc.7&id2=v0.1.2-rc.6
 [0.1.2-rc.6]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.2-rc.6&id2=v0.1.2-rc.5
