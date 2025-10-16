@@ -33,9 +33,10 @@ tasks:
         vitest.config.ts
 
     cmds:
-    - cmd: powershell mkdir {{ .BINARY_DIR }} -Force
+    - cmd: mkdir -p {{ .BINARY_DIR }}
     #tgz the source files
-    - cmd: tar -czf {{ .BINARY_DIR }}/src.tgz {{ .TAR_FILES }}
+    - cmd: tar{{ if eq OS "windows" }}.exe{{ end }}
+        -czf {{ .BINARY_DIR }}/src.tgz {{ .TAR_FILES }}
 
 #Remove the output dirs on clean
   clean:
@@ -43,4 +44,4 @@ tasks:
     ignore_error: true
     cmds:
      - for: ['bin/', 'node_modules/']
-       cmd: powershell rm -Recurse '{{ .ITEM }}'
+       cmd: rm -rf '{{ .ITEM }}'

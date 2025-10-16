@@ -59,10 +59,13 @@ tasks:
     vars:
       RELEASE_DIR: "{{ .BINARY_DIR }}/release/{{ .TARGET_FRAMEWORK }}"
     cmds:
-     - cmd: powershell mkdir {{ .BINARY_DIR }} -Force
+     - cmd: mkdir -p {{ .BINARY_DIR }}
 
      #remove uncessary files from the release dir
      - cmd: powershell -Command "Get-ChildItem -Recurse '{{ .RELEASE_DIR }}/' -Include *.pdb,*.xml | Remove-Item"
+       platforms: [ "windows" ]
+     - cmd: cd '{{ .RELEASE_DIR }}' && rm -f *.xml *.pdb
+       platforms: [ "linux", "darwin" ]
 
      - task: pack_parallel
 
@@ -82,10 +85,12 @@ tasks:
       BUILD_DIR: "{{ .BINARY_DIR }}/{{ .BUILD_MODE }}/{{ .TARGET_FRAMEWORK }}/{{ .TARGET_OS }}/publish"
     cmds:     
      #copy and readme to target
-     - powershell cp ../build.readme.txt '{{ .BUILD_DIR }}/readme.txt'
+     - cmd: cp ../build.readme.txt '{{ .BUILD_DIR }}/readme.txt'
      
      #tar outputs
-     - cd "{{ .BUILD_DIR }}" && tar -czf "{{ .USER_WORKING_DIR }}/{{ .BINARY_DIR }}/{{ .TARGET_OS }}-{{ .BUILD_MODE }}.tgz" .
+     - cmd: cd "{{ .BUILD_DIR }}" 
+         && tar{{ if eq OS "windows" }}.exe{{ end }} 
+         -czf "{{ .USER_WORKING_DIR }}/{{ .BINARY_DIR }}/{{ .TARGET_OS }}-{{ .BUILD_MODE }}.tgz" .
 
   pack_source:
     internal: true
@@ -102,7 +107,9 @@ tasks:
 
     cmds:
       #pack up source code and put in output
-     - cmd: cd .. && tar {{ .EXCLUDES }} -czf '{{ .USER_WORKING_DIR }}/{{ .BINARY_DIR }}/src.tgz' {{ .INCLUDES }}
+     - cmd: cd .. && 
+         tar{{ if eq OS "windows" }}.exe{{ end }}
+         {{ .EXCLUDES }} -czf '{{ .USER_WORKING_DIR }}/{{ .BINARY_DIR }}/src.tgz' {{ .INCLUDES }}
 
     #Remove the output dirs on clean
   clean:
@@ -112,5 +119,5 @@ tasks:
      - cmd: dotnet clean
 
      - for: [ bin/, obj/ ]
-       cmd: powershell Remove-Item -Recurse -Force '{{ .USER_WORKING_DIR }}/{{ .ITEM }}'
+       cmd: rm -rf '{{ .USER_WORKING_DIR }}/{{ .ITEM }}'
 
