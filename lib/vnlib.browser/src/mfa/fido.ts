@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Vaughn Nugent
+// Copyright (c) 2025 Vaughn Nugent
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -27,13 +27,11 @@ import type {
 import { 
     startRegistration, 
     startAuthentication, 
-    browserSupportsWebAuthn 
+    browserSupportsWebAuthn,
+    type RegistrationResponseJSON, 
+    type PublicKeyCredentialCreationOptionsJSON, 
+    type PublicKeyCredentialRequestOptionsJSON
 } from "@simplewebauthn/browser";
-import type { 
-    RegistrationResponseJSON, 
-    PublicKeyCredentialCreationOptionsJSON, 
-    PublicKeyCredentialRequestOptionsJSON
-} from "@simplewebauthn/types";
 import type { WebMessage } from "../types";
 import { type MfaApi } from "./config";
 import type { AccountRpcResponse } from "../account/types";
@@ -156,7 +154,7 @@ export const useFidoApi: UseFidoApi = (options?: Pick<MfaApi, 'sendRequest'>): I
         //begin registration
         const serverOptions = await beginRegistration(options);
 
-        const reg = await startRegistration(serverOptions);
+        const reg = await startRegistration({ optionsJSON: serverOptions });
     
         return await registerCredential(reg, commonName, options);
     }
@@ -204,7 +202,10 @@ export const fidoMfaProcessor = () : IMfaTypeProcessor => {
             
             const { fido } = (payload as any) as { fido: PublicKeyCredentialRequestOptionsJSON }; 
 
-            const result = await startAuthentication(fido, useAutoFill) as IMfaSubmission
+            const result = await startAuthentication({ 
+                optionsJSON: fido, 
+                useBrowserAutofill: useAutoFill 
+            }) as IMfaSubmission
 
             return await onSubmit.submit({ fido: result, ...options });
         }
