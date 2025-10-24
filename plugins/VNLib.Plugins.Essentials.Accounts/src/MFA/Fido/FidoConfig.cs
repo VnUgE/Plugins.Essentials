@@ -96,7 +96,9 @@ namespace VNLib.Plugins.Essentials.Accounts.MFA.Fido
 
             val.RuleFor(c => c.AttestationType)
                 .NotEmpty()
-                .WithMessage("Fido 'attestation_type' must be provided");
+                .WithMessage("Fido 'attestation_type' must be provided")
+                .Must(type => type == "none" || type == "direct")
+                .WithMessage("Fido 'attestation_type' must be 'none' or 'direct' ('indirect' is no longer supported in WebAuthn L3)");
 
             val.RuleFor(c => c.FIDOAuthSelection)
                 .NotNull()
