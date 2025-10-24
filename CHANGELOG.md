@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4-rc.1] - 2025-10-24
+
+### Changed
+
+- Update SimpleWebAuthn to v13 and implement changes - (deps) [0068386](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=0068386187c1a6606551781f07d6648bc6deed2b)
+
+### Fixed
+
+- Limit webauthn AttestationType to `none` or `direct` for correct protocol compatability. - (webauthn) [d59b50f](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=d59b50f4e3683958c418691a450bd73002b18940)
+
 ## [0.1.3] - 2025-10-16
 
 ### Changed
@@ -145,6 +155,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Breaking Change:** Disable users auto "migrate" & add json config type - [a5fa032](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=a5fa032810c4f5e4afde43cea157e28fa1547561)
 
+[0.1.4-rc.1]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.4-rc.1&id2=v0.1.3
 [0.1.3]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.3&id2=v0.1.2
 [0.1.2]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.2&id2=v0.1.2-rc.7
 [0.1.2-rc.7]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.2-rc.7&id2=v0.1.2-rc.6
