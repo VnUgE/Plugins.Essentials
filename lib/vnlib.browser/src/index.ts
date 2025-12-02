@@ -41,7 +41,10 @@ export type {
     UserAppDataApi, 
     ScopedUserAppDataApi
 } from './default/app-data'
-export { useAppDataApi, useScopedAppDataApi } from './default/app-data'
+export { 
+    useAppDataApi, 
+    useScopedAppDataApi 
+} from './default/app-data'
 
 //Axios exports
 export { useAxios } from './default/axios'
@@ -101,11 +104,25 @@ export type {
     UseFidoApi, 
     FidoAuthenticateOptions 
 } from './default/mfa/fido'
-export { useFidoApi, fidoMfaProcessor, fidoMfaAuthenticate, fidoGetMfaData } from './default/mfa/fido'
+export { 
+    useFidoApi, 
+    fidoMfaProcessor, 
+    fidoMfaAuthenticate, 
+    fidoGetMfaData 
+} from './default/mfa/fido'
 
 // TOTP exports
-export type { TotpRequestOptions, TotpUpdateResponse, ITotpApi, TotpSubmitCodeOptions } from './default/mfa/totp'
-export { useTotpApi, totpMfaProcessor, totpSubmitCode } from './default/mfa/totp'
+export type { 
+    TotpRequestOptions, 
+    TotpUpdateResponse, 
+    ITotpApi, 
+    TotpSubmitCodeOptions 
+} from './default/mfa/totp'
+export { 
+    useTotpApi, 
+    totpMfaProcessor, 
+    totpSubmitCode 
+} from './default/mfa/totp'
 
 //Social exports
 export type { 
