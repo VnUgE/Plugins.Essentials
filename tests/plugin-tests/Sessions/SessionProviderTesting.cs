@@ -22,7 +22,7 @@ namespace Plugins.Essentials.Tests.Sessions
             new TestPluginLoader<SessionProviderEntry>()
                 .WithCliArgs(["--verbose"])  //Enable verbose logging
                 .WithLocalHostConfig()
-                .WithLocalPluignConfig("Essentials.Sessions.json")
+                .WithLocalPluignConfig("SessionProvider.json")
                 .Load()
                 .GetServices(services =>
                 {
