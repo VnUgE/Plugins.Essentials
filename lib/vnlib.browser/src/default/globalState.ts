@@ -116,13 +116,13 @@ export const useLibraryStateInternal = (): ReadonlyManualRef<GlobalApiConfig> =>
 export const setApiConfigInternal = (config: GlobalConfigUpdate): void => {
 
     //merge with current configuration
-    const newConfig = {
-        axios: merge(_globalState.axios, config.axios),
-        session: merge(_globalState.session, config.session),
-        user: merge(_globalState.account, config.account),
-        storage: config.storage
+    const newConfig: GlobalApiConfig = {
+        axios: merge(getDefaultAxiosConfig(), config.axios),
+        session: merge(getDefaultSessionConfig(), config.session),
+        account: merge(getDefaultUserConfig(), config.account),
+        storage: config.storage ?? getDefaultStorage()
     }
-
+   
     //Update the global state
     merge(_globalState, newConfig)
 }
