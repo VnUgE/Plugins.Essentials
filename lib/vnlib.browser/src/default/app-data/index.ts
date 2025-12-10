@@ -18,6 +18,8 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+import { type MaybeRef } from 'vue'
+import { get, type StorageLikeAsync } from '@vueuse/core'
 import { useAxios } from '../axios'
 import { defaultTo, isFunction } from 'lodash-es'
 import type { Axios } from 'axios'
@@ -92,18 +94,14 @@ interface GetUrl{
  * @param axios The optional axios instance to use for requests
  * @returns The AppData API
  */
-export const useAppDataApi = (endpoint: string, axios?: Axios): UserAppDataApi => {
+export const useAppDataApi = (endpoint: MaybeRef<string>, axios?: Axios): UserAppDataApi => {
 
     axios = defaultTo(axios, useAxios(null));
-
-    const getEndpoint = () => {
-        return isFunction(endpoint) ? endpoint() : endpoint;
-    }
 
     const getUrl = ({ flush, noCache, scope }: GetUrl) => {
         const fl = flush ? '&flush=true' : ''
         const nc = noCache ? '&no_cache=true' : ''
-        return `${getEndpoint()}?scope=${scope}${nc}${fl}`
+        return `${get(endpoint)}?scope=${scope}${nc}${fl}`
     }
 
     return {

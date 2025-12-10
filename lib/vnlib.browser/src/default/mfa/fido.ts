@@ -26,13 +26,11 @@ import type {
 import { 
     startRegistration, 
     startAuthentication, 
-    browserSupportsWebAuthn 
+    browserSupportsWebAuthn,
+    type RegistrationResponseJSON, 
+    type PublicKeyCredentialCreationOptionsJSON, 
+    type PublicKeyCredentialRequestOptionsJSON
 } from "@simplewebauthn/browser";
-import type { 
-    RegistrationResponseJSON, 
-    PublicKeyCredentialCreationOptionsJSON, 
-    PublicKeyCredentialRequestOptionsJSON
-} from "@simplewebauthn/types";
 import type { WebMessage } from "../types";
 import { type MfaApi, type MfaGetResponse, mfaGetDataFor } from "./config";
 import type { AccountRpcResponse } from "../account/types";
@@ -176,7 +174,7 @@ export const useFidoApi: UseFidoApi = (options?: Pick<MfaApi, 'sendRequest'>): I
         //begin registration
         const serverOptions = await beginRegistration(options);
 
-        const reg = await startRegistration(serverOptions);
+        const reg = await startRegistration({ optionsJSON: serverOptions });
     
         return await registerCredential(reg, commonName, options);
     }
@@ -225,6 +223,14 @@ export const fidoMfaProcessor = () : IMfaTypeProcessor => {
         }
 
         const { fido } = (payload as any) as { fido: PublicKeyCredentialRequestOptionsJSON }; 
+
+            const result = await startAuthentication({ 
+                optionsJSON: fido, 
+                useBrowserAutofill: useAutoFill 
+            }) as IMfaSubmission
+
+            return await onSubmit.submit({ fido: result, ...options });
+        }
 
         return Promise.resolve({
             ...payload,
