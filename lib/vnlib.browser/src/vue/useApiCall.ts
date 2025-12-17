@@ -18,182 +18,129 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import { type Ref, readonly, ref } from '@vue/reactivity';
-import { get, type MaybeRef } from '@vueuse/core';
-import { type AxiosRequestConfig, type Axios } from 'axios';
 import { defaultTo, isArray, isNil, first, isString } from 'lodash-es';
-import { useAxios } from '../default/axios';
-import { 
-    useFormToaster, 
-    useToaster,
-    type IErrorNotifier,
-    type CombinedToaster 
-} from './toast';
+import type { Toaster } from './toaster';
 
-export interface IApiHandle<T> {
-    /**
-     * Called to get the object to pass to apiCall is invoked
-     */
-    getCallbackObject(): T;
-
-    /**
-     * Called to get the notifier to use for the api call
-     */
-    getNotifier(): IErrorNotifier;
-
-    /**
-     * Called to set the waiting flag
-     */
-    setWaiting: (waiting: boolean) => void;
-}
-
-export interface IApiPassThrough {
-    readonly axios: Axios;
-    readonly toaster: CombinedToaster;
+export interface UseApiCallArgs {
+    readonly toaster: Toaster
 }
 
 export interface UseApiCallReturn {
     /**
      * The api call function object {apiCall: Promise }
      */
-    <TR>(callback: (data: IApiPassThrough) => Promise<TR | undefined>): Promise<TR | undefined>;
+    <TR>(callback: () => Promise<TR | undefined>): Promise<TR | undefined>;
     /**
      * The api call function object {apiCall: Promise }
      */
-    invoke<TR>(callback: (data: IApiPassThrough) => Promise<TR | undefined>): Promise<TR | undefined>;
+    invoke<TR>(callback: () => Promise<TR | undefined>): Promise<TR | undefined>;
     /**
      * The waiting flag that indicates if the api call is in progress
      */
     readonly waiting: Readonly<Ref<boolean>>;
 }
 
-export interface UseApiCallArgs {
-    /**
-     * The notifier to write errors to 
-     */
-    readonly notifier?: MaybeRef<IErrorNotifier>;
-    /**
-     * The axios request configuration to use for the api call
-     * If not provided, the default axios instance will be used
-     */
-    readonly axConfig?: AxiosRequestConfig | undefined | null;
-}
-
-export interface UseApiCall {
-    (): UseApiCallReturn;
-    (args: UseApiCallArgs): UseApiCallReturn;
-}
-
 // Defined by the vnlib client-server api
 type ValidationError = { property: string, message: string } 
 type ErrorResponse = ValidationError | string
 
-
 /**
  * Provides a wrapper method for making remote api calls to a server
  * while capturing context and errors and common api arguments.
- * @returns {Object} The api call function object {apiCall: Promise }
+ * @param args - 
+ * @returns API call wrapper with waiting state
  */
-export const useApiCall: UseApiCall = (args?: UseApiCallArgs): UseApiCallReturn => {
-
-    const { notifier, axConfig } = args ?? { notifier: useFormToaster() };
-
-    const axios = useAxios(axConfig);
-    const toaster = useToaster();
+export const useApiCall = ({ toaster }: UseApiCallArgs): UseApiCallReturn => {
+    
     const waitValue = ref(false);
 
-    const getCallbackObject = (): IApiPassThrough => ({ axios, toaster })
-    const setWaiting = (value: boolean) => waitValue.value = value;
+    const setWaiting = (value: boolean) => waitValue.value = value; 
 
-    const invoke = async <TR>(callback: (data: IApiPassThrough) => Promise<TR | undefined>)
+    const invoke = async <TR>(callback: () => Promise<TR | undefined>)
         : Promise<TR | undefined> => {
-        const ntf = get(notifier)
 
         // Set the waiting flag
         setWaiting(true);
 
         try {
-            //Close the current toast value
-            ntf?.close();
+            //Close previous toasts
+            toaster.close();
 
-            const obj = getCallbackObject();
-
-            //Exec the async function
-            return await callback(obj);
+            //Execute the async function
+            return await callback();
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (errMsg: any) {
             console.error(errMsg)
+
             // See if the error has an axios response
             if (isNil(errMsg.response)) {
                 if (errMsg.message === 'Network Error') {
-                    ntf?.notifyError('Please check your internet connection')
+                    toaster.error('Network Error', 'Please check your internet connection');
                 } else {
-                    ntf?.notifyError('An unknown error occured')
+                    toaster.error('An unknown error occurred');
                 }
-                return
+                return;
             }
+
             // Axios error message
             const response = errMsg.response
             const errors = response?.data?.errors as ErrorResponse[]
             const hasErrors = isArray(errors) && errors.length > 0
 
-            const SetMessageWithDefault = (message: string) => {
+            const showErrorMessage = (defaultMessage: string) => {
                 if (hasErrors) {
-                    const fe = first(errors)
-                    if(isString(fe)){
-                       ntf?.notifyError(fe as string)
-                    }
-                    else{
-                        const { message, property } = fe as ValidationError
+                    const firstError = first(errors);
 
-                        ntf?.notifyError(
-                            'Please verify your ' + defaultTo(property, 'form'),
-                            message
-                        )
+                    if (isString(firstError)) {
+                        toaster.error(firstError);
+                    } 
+                    else {
+                        const { message, property } = firstError as ValidationError;
+                        toaster.error( `Please verify your ${property ?? 'form'}`, message);
                     }
-                  
                 } else {
-                    ntf?.notifyError(defaultTo(response?.data?.result, message))
+                    const serverMessage = defaultTo(response?.data?.result, defaultMessage);
+                    toaster.error(serverMessage);
                 }
-            }
+            };
 
             switch (response.status) {
                 case 200:
-                    SetMessageWithDefault('')
-                    break
+                    break;
                 case 400:
-                    SetMessageWithDefault('Bad Request')
-                    break
+                    showErrorMessage('Bad Request');
+                    break;
                 case 422:
-                    SetMessageWithDefault('The server did not accept the request')
-                    break
+                    showErrorMessage('The server did not accept the request');
+                    break;
                 case 401:
-                    SetMessageWithDefault('You are not logged in.')
-                    break
+                    showErrorMessage('You are not logged in');
+                    break;
                 case 403:
-                    SetMessageWithDefault('Please clear you cookies/cache and try again')
-                    break
+                    showErrorMessage('Please clear your cookies/cache and try again');
+                    break;
                 case 404:
-                    SetMessageWithDefault('The requested resource was not found')
-                    break
+                    showErrorMessage('The requested resource was not found');
+                    break;
                 case 409:
-                    SetMessageWithDefault('Please clear you cookies/cache and try again')
-                    break
+                    showErrorMessage('Please clear your cookies/cache and try again');
+                    break;
                 case 410:
-                    SetMessageWithDefault('The requested resource has expired')
-                    break
+                    showErrorMessage('The requested resource has expired');
+                    break;
                 case 423:
-                    SetMessageWithDefault('The requested resource is locked')
-                    break
+                    showErrorMessage('The requested resource is locked');
+                    break;
                 case 429:
-                    SetMessageWithDefault('You have made too many requests, please try again later')
-                    break
+                    showErrorMessage('You have made too many requests, please try again later');
+                    break;
                 case 500:
-                    SetMessageWithDefault('There was an error processing your request')
-                    break
+                    showErrorMessage('There was an error processing your request');
+                    break;
                 default:
-                    SetMessageWithDefault('An unknown error occured')
-                    break
+                    showErrorMessage('An unknown error occurred');
+                    break;
             }
         } finally {
             // Clear the waiting flag

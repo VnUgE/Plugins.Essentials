@@ -18,8 +18,9 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import { first } from "lodash-es";
-import { type MaybeRef, get } from '@vueuse/core';
-import { useFormToaster, type IErrorNotifier } from "./toast";
+import type { MaybeRef } from '@vue/reactivity'
+import { get } from '@vueuse/core';
+import { type Toaster } from "./toaster";
 
 /**
  * Represents a generic validator interface that can be used
@@ -52,8 +53,8 @@ export interface VuelidateInstance {
 }
 
 export interface ValidateFunction {
-    (validator: MaybeRef<VuelidateInstance>, toaster?: IErrorNotifier): Promise<boolean>;
-    (validator: MaybeRef<IValidator>, toaster?: IErrorNotifier): Promise<boolean>;
+    (validator: MaybeRef<VuelidateInstance>, toaster?: Toaster): Promise<boolean>;
+    (validator: MaybeRef<IValidator>, toaster?: Toaster): Promise<boolean>;
 }
 
 const wrapVuelidate = (validator: MaybeRef<VuelidateInstance | IValidator>): IValidator => {
@@ -94,23 +95,24 @@ export type VuelidateOrValidator = VuelidateInstance | IValidator;
 /**
  * Validates a form using the provided validator and displays an error message
  * if the validation fails.
- * @param validator The validator to use for validation, can be a VuelidateInstance or IValidator
- * @param toaster Optional error notifier to display error messages
+ * @template T - Validator type extending VuelidateInstance
+ * @param toaster - Toaster instance to display error messages
+ * @param validator - The validator to use for validation, can be a VuelidateInstance or IValidator
  * @returns A promise that resolves to true if the validation is successful, false otherwise
  */
-export const validateForm = async <T extends VuelidateInstance>(validator: MaybeRef<T>, toaster?: IErrorNotifier)
+export const validateForm = async <T extends VuelidateInstance>(toaster: Toaster, validator: MaybeRef<T>)
    : Promise<boolean> => {
 
     const instance = wrapVuelidate(validator);
-    toaster = toaster || useFormToaster();
 
     // Validate the form
     const valid = await instance.validate();
+
     // If the form is no valid set the error message
     if (!valid) {
         const first = instance.firstError();
         // Set the error message to the first error in the form list
-        toaster?.notifyError(first.message);
+        toaster?.error(first.message);
     }
 
     return valid;

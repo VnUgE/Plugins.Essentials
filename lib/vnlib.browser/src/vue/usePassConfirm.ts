@@ -18,49 +18,53 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import { useConfirmDialog } from "@vueuse/core";
-import { 
-    type IApiPassThrough, 
-    useApiCall, 
-    UseApiCallArgs 
-} from "../vue/useApiCall";
+import { useApiCall, type UseApiCallArgs } from "../vue/useApiCall";
 import { AxiosError } from "axios";
 import { isEqual, isNil, memoize } from "lodash-es";
 
-export interface IElevatedCallPassThrough extends IApiPassThrough {
+/**
+ * Extended API pass-through interface for password-protected operations.
+ * Includes the user-provided password for elevated access.
+ */
+export interface IElevatedCallPassThrough  {
     readonly password: string;
 }
 
-//Must store a global reference to the confirm dialog to share between components
-const dialog = memoize(useConfirmDialog);
+/**
+ * Configuration for password-protected API calls.
+ * Extends UseApiCallArgs with a confirm dialog instance.
+ * @template T - Type of data returned from the confirm dialog
+ */
+export interface UsePassConfirmArgs<T> extends UseApiCallArgs {
+    readonly dialog: ReturnType<typeof useConfirmDialog<T>>
+}
 
 /**
  * Gets the shared password prompt object and the elevated api call method handler 
  * to allow for elevated api calls that require a password.
+ * @param args - Configuration object containing toaster for notifications
  * @returns {Object} The password prompt configuration object, and the elevated api call method
  */
-export const usePassConfirm = (args?: UseApiCallArgs) => {
+export const usePassConfirm = <T>(args: UsePassConfirmArgs<T>) => {
 
-    //Shared confirm object
-    const confirm = dialog();
-
-    const apiCall = useApiCall(args!);
+    const apiCall = useApiCall(args); 
 
     /**
      * Displays the password prompt and executes the api call with the password
      * captured from the prompt. If the api call returns a 401 error, the password
-     * prompt is re-displayed and the server error message is displayed in the form
-     * error toaster.
-     * @param callback The async callback method that invokes the elevated api call.
-     * @returns A promise that resolves to the result of the async function
+     * prompt is re-displayed and the server error message is displayed.
+     * @template TResult - The return type of the elevated API call
+     * @param callback - The async callback method that invokes the elevated api call
+     * @returns A promise that resolves to the result of the async function, or undefined if canceled
      */
-    const elevatedApiCall = <T>(callback: (api: IElevatedCallPassThrough) => Promise<T>): Promise<T | undefined> => {
+    const elevatedApiCall = <TResult>(callback: (api: IElevatedCallPassThrough) => Promise<TResult>): Promise<TResult | undefined> => {
         //Invoke api call method but handle 401 errors by re-displaying the password prompt
-        return apiCall<T>(async (api: IApiPassThrough) : Promise<T | undefined> => {
+        return apiCall<TResult>(async () : Promise<TResult | undefined> => {
             // eslint-disable-next-line no-constant-condition
             while (1) {
 
                 //Display the password prompt
-                const { data, isCanceled } = await confirm.reveal()
+                const { data, isCanceled } = await args.dialog.reveal()
                 
                 if (isCanceled) {
                     break;
@@ -68,7 +72,7 @@ export const usePassConfirm = (args?: UseApiCallArgs) => {
 
                 try {
                     //Execute the api call with prompt response
-                    return await callback({...api, ...data });
+                    return await callback({ ...data });
                 }
                 //Catch 401 errors and re-display the password prompt, otherwise throw the error
                 catch (err) {
@@ -88,7 +92,7 @@ export const usePassConfirm = (args?: UseApiCallArgs) => {
                     } 
 
                     //Display the error message
-                    api.toaster.form.error({ title: response.data.result });
+                    args.toaster.error(response.data.result);
 
                     //Re-display the password prompt
                 }
@@ -97,5 +101,5 @@ export const usePassConfirm = (args?: UseApiCallArgs) => {
     }
 
     //Pass through confirm object and elevated api call
-    return { ...confirm, ...apiCall, elevatedApiCall };
+    return { ...args.dialog, ...apiCall, elevatedApiCall };
 };
