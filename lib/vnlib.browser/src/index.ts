@@ -18,161 +18,218 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 /*************************
-    EXPORTS
+    CORE CONFIG & TYPES
+*************************/
+
+// Core configuration
+export { createApiConfig } from './default/config';
+export { getDefaultSessionConfig } from './default/session';
+export { getDefaultAccountConfig } from './default/account';
+export { getDefaultAxiosRequestConfig } from './default/axios';
+
+// Core types
+export type { 
+    WebMessage, 
+    ServerValidationError,
+    ApiConfig,
+    ApiConfigOverrides,
+    SessionConfig,
+    Awaitable,
+    ConfigScopeToken
+} from './default/types';
+
+/*************************
+    SESSION
 *************************/
 
 export type { 
-    WebMessage, 
-    ServerValidationError, 
-    StorageLikeAsync,
-    Awaitable,
-    GlobalApiConfig, 
-    GlobalConfigUpdate
-} from './default/types'
+    ISession,
+    ITokenResponse,
+    ClientCredential
+} from './default/session';
+export { useSession } from './default/session';
 
-//Forward session public exports
-export type * from './default/session'
-export { useSession } from './default/session'
+/*************************
+    ACCOUNT & AUTH
+*************************/
 
-//App-data
 export type { 
-    AppDataGetOptions,
-    AppDataSetOptions, 
-    UserAppDataApi, 
-    ScopedUserAppDataApi
-} from './default/app-data'
-export { 
-    useAppDataApi, 
-    useScopedAppDataApi 
-} from './default/app-data'
+    AccountApi,
+    AccountRpcApi,
+    AccountRpcApiConfig,
+    AccountRpcGetResult,
+    AccountRpcRequest,
+    AccountRpcResponse,
+    ExtendedLoginResponse,
+    IUserLoginRequest,
+    ProfileApi,
+    UserLoginCredential,
+    UserProfile
+} from './default/account/types';
 
-//Axios exports
-export { useAxios } from './default/axios'
-
-//User exports
-export type * from './default/account/types'
 export { 
-    useAccountRpc, 
     useAccount, 
+    useAccountRpc, 
     useProfile, 
     isLoggedIn, 
     isLocalAccount 
-} from './default/account'
-
-//Mfa exports
-// Config exports
-export type { 
-    UserArg, 
-    MfaMethodResponse,
-    MfaGetResponse, 
-    MfaRequestJson, 
-    MfaApi 
-} from './default/mfa/config'
-export { useMfaApi, mfaGetDataFor } from './default/mfa/config'
-
-// Login exports  
-export type { 
-    MfaMethod, 
-    IMfaSubmission, 
-    IMfaMessage, 
-    IMfaFlow, 
-    IMfaContinuation, 
-    MfaUpgradeState, 
-    IMfaTypeProcessor, 
-    IMfaLoginManager 
-} from './default/mfa/login'
-export { useMfaLogin } from './default/mfa/login'
-
-// PKI exports
-export type { 
-    PkOtpLogin, 
-    PkiLogin, 
-    PkiPublicKey, 
-    OtpRpcGetData, 
-    IOtpRequestOptions, 
-    OtpApi 
-} from './default/mfa/pki'
-export { useOtpAuth, useOtpApi, otpGetMfaData } from './default/mfa/pki'
-
-// FIDO exports
-export type { 
-    IFidoServerOptions, 
-    IFidoRequestOptions, 
-    IFidoDevice, 
-    FidoRpcGetData, 
-    IFidoApi, 
-    UseFidoApi, 
-    FidoAuthenticateOptions 
-} from './default/mfa/fido'
-export { 
-    useFidoApi, 
-    fidoMfaProcessor, 
-    fidoMfaAuthenticate, 
-    fidoGetMfaData 
-} from './default/mfa/fido'
-
-// TOTP exports
-export type { 
-    TotpRequestOptions, 
-    TotpUpdateResponse, 
-    ITotpApi, 
-    TotpSubmitCodeOptions 
-} from './default/mfa/totp'
-export { 
-    useTotpApi, 
-    totpMfaProcessor, 
-    totpSubmitCode 
-} from './default/mfa/totp'
-
-//Social exports
-export type { 
-    SocialOAuthMethod, 
-    SocialLoginRpcResponse, 
-    BeginFlowArgs, 
-    LogoutArguments, 
-    LogoutResponse, 
-    SocialLoginApi 
-} from './default/social'
-export { useOauthLogin } from './default/social'
-
-//Export helpers
-export { debugLog } from './default/helpers/debugLog'
-
-// Binary helpers
-export { 
-    LongToArray, 
-    IntToArray, 
-    Base64ToArray, 
-    Base64ToUint8Array, 
-    Utf8StringToBuffer, 
-    ArrayBuffToBase64, 
-    ArrayToHexString 
-} from './default/helpers/binhelpers'
-
-// Webcrypto helpers
-export { 
-    isCryptoSupported, 
-    getCryptoOrThrow, 
-    hmacSignAsync, 
-    decryptAsync, 
-    getRandomHex 
-} from './default/helpers/webcrypto'
-
-// JRPC helpers  
-export type { RpcMethodArgs, RpcClient } from './default/helpers/jrpc'
-export { useJrpc } from './default/helpers/jrpc'
+} from './default/account';
 
 /*************************
-    SETUP/LOCALS
+    AXIOS
 *************************/
 
-import { cloneDeep } from 'lodash-es';
-import { setApiConfigInternal } from './default/globalState';
-import type { GlobalConfigUpdate } from './default/types';
+export { 
+    useAxios, 
+    type AxiosConfig 
+} from './default/axios';
 
-/**
- * Configures the global api settings for the entire library,
- * may be called at any time, but should be called in the main app component
- * before other stateful components are mounted.
- */
-export const configureApi = (config: GlobalConfigUpdate) => setApiConfigInternal(cloneDeep(config));
+/*************************
+    APP DATA
+*************************/
+
+export type {
+    AppDataApiOptions,
+    AppDataGetOptions,
+    AppDataSetOptions,
+    ScopedUserAppDataApi,
+    UserAppDataApi
+} from './default/app-data';
+
+export { 
+    useAppDataApi,
+    useScopedAppDataApi
+} from './default/app-data';
+
+/*************************
+    MFA
+*************************/
+
+// MFA types and core
+export type {
+    IMfaFlow,
+    IMfaLoginManager,
+    IMfaMessage,
+    IMfaSubmission,
+    IMfaContinuation,
+    IMfaTypeProcessor,
+    MfaMethod,
+    MfaLoginOptions,
+    MfaUpgradeState
+} from './default/mfa/login';
+
+export { useMfaLogin } from './default/mfa/login';
+
+export type {
+    MfaApi,
+    MfaGetResponse,
+    MfaMethodResponse,
+    MfaRequestJson,
+    UserArg
+} from './default/mfa/config';
+
+export { 
+    useMfaApi,
+    mfaGetDataFor
+} from './default/mfa/config';
+
+// FIDO
+export type {
+    FidoAuthenticateOptions,
+    FidoRpcGetData,
+    IFidoApi,
+    IFidoDevice,
+    IFidoRequestOptions,
+    IFidoServerOptions,
+    UseFidoApi
+} from './default/mfa/fido';
+
+export {
+    useFidoApi,
+    fidoMfaProcessor,
+    fidoMfaAuthenticate,
+    fidoGetMfaData
+} from './default/mfa/fido';
+
+// TOTP
+export type {
+    ITotpApi,
+    TotpRequestOptions,
+    TotpSubmitCodeOptions,
+    TotpUpdateResponse
+} from './default/mfa/totp';
+
+export {
+    useTotpApi,
+    totpMfaProcessor,
+    totpSubmitCode
+} from './default/mfa/totp';
+
+// PKI/OTP
+export type {
+    IOtpRequestOptions,
+    OtpApi,
+    OtpAuthOptions,
+    OtpRpcGetData,
+    PkiLogin,
+    PkiPublicKey,
+    PkOtpLogin
+} from './default/mfa/pki';
+
+export {
+    useOtpApi,
+    useOtpAuth,
+    otpGetMfaData
+} from './default/mfa/pki';
+
+/*************************
+    SOCIAL/OAUTH
+*************************/
+
+export type {
+    BeginFlowArgs,
+    LogoutArguments,
+    LogoutResponse,
+    OauthLoginOptions,
+    SocialLoginApi,
+    SocialLoginRpcResponse,
+    SocialOAuthMethod
+} from './default/social';
+
+export { useOauthLogin } from './default/social';
+
+/*************************
+    HELPERS
+*************************/
+
+export type {
+    RpcClient,
+    RpcMethodArgs
+} from './default/helpers/jrpc';
+
+export { useJrpc } from './default/helpers/jrpc';
+
+export type { AsyncStorageItem } from './default/helpers/storage';
+export { createStorageSlot } from './default/helpers/storage';
+
+export type { CryptoContext } from './default/helpers/webcrypto';
+export {
+    isCryptoSupported,
+    getCryptoContext,
+    getCryptoOrThrow,
+    hmacSignAsync,
+    decryptAsync,
+    getRandomHex
+} from './default/helpers/webcrypto';
+
+export {
+    LongToArray,
+    IntToArray,
+    Base64ToArray,
+    Base64ToUint8Array,
+    Utf8StringToBuffer,
+    ArrayBuffToBase64,
+    ArrayToHexString
+} from './default/helpers/binhelpers';
+
+export { debugLog } from './default/helpers/debugLog';
