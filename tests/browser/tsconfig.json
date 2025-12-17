@@ -2,11 +2,13 @@
     "compilerOptions": {
         "target": "esnext",
         "module": "esnext",
-        "moduleResolution": "node",
+        "moduleResolution": "bundler",
         "strict": true,
         "esModuleInterop": true,
         "skipLibCheck": true,
-        "resolveJsonModule": true
+        "resolveJsonModule": true,
+        "allowSyntheticDefaultImports": true,
+        "types": ["vitest/globals", "vitest/jsdom"]
     },
     "exclude": [ "node_modules" ]
 }

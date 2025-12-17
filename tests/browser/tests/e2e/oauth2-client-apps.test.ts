@@ -1,5 +1,5 @@
-import { describe, expect, it, test } from 'vitest';
-import { applications, scopes } from "../../../plugins/VNLib.Plugins.Essentials.Oauth.ClientApps/src/Essentials.Oauth.ClientApps.json"
+import { describe, expect, it } from 'vitest';
+import { applications, scopes } from "../../../../plugins/VNLib.Plugins.Essentials.Oauth.ClientApps/src/Essentials.Oauth.ClientApps.json"
 import { useAccount, useAccountRpc, useAxios } from '@vnuge/vnlib.browser'
 const { getData } = useAccountRpc()
 const { login, logout } = useAccount()

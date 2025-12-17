@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { useAccountRpc, useOauthLogin, useSession } from '@vnuge/vnlib.browser'
+import { useAccountRpc, useOauthLogin } from '@vnuge/vnlib.browser'
 const { getData } = useAccountRpc()
 
 const { getPortals, isEnabled } = useOauthLogin();

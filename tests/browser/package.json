@@ -4,28 +4,29 @@
   "copyright": "Copyright © 2025 Vaughn Nugent",
   "type": "module",
   "scripts": {
-    "test:dev": "vitest --workspace=vitest.dev.ts",
-    "test:ci": "vitest run --no-color --workspace=vitest.headless.ts"
+    "test:unit": "vitest run --no-color --config=vitest.unit.ts",
+    "test:e2e": "vitest --config=vitest.dev.ts",
+    "test:dev": "vitest --config=vitest.dev.ts",
+    "test:ci": "vitest run --no-color --config=vitest.headless.ts"
   },
   "repository": "https://git.vaughnnugent.com/cgit/vnuge/plugins.essentials/tree/tests/api-tests",
   "author": "Vaughn Nugent",
   "license": "ISC",
   "devDependencies": {
-    "@vitest/browser": "^3.0.x",
-    "jsdom": "^26.0.x",
-    "ts-node": "^10.9.2",
-    "vitest": "^3.0.x",
-    "webdriverio": "^9.4.1"
+    "@vitest/browser": "^4.0.x",
+    "@vitest/browser-webdriverio": "^4.0.x",
+    "jsdom": "^27.2.x",
+    "vitest": "^4.0.x",
+    "webdriverio": "^9.4.x"
   },
   "dependencies": {
-    "@simplewebauthn/browser": "^10.x.x",
+    "@simplewebauthn/browser": "^13.x.x",
     "@vnuge/vnlib.browser": "../../lib/vnlib.browser",
-    "@vueuse/core": "^13.x",
+    "@vueuse/core": "^14.x",
     "axios": "^1.7.9",
-    "axios-cookiejar-support": "^5.0.3",
+    "axios-cookiejar-support": "^6.0.5",
     "jose": "^6.0.8",
     "lodash-es": "^4.x",
-    "universal-cookie": "^8.0.1",
     "vue": "^3.x"
   }
 }
