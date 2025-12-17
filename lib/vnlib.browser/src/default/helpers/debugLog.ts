@@ -17,12 +17,13 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+import type { ApiConfig } from '../types';
 
 /**
- * Writes logs to the console if the environment is set to development
+ * Writes debug logs using the configured logger if provided.
+ * If no debugLog callback is configured, this is a no-op.
+ * 
+ * @param config - The API configuration containing the optional debugLog callback
+ * @param args - Arguments to pass to the debug logger
  */
-export const debugLog = function (...args : unknown[]) {
-    if (process.env.NODE_ENV === 'development') {
-      console.log(...args)
-    }
-  }
+export const debugLog = (config: ApiConfig, ...args : unknown[]) => config.debugLog?.(...args);

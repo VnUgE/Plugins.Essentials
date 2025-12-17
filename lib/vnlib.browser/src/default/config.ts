@@ -132,6 +132,7 @@ export const createApiConfig = (overrides?: ApiConfigOverrides): ApiConfig => {
         axios: resolveAxiosConfig(overrides?.axios),
         account: merge({}, getDefaultAccountConfig(), overrides?.account),
         storage: overrides?.storage ?? resolveDefaultStorage(),
+        debugLog: overrides?.debugLog,
         // Initialize empty state Map - modules will populate on demand
         [INTERNAL_STATE_KEY]: new Map<string, any>()
     };
