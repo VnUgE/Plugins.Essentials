@@ -18,7 +18,7 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import type { WebMessage } from "../types"
-import type { ITokenResponse } from "../session"
+import type { TokenResponse } from "../session"
 
 /**
  * Represents the configuration for the account RPC API.
@@ -45,7 +45,7 @@ export interface AccountApi {
     /**
      * Prepares a login request for the server
      */
-    prepareLogin(): Promise<IUserLoginRequest>
+    prepareLogin(): Promise<UserLoginRequest>
     /**
      * Attempts to log the user out 
      */
@@ -75,16 +75,16 @@ export interface AccountApi {
     heartbeat(): Promise<void>
 }
 
-export interface IUserLoginRequest {
+export interface UserLoginRequest {
     /**
      * Finalizes a login process with the given response from the server
      * @param response The finalized login response from the server
      */
-    finalize(response: ITokenResponse): Promise<void>
+    finalize(response: TokenResponse): Promise<void>
 }
 
 export interface ExtendedLoginResponse<T> extends WebMessage<T> {
-    finalize: (response : ITokenResponse) => Promise<void>
+    finalize: (response : TokenResponse) => Promise<void>
 }
 
 export interface UserProfile {

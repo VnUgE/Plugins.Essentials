@@ -18,9 +18,9 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import type { 
-    IMfaFlow, 
-    IMfaMessage, 
-    IMfaTypeProcessor, 
+    MfaFlow, 
+    MfaMessage, 
+    MfaTypeProcessor, 
     MfaUpgradeState
 } from "./login";
 import { 
@@ -36,13 +36,13 @@ import { type MfaApi, type MfaGetResponse, mfaGetDataFor } from "./config";
 import type { AccountRpcResponse } from "../account/types";
 import { defaultTo } from "lodash-es";
 
-export type IFidoServerOptions = PublicKeyCredentialCreationOptionsJSON
+export type FidoServerOptions = PublicKeyCredentialCreationOptionsJSON
 
-export interface IFidoRequestOptions extends Record<string, any>{
+export interface FidoRequestOptions extends Record<string, any>{
     readonly password: string;
 }
 
-export interface IFidoDevice{
+export interface FidoDevice{
     readonly n: string;
     readonly id: string;
     readonly alg: number;
@@ -55,7 +55,7 @@ export interface FidoRpcGetData{
     /**
      * The list of FIDO devices registered for the user
      */
-    readonly devices: IFidoDevice[]; 
+    readonly devices: FidoDevice[]; 
     /**
      * Whether the user can add new devices
      */
@@ -82,7 +82,7 @@ interface FidoRegistration{
     readonly attestationObject?: string;
 }
 
-export interface IFidoApi {   
+export interface FidoApi {   
      /*
     * Checks if the current browser supports the FIDO authentication API
     */
@@ -92,7 +92,7 @@ export interface IFidoApi {
      * Gets fido credential options from the server for a currently logged-in user
      * @returns A promise that resolves to the server options for the FIDO API
      */
-    beginRegistration: (options?: Partial<IFidoRequestOptions>) => Promise<PublicKeyCredentialCreationOptionsJSON>;
+    beginRegistration: (options?: Partial<FidoRequestOptions>) => Promise<PublicKeyCredentialCreationOptionsJSON>;
 
     /**
      * Creates a new credential for the currently logged-in user
@@ -105,7 +105,7 @@ export interface IFidoApi {
      * Registers the default device for the currently logged-in user
      * @returns A promise that resolves to a web message status of the operation
      */
-    registerDefaultDevice: (commonName: string, options?: Partial<IFidoRequestOptions>) => Promise<AccountRpcResponse<string>>;
+    registerDefaultDevice: (commonName: string, options?: Partial<FidoRequestOptions>) => Promise<AccountRpcResponse<string>>;
 
     /**
      * Disables a device for the currently logged-in user.
@@ -114,7 +114,7 @@ export interface IFidoApi {
      * @param options The options to pass to the server
      * @returns A promise that resolves to a web message status of the operation
      */
-    disableDevice: (device: IFidoDevice, options?: Partial<IFidoRequestOptions>) => Promise<AccountRpcResponse<string>>;
+    disableDevice: (device: FidoDevice, options?: Partial<FidoRequestOptions>) => Promise<AccountRpcResponse<string>>;
 
     /**
      * Disables all devices for the currently logged-in user.
@@ -122,15 +122,15 @@ export interface IFidoApi {
      * @param options The options to pass to the server
      * @returns A promise that resolves to a web message status of the operation
      */
-    disableAllDevices: (options?: Partial<IFidoRequestOptions>) => Promise<AccountRpcResponse<string>>;
+    disableAllDevices: (options?: Partial<FidoRequestOptions>) => Promise<AccountRpcResponse<string>>;
 }
 
 export interface UseFidoApi {
     /**
      * Creates a minimal fido api for checking browser support 
      */
-    (): Pick<IFidoApi, 'isSupported'>;
-    (options: Pick<MfaApi, 'sendRequest'>): IFidoApi;
+    (): Pick<FidoApi, 'isSupported'>;
+    (options: Pick<MfaApi, 'sendRequest'>): FidoApi;
 }
 
  /**
@@ -138,12 +138,12 @@ export interface UseFidoApi {
  * @param sendRequest The function to send a request to the server
  * @returns An object containing the fido api
  */
-export const useFidoApi: UseFidoApi = (options?: Pick<MfaApi, 'sendRequest'>): IFidoApi =>{
+export const useFidoApi: UseFidoApi = (options?: Pick<MfaApi, 'sendRequest'>): FidoApi =>{
 
     const sendRequest = options?.sendRequest ?? (() => { throw new Error('No sendRequest function provided') });
 
-    const beginRegistration = async (options?: Partial<IFidoRequestOptions>) : Promise<IFidoServerOptions> => {
-        const data = await sendRequest<IFidoServerOptions>({ 
+    const beginRegistration = async (options?: Partial<FidoRequestOptions>) : Promise<FidoServerOptions> => {
+        const data = await sendRequest<FidoServerOptions>({ 
              ...options,
             type: 'fido',
             action: 'prepare_device'
@@ -151,7 +151,7 @@ export const useFidoApi: UseFidoApi = (options?: Pick<MfaApi, 'sendRequest'>): I
         return data.getResultOrThrow();
     }
 
-    const registerCredential = (reg: RegistrationResponseJSON, commonName: string, options?: Partial<IFidoRequestOptions>): Promise<AccountRpcResponse<string>> => {
+    const registerCredential = (reg: RegistrationResponseJSON, commonName: string, options?: Partial<FidoRequestOptions>): Promise<AccountRpcResponse<string>> => {
 
         const registration: FidoRegistration = {
             id: reg.id,
@@ -171,7 +171,7 @@ export const useFidoApi: UseFidoApi = (options?: Pick<MfaApi, 'sendRequest'>): I
         })
     }
 
-    const registerDefaultDevice = async (commonName: string, options?: Partial<IFidoRequestOptions>): Promise<AccountRpcResponse<string>> => {
+    const registerDefaultDevice = async (commonName: string, options?: Partial<FidoRequestOptions>): Promise<AccountRpcResponse<string>> => {
         //begin registration
         const serverOptions = await beginRegistration(options);
 
@@ -180,7 +180,7 @@ export const useFidoApi: UseFidoApi = (options?: Pick<MfaApi, 'sendRequest'>): I
         return await registerCredential(reg, commonName, options);
     }
 
-    const disableDevice = async (device: IFidoDevice, options?: Partial<IFidoRequestOptions>): Promise<AccountRpcResponse<string>> => {
+    const disableDevice = async (device: FidoDevice, options?: Partial<FidoRequestOptions>): Promise<AccountRpcResponse<string>> => {
         return sendRequest<string>({
             ...options,
             type: 'fido',
@@ -189,7 +189,7 @@ export const useFidoApi: UseFidoApi = (options?: Pick<MfaApi, 'sendRequest'>): I
         })
     }
 
-    const disableAllDevices = async (options?: Partial<IFidoRequestOptions>): Promise<AccountRpcResponse<string>> => {
+    const disableAllDevices = async (options?: Partial<FidoRequestOptions>): Promise<AccountRpcResponse<string>> => {
         return sendRequest<string>({
             ...options,
             type: 'fido',
@@ -207,7 +207,7 @@ export const useFidoApi: UseFidoApi = (options?: Pick<MfaApi, 'sendRequest'>): I
     }
 }
 
-interface IFidoMfaFlow extends IMfaFlow<'fido'> {
+interface IFidoMfaFlow extends MfaFlow<'fido'> {
     fido: PublicKeyCredentialRequestOptionsJSON;
 }
 
@@ -215,9 +215,9 @@ interface IFidoMfaFlow extends IMfaFlow<'fido'> {
  * Enables fido as a supported multi-factor authentication method
  * @returns A mfa login processor for fido multi-factor
  */
-export const fidoMfaProcessor = () : IMfaTypeProcessor => {
+export const fidoMfaProcessor = () : MfaTypeProcessor => {
 
-    const getContinuation = (payload: IMfaMessage, state: MfaUpgradeState) : Promise<IFidoMfaFlow> => {
+    const getContinuation = (payload: MfaMessage, state: MfaUpgradeState) : Promise<IFidoMfaFlow> => {
 
         if(!('fido' in payload)){
             throw new Error('Fido mfa flow is not supported by the server. This is an internal error.');
@@ -249,7 +249,7 @@ export interface FidoAuthenticateOptions {
     /**
      * Optional request options to pass to the FIDO authentication request
      */
-    options?: Partial<IFidoRequestOptions>;
+    options?: Partial<FidoRequestOptions>;
 }
 
 /**
@@ -258,7 +258,7 @@ export interface FidoAuthenticateOptions {
  * @param options Optional options for the FIDO authentication
  * @return A promise that resolves to a web message containing the authentication result
  */
-export const fidoMfaAuthenticate = async <T>(flow: IMfaFlow<'fido'>, options?: FidoAuthenticateOptions): Promise<WebMessage<T>> => {
+export const fidoMfaAuthenticate = async <T>(flow: MfaFlow<'fido'>, options?: FidoAuthenticateOptions): Promise<WebMessage<T>> => {
 
      const fidoResult = await startAuthentication({ 
         optionsJSON: (flow as IFidoMfaFlow).fido, 

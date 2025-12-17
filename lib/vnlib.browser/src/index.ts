@@ -33,7 +33,6 @@ export type {
     ServerValidationError,
     ApiConfig,
     ApiConfigOverrides,
-    SessionConfig,
     Awaitable,
     ConfigScopeToken
 } from './default/types';
@@ -43,9 +42,10 @@ export type {
 *************************/
 
 export type { 
-    ISession,
-    ITokenResponse,
-    ClientCredential
+    Session,
+    TokenResponse,
+    ClientCredential,
+    SessionConfig
 } from './default/session';
 export { useSession } from './default/session';
 
@@ -61,7 +61,7 @@ export type {
     AccountRpcRequest,
     AccountRpcResponse,
     ExtendedLoginResponse,
-    IUserLoginRequest,
+    UserLoginRequest,
     ProfileApi,
     UserLoginCredential,
     UserProfile
@@ -107,12 +107,12 @@ export {
 
 // MFA types and core
 export type {
-    IMfaFlow,
-    IMfaLoginManager,
-    IMfaMessage,
-    IMfaSubmission,
-    IMfaContinuation,
-    IMfaTypeProcessor,
+    MfaFlow,
+    MfaLoginManager,
+    MfaMessage,
+    MfaSubmission,
+    MfaContinuation,
+    MfaTypeProcessor,
     MfaMethod,
     MfaLoginOptions,
     MfaUpgradeState
@@ -137,10 +137,10 @@ export {
 export type {
     FidoAuthenticateOptions,
     FidoRpcGetData,
-    IFidoApi,
-    IFidoDevice,
-    IFidoRequestOptions,
-    IFidoServerOptions,
+    FidoApi,
+    FidoDevice,
+    FidoRequestOptions,
+    FidoServerOptions,
     UseFidoApi
 } from './default/mfa/fido';
 
@@ -153,7 +153,7 @@ export {
 
 // TOTP
 export type {
-    ITotpApi,
+    TotpApi,
     TotpRequestOptions,
     TotpSubmitCodeOptions,
     TotpUpdateResponse
@@ -165,20 +165,19 @@ export {
     totpSubmitCode
 } from './default/mfa/totp';
 
-// PKI/OTP
+// OTP (Cryptographic Login)
 export type {
-    IOtpRequestOptions,
+    OtpManagementOptions,
     OtpApi,
     OtpAuthOptions,
     OtpRpcGetData,
-    PkiLogin,
-    PkiPublicKey,
-    PkOtpLogin
+    OtpLogin,
+    OtpPublicKey
 } from './default/mfa/pki';
 
 export {
     useOtpApi,
-    useOtpAuth,
+    useOtpLogin,
     otpGetMfaData
 } from './default/mfa/pki';
 

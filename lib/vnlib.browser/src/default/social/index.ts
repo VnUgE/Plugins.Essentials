@@ -19,7 +19,7 @@
 
 import { defaultTo, filter, isNil } from "lodash-es";
 import { useAccountRpc, useAccount } from "../account";
-import { useSession, type ITokenResponse } from "../session";
+import { useSession, type TokenResponse } from "../session";
 import type { ApiConfig } from "../types";
 import type { AccountRpcGetResult, AccountRpcResponse } from "../account/types";
 
@@ -195,7 +195,7 @@ export const useOauthLogin = (config: ApiConfig, _options?: OauthLoginOptions): 
 
         if ('token' in result){
             const { finalize } = await prepareLogin();
-            await finalize(result as ITokenResponse);
+            await finalize(result as TokenResponse);
         }
         else {
             throw new Error('The server did not return a valid login response');

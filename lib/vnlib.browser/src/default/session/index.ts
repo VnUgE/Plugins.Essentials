@@ -24,14 +24,14 @@ import { createStorageSlot } from '../helpers/storage';
 import { getCryptoOrThrow, decryptAsync, getRandomHex } from '../helpers/webcrypto';
 import { ArrayBuffToBase64, Base64ToUint8Array } from '../helpers/binhelpers';
 import { getInternalState } from '../config';
-import type { ApiConfig, WebMessage, SessionConfig } from '../types';
+import type { ApiConfig, WebMessage } from '../types';
 
 /**
  * Server response containing an encrypted session token.
  * The token is RSA-encrypted with the client's public key and must be
  * decrypted before use. Typically returned after successful authentication.
  */
-export interface ITokenResponse<T = unknown> extends WebMessage<T> {
+export interface TokenResponse<T = unknown> extends WebMessage<T> {
     readonly token: string;
 }
 
@@ -46,14 +46,51 @@ export interface ClientCredential {
 }
 
 /**
- * Persistent storage structure for session identity and authentication token.
- * Shared globally across all config scopes to maintain consistent client identity.
+ * Configuration for client-side session security and cryptographic operations.
+ * Controls browser identification, token generation, and encryption parameters.
+ * 
+ * @remarks
+ * Default configuration provides strong security with RSA-4096 encryption and HMAC-SHA256 signatures.
+ * Override only if you need specific cryptographic requirements or compatibility needs.
+ * 
+ * @see {@link getDefaultSessionConfig} for default values
  */
-interface SessionStateStorage {
-    token: string | null;       // Base64-encoded HMAC key for OTP signing
-    browserId: string | null;   // Unique identifier for this browser instance
-    privateKey: string | null;  // Base64-encoded PKCS#8 private key
-    publicKey: string | null;   // Base64-encoded SPKI public key
+export interface SessionConfig {
+    /**
+     * Size in bytes of the randomly generated browser identifier.
+     * Used to uniquely identify this client instance across sessions.
+     * 
+     * @defaultValue 32 bytes (256 bits)
+     * @remarks Persisted in storage and sent with authentication requests
+     */
+    readonly browserIdSize: number;
+    
+    /**
+     * JWT signature algorithm for signing one-time tokens.
+     * Must match server-side verification configuration.
+     * 
+     * @defaultValue 'HS256' (HMAC-SHA256)
+     * @remarks Used for OTP token generation to prevent replay attacks
+     */
+    readonly signatureAlgorithm: string;
+    
+    /**
+     * Web Crypto API algorithm specification for RSA key pair generation.
+     * Defines encryption parameters for secure token exchange with server.
+     * 
+     * @defaultValue RSA-OAEP with 4096-bit modulus and SHA-256 hash
+     * @remarks Server encrypts session tokens with the client's public key
+     */
+    readonly keyAlgorithm: AlgorithmIdentifier;
+    
+    /**
+     * Size in bytes for one-time password (OTP) nonce generation.
+     * Provides entropy for single-use authentication tokens.
+     * 
+     * @defaultValue 16 bytes (128 bits)
+     * @remarks Each OTP token includes a unique nonce to prevent reuse
+     */
+    readonly otpNonceSize: number;
 }
 
 /**
@@ -62,7 +99,7 @@ interface SessionStateStorage {
  * lifecycle (get/reset/clear), cryptographic operations (decrypt/hash),
  * and server authentication (OTP token generation).
  */
-export interface ISession {
+export interface Session {
     /**
      * Ensures client credentials exist, generating them if necessary.
      * Returns the browser identifier and public key for server registration.
@@ -104,7 +141,7 @@ export interface ISession {
      * This token (typically an HMAC key) is used to sign OTP requests.
      * Must be called after successful login to enable authenticated requests.
      */
-    updateCredentials(response: ITokenResponse): Promise<void>;
+    updateCredentials(response: TokenResponse): Promise<void>;
 
     /**
      * Generates a signed JWT one-time token for authenticated API calls.
@@ -130,6 +167,16 @@ export const getDefaultSessionConfig = (): SessionConfig => ({
     } as RsaHashedKeyAlgorithm
 });
 
+/**
+ * Persistent storage structure for session identity and authentication token.
+ * Shared globally across all config scopes to maintain consistent client identity.
+ */
+interface SessionStateStorage {
+    token: string | null;       // Base64-encoded HMAC key for OTP signing
+    browserId: string | null;   // Unique identifier for this browser instance
+    privateKey: string | null;  // Base64-encoded PKCS#8 private key
+    publicKey: string | null;   // Base64-encoded SPKI public key
+}
 
 const storageSlotFactory = ({ storage }: Pick<ApiConfig, 'storage'>) => {
     return createStorageSlot<SessionStateStorage>(
@@ -147,7 +194,7 @@ const storageSlotFactory = ({ storage }: Pick<ApiConfig, 'storage'>) => {
  * @param config - ApiConfig instance created at app startup.
  * @returns Session instance bound to the supplied config.
  */
-export const useSession = (config: ApiConfig): ISession => {
+export const useSession = (config: ApiConfig): Session => {
     const { session } = config;
     
     // Get or create shared session storage slot - automatically lazy-initialized
@@ -164,7 +211,7 @@ export const useSession = (config: ApiConfig): ISession => {
 
         await state.browserId.set(value);
 
-        debugLog('Generated new browser id for session scope');
+        debugLog(config, 'Generated new browser id for session scope');
 
         return value;
     };
@@ -223,7 +270,7 @@ export const useSession = (config: ApiConfig): ISession => {
        
         await persistKeyPair(keyPair);
        
-        debugLog('Generated new client keypair for session scope');
+        debugLog(config, 'Generated new client keypair for session scope');
     };
 
     /**
@@ -299,7 +346,7 @@ export const useSession = (config: ApiConfig): ISession => {
      * The token is typically an HMAC key used to sign subsequent OTP requests.
      * Must be called after login to enable authenticated API calls.
      */
-    const updateCredentials = async (response: ITokenResponse): Promise<void> => {
+    const updateCredentials = async (response: TokenResponse): Promise<void> => {
         const decrypted = await decryptPayload(response.token);
         await state.token.set(ArrayBuffToBase64(decrypted));
     };

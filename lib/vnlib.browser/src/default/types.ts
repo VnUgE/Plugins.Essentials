@@ -19,7 +19,8 @@
 
 import type { Axios, AxiosInstance, AxiosRequestConfig } from "axios";
 import type { AxiosConfig } from "./axios";
-import { AccountRpcApiConfig } from "./account/types";
+import type { AccountRpcApiConfig } from "./account/types";
+import type { SessionConfig } from "./session";
 
 /**
  * Represents a uniform message from the server
@@ -67,8 +68,28 @@ export type Awaitable<T> = T | Promise<T>;
 export type ConfigScopeToken = symbol;
 
 /**
- * Represents a storage-like interface that can be used to store and retrieve items
- * in a key-value format, with support for asynchronous operations.
+ * Storage interface for persisting session state and credentials.
+ * Compatible with browser localStorage, sessionStorage, or custom async storage.
+ * Supports both synchronous and asynchronous implementations via Awaitable return types.
+ * 
+ * @remarks
+ * The library automatically detects and wraps browser localStorage if available.
+ * Falls back to in-memory Map-based storage if localStorage is unavailable.
+ * Custom implementations can integrate with IndexedDB, secure storage, or other backends.
+ * 
+ * @example
+ * // Browser localStorage (automatic)
+ * const config = createApiConfig(); // Uses localStorage by default
+ * 
+ * @example
+ * // Custom async storage
+ * const config = createApiConfig({
+ *   storage: {
+ *     getItem: async (key) => await db.get(key),
+ *     setItem: async (key, value) => await db.set(key, value),
+ *     removeItem: async (key) => await db.delete(key)
+ *   }
+ * });
  */
 export interface StorageLikeAsync {
     
@@ -95,26 +116,7 @@ export interface StorageLikeAsync {
     removeItem: (key: string) => Awaitable<void>;
 }
 
-export interface SessionConfig {
-    /**
-     * The size of the browser ID used for 
-     * session management.
-     */
-    readonly browserIdSize: number;
-    /**
-     * The algorithm used for signing session data.
-     */
-    readonly signatureAlgorithm: string;
-    /**
-     * The algorithm used for generating session keys.
-     */
-    readonly keyAlgorithm: AlgorithmIdentifier;
-    /**
-     * The size in bytes for OTP nonce generation.
-     * Provides sufficient entropy for single-use tokens.
-     */
-    readonly otpNonceSize: number;
-}
+
 
 /**
  * Aggregate API configuration passed to all composables. All defaults are
@@ -125,6 +127,15 @@ export interface ApiConfig {
     readonly axios: AxiosConfig;
     readonly account: AccountRpcApiConfig;
     readonly storage: StorageLikeAsync;
+    /**
+     * Optional debug logger callback for internal library diagnostics.
+     * If provided, the library will call this function with debug messages.
+     * Useful for development and troubleshooting.
+     * 
+     * @example
+     * debugLog: (...args) => console.log('[VNLib]', ...args)
+     */
+    readonly debugLog?: (...args: unknown[]) => void;
 }
 
 /**
@@ -150,17 +161,150 @@ export interface ApiConfigInternal extends ApiConfig {
 }
 
 /**
- * Override shape used when creating an ApiConfig instance. Modules merge
- * provided overrides with their local defaults.
+ * Configuration overrides for customizing API behavior when creating an ApiConfig.
+ * All properties are optional; unspecified values use sensible defaults.
+ * 
+ * @remarks
+ * Pass to {@link createApiConfig} to customize HTTP client, storage, endpoints, and security.
+ * Useful for testing, multi-tenant applications, or non-standard server configurations.
+ * 
+ * @example
+ * // Minimal configuration (uses all defaults)
+ * const config = createApiConfig();
+ * 
+ * @example
+ * // Custom endpoint and debug logging
+ * const config = createApiConfig({
+ *   account: { endpointUrl: '/api/v2/account' },
+ *   debugLog: (...args) => console.log('[VNLib]', ...args)
+ * });
+ * 
+ * @example
+ * // Custom axios instance with interceptors
+ * const customAxios = axios.create({ baseURL: 'https://api.example.com' });
+ * customAxios.interceptors.request.use(config => { ... });
+ * const config = createApiConfig({
+ *   axios: { instance: customAxios, tokenHeader: 'X-Custom-Token' }
+ * });
  */
 export interface ApiConfigOverrides {
+    /**
+     * Partial session configuration overrides.
+     * Merged with defaults from {@link getDefaultSessionConfig}.
+     * 
+     * @example
+     * session: {
+     *   browserIdSize: 48, // Increase from default 32 bytes
+     *   signatureAlgorithm: 'HS512' // Upgrade from HS256
+     * }
+     */
     readonly session?: Partial<SessionConfig>;
+    
+    /**
+     * Axios HTTP client configuration.
+     * Provide a pre-configured instance or customize request defaults.
+     * 
+     * @remarks
+     * If `instance` is provided, `axiosConfig` and `configureInstance` are ignored.
+     * The library adds request/response interceptors for OTP token injection.
+     */
     readonly axios?: {
+        /**
+         * Pre-configured Axios instance to use instead of creating a new one.
+         * Useful for sharing instances or applying custom interceptors.
+         * 
+         * @remarks
+         * When provided, the library will provision the instance to work woth vnlib apis
+         */
         readonly instance?: Axios;
+        
+        /**
+         * HTTP header name for sending one-time password tokens.
+         * Server must be configured to validate this header.
+         * 
+         * @defaultValue 'X-Web-Token'
+         */
         readonly tokenHeader?: string;
+        
+        /**
+         * Axios creation options when no instance is provided.
+         * Merged with defaults.
+         * 
+         * @example
+         * axiosConfig: {
+         *   timeout: 30000,
+         *   baseURL: 'https://api.example.com',
+         *   headers: { 'X-Custom-Header': 'value' }
+         * }
+         */
         readonly axiosConfig?: AxiosRequestConfig;
+        
+        /**
+         * Callback to configure the Axios instance before library interceptors are added.
+         * Only called when no custom instance is provided.
+         * 
+         * @param axios - The newly created Axios instance
+         * @returns The configured instance (usually the same reference)
+         * 
+         * @example
+         * configureInstance: (axios) => {
+         *   axios.interceptors.request.use(config => {
+         *     config.headers['X-Custom'] = 'value';
+         *     return config;
+         *   });
+         *   return axios;
+         * }
+         */
         readonly configureInstance?: (axios: AxiosInstance) => AxiosInstance;
     };
+    
+    /**
+     * Account/profile RPC endpoint configuration.
+     * Merged with defaults.
+     * 
+     * @example
+     * account: {
+     *   endpointUrl: '/api/v2/user' // Change from default '/account'
+     * }
+     */
     readonly account?: Partial<AccountRpcApiConfig>;
+    
+    /**
+     * Custom storage implementation for persisting session state.
+     * If not provided, automatically uses browser localStorage or in-memory fallback.
+     * 
+     * @remarks
+     * Custom storage useful for:
+     * - Server-side rendering (SSR) environments
+     * - IndexedDB for larger data storage
+     * - Encrypted storage wrappers
+     * - Testing with mock storage
+     * 
+     * @example
+     * // In-memory storage for testing
+     * const testStorage = new Map<string, string>();
+     * storage: {
+     *   getItem: (key) => testStorage.get(key) ?? null,
+     *   setItem: (key, value) => testStorage.set(key, value),
+     *   removeItem: (key) => testStorage.delete(key)
+     * }
+     */
     readonly storage?: StorageLikeAsync;
+    
+    /**
+     * Optional debug logger callback for internal library diagnostics.
+     * If provided, the library will call this function with debug messages.
+     * Useful for development and troubleshooting.
+     * 
+     * @remarks NOTE: Mey print client-side sensitive data (altough it's avoided)
+     * 
+     * @example
+     * // Simple console logging
+     * debugLog: (...args) => console.log('[VNLib]', ...args)
+     * 
+     * @example
+     * // Custom logger integration
+     * debugLog: (...args) => myLogger.debug('vnlib', ...args)
+     */
+    readonly debugLog?: (...args: unknown[]) => void;
 }

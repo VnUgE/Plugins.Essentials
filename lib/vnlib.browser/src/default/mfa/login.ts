@@ -22,12 +22,12 @@ import { isArray, map, mapKeys, without } from 'lodash-es';
 import { debugLog } from "../helpers/debugLog";
 import { useAccountRpc, useAccount } from "../account";
 import type { ExtendedLoginResponse, UserLoginCredential } from "../account/types";
-import type { ITokenResponse } from "../session";
+import type { TokenResponse } from "../session";
 import type { ApiConfig, WebMessage } from "../types";
 
 export type MfaMethod = 'totp' | 'fido' | 'pkotp';
 
-export interface IMfaSubmission {
+export interface MfaSubmission {
     /**
      * TOTP code submission
      */
@@ -40,7 +40,7 @@ export interface IMfaSubmission {
  * The mfa upgrade message that is signed and sent to the client
  * to complete the mfa upgrade process
  */
-export interface IMfaMessage extends JWTPayload {
+export interface MfaMessage extends JWTPayload {
     /**
      * The supported mfa methods for the user
      */
@@ -51,7 +51,7 @@ export interface IMfaMessage extends JWTPayload {
     readonly expires?: number;
 }
 
-export interface IMfaFlow<T extends MfaMethod>{
+export interface MfaFlow<T extends MfaMethod>{
     /**
      * The mfa method this continuation is for 
      */
@@ -62,14 +62,14 @@ export interface IMfaFlow<T extends MfaMethod>{
      * @param message The mfa submission to send to the server
      * @returns A promise that resolves to a login result
      */
-    submit: <T>(message: IMfaSubmission) => Promise<WebMessage<T>>;
+    submit: <T>(message: MfaSubmission) => Promise<WebMessage<T>>;
 }
 
 /**
  * Retuned by the login API to signal an MFA upgrade is 
  * required to continue the login process
  */
-export interface IMfaContinuation {
+export interface MfaContinuation {
     /**
    * The time in seconds that the mfa upgrade is valid for
    */
@@ -78,7 +78,7 @@ export interface IMfaContinuation {
      * The mfa methods that are supported by the user
      * to continue the login process
      */
-    readonly methods: IMfaFlow<MfaMethod>[]
+    readonly methods: MfaFlow<MfaMethod>[]
 }
 
 /**
@@ -89,7 +89,7 @@ export interface MfaUpgradeState {
      * Submits an mfa upgrade submission to the server
      * @param submission The mfa upgrade submission to send to the server to complete an mfa login
      */
-    submit<T>(submission: IMfaSubmission): Promise<WebMessage<T>>;
+    submit<T>(submission: MfaSubmission): Promise<WebMessage<T>>;
 
     execRpcCommand: ReturnType<typeof useAccountRpc>['exec'];
 }
@@ -98,7 +98,7 @@ export interface MfaUpgradeState {
  * Interface for processing mfa messages from the server of a given 
  * mfa type
  */
-export interface IMfaTypeProcessor {
+export interface MfaTypeProcessor {
     readonly type: MfaMethod;
     /**
      * Determines if the current runtime supports login with this method
@@ -112,10 +112,10 @@ export interface IMfaTypeProcessor {
     * @param state The submission handler to use to submit the mfa upgrade
     * @returns A promise that resolves to a Login request
     */
-    getContinuation: (payload: IMfaMessage, state: MfaUpgradeState) => Promise<IMfaFlow<MfaMethod>>
+    getContinuation: (payload: MfaMessage, state: MfaUpgradeState) => Promise<MfaFlow<MfaMethod>>
 }
 
-export interface IMfaLoginManager {
+export interface MfaLoginManager {
     /**
      * Gets a value that indicates if the given mfa method is supported by the client
      * @param method The mfa method to check for support
@@ -127,13 +127,13 @@ export interface IMfaLoginManager {
      * or a mfa flow continuation depending on the login flow
      * @param credential The login credential to for the user (username and password)
      */
-    login(credential: UserLoginCredential): Promise<WebMessage | IMfaContinuation>;
+    login(credential: UserLoginCredential): Promise<WebMessage | MfaContinuation>;
     /**
      * Checks if the given response is an mfa continuation response
      * @param response The response to check
      * @returns True if the response is an mfa continuation response
      */
-    isMfaResponse: (response: WebMessage | IMfaContinuation) => response is IMfaContinuation;
+    isMfaResponse: (response: WebMessage | MfaContinuation) => response is MfaContinuation;
 }
 
 /**
@@ -143,7 +143,7 @@ export interface MfaLoginOptions {
     /**
      * Array of MFA type processors to enable (TOTP, FIDO, PKI OTP).
      */
-    readonly handlers: IMfaTypeProcessor[];
+    readonly handlers: MfaTypeProcessor[];
     /**
      * Api configuration instance created at app startup.
      */
@@ -158,7 +158,7 @@ export interface MfaLoginOptions {
  * @param handlers - Array of MFA type processors (TOTP, FIDO, PKI OTP).
  * @param config - Api configuration instance.
  */
-const getMfaProcessor = (handlers: IMfaTypeProcessor[], config: ApiConfig) => {
+const getMfaProcessor = (handlers: MfaTypeProcessor[], config: ApiConfig) => {
 
     //Store handlers by their mfa type
     const handlerMap = mapKeys(handlers, (h) => h.type)
@@ -166,10 +166,10 @@ const getMfaProcessor = (handlers: IMfaTypeProcessor[], config: ApiConfig) => {
     const { exec } = useAccountRpc<'mfa.login'>(config);
 
     //Creates a submission handler for an mfa upgrade
-    const createState = (type: MfaMethod, upgrade : string, finalize: (res: ITokenResponse) => Promise<void>) 
+    const createState = (type: MfaMethod, upgrade : string, finalize: (res: TokenResponse) => Promise<void>) 
     : MfaUpgradeState => {
 
-        const submit = async<T>(submission: IMfaSubmission): Promise<WebMessage<T>> => {
+        const submit = async<T>(submission: MfaSubmission): Promise<WebMessage<T>> => {
            
             //Exec against the mfa.login method
             const data = await exec<T>('mfa.login', {
@@ -187,7 +187,7 @@ const getMfaProcessor = (handlers: IMfaTypeProcessor[], config: ApiConfig) => {
 
             // If the server returned a token, finalize the login
             if (data.success && 'token' in data) {
-                await finalize(data as ITokenResponse);
+                await finalize(data as TokenResponse);
             }
 
             return data;
@@ -196,13 +196,13 @@ const getMfaProcessor = (handlers: IMfaTypeProcessor[], config: ApiConfig) => {
         return { submit, execRpcCommand: exec }
     }
 
-    const processMfa = async (mfaMessage: string, finalize: (res: ITokenResponse) => Promise<void>): Promise<IMfaContinuation> => {
+    const processMfa = async (mfaMessage: string, finalize: (res: TokenResponse) => Promise<void>): Promise<MfaContinuation> => {
 
         //Mfa message is a jwt, decode it (unsecure decode)
-        const mfa = decodeJwt(mfaMessage) as IMfaMessage;
-        debugLog('mfa login upgrade', mfa);
+        const mfa = decodeJwt(mfaMessage) as MfaMessage;
+        debugLog(config, 'mfa login upgrade', mfa);
 
-        const supportedContinuations = map(mfa.capabilities, (supportedType): Promise<IMfaFlow<MfaMethod> | undefined> => {
+        const supportedContinuations = map(mfa.capabilities, (supportedType): Promise<MfaFlow<MfaMethod> | undefined> => {
             //Select the mfa handler
             const handler = handlerMap[supportedType];
 
@@ -222,7 +222,7 @@ const getMfaProcessor = (handlers: IMfaTypeProcessor[], config: ApiConfig) => {
 
         return {
             expires: mfa.expires,
-            methods: without(methods, undefined) as IMfaFlow<MfaMethod>[]
+            methods: without(methods, undefined) as MfaFlow<MfaMethod>[]
         }
     }
 
@@ -246,7 +246,7 @@ interface IMfaUpgradeResponse{
  * @param options - Configuration including handlers and api config.
  * @returns MFA login manager with methods for login and capability checking.
  */
-export const useMfaLogin = (options: MfaLoginOptions): IMfaLoginManager => {
+export const useMfaLogin = (options: MfaLoginOptions): MfaLoginManager => {
 
      const { handlers, config } = options;
 
@@ -257,7 +257,7 @@ export const useMfaLogin = (options: MfaLoginOptions): IMfaLoginManager => {
     const { processMfa, isSupported } = getMfaProcessor(handlers, config);
 
     //Login that passes through logins with mfa
-    const login = async <T>(credential: UserLoginCredential): Promise<ExtendedLoginResponse<T> | IMfaContinuation> => {
+    const login = async <T>(credential: UserLoginCredential): Promise<ExtendedLoginResponse<T> | MfaContinuation> => {
 
         //User-login with mfa response
         const response = await userLogin<T | IMfaUpgradeResponse>(credential);
@@ -282,7 +282,7 @@ export const useMfaLogin = (options: MfaLoginOptions): IMfaLoginManager => {
         return response as ExtendedLoginResponse<T>;
     }
 
-    const isMfaResponse = (response: WebMessage | IMfaContinuation): response is IMfaContinuation => {
+    const isMfaResponse = (response: WebMessage | MfaContinuation): response is MfaContinuation => {
         //Check if the response is an mfa continuation 
         return 'methods' in response 
             && isArray(response.methods)

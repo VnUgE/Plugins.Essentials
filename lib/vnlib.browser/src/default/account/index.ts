@@ -19,7 +19,7 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import { filter, isNil, get, some } from 'lodash-es'
-import { useSession, type ITokenResponse } from '../session'
+import { useSession, type TokenResponse } from '../session'
 import { useAxios } from '../axios'
 import type { ApiConfig, WebMessage } from '../types'
 import type { 
@@ -96,7 +96,7 @@ export const useAccount = (config: ApiConfig): AccountApi => {
 
     const prepareLogin = async () => {
         //Store a copy of the session data and the current time for the login request
-        const finalize = async (response: ITokenResponse): Promise<void> => {
+        const finalize = async (response: TokenResponse): Promise<void> => {
             //Update the session with the new credentials
             await updateCredentials(response);
         }
@@ -142,7 +142,7 @@ export const useAccount = (config: ApiConfig): AccountApi => {
 
             // If the server returned a token, complete the login
             if (!isNil(data.token)) {
-                await prepped.finalize(data as ITokenResponse);
+                await prepped.finalize(data as TokenResponse);
             }
         }
 
@@ -181,7 +181,7 @@ export const useAccount = (config: ApiConfig): AccountApi => {
         if (data.success && 'token' in data) {
 
             //Update credential
-            await updateCredentials(data as ITokenResponse);
+            await updateCredentials(data as TokenResponse);
         }
     }
 

@@ -18,9 +18,9 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import type {
-    IMfaFlow,
-    IMfaMessage,
-    IMfaTypeProcessor,
+    MfaFlow,
+    MfaMessage,
+    MfaTypeProcessor,
     MfaUpgradeState
 } from "./login";
 
@@ -41,7 +41,7 @@ export interface TotpUpdateResponse {
 }
 
 
-export interface ITotpApi {
+export interface TotpApi {
     enable(options?: Partial<TotpRequestOptions>): Promise<TotpUpdateResponse>;
     disable(options?: Partial<TotpRequestOptions>): Promise<AccountRpcResponse<string>>;
     verify(code: number, options?: Partial<TotpRequestOptions>): Promise<AccountRpcResponse<void>>;
@@ -54,7 +54,7 @@ export interface ITotpApi {
  * @param axiosConfig The optional axios configuration to use
  * @returns An object containing the fido api
  */
-export const useTotpApi = ({ sendRequest }: Pick<MfaApi, 'sendRequest'>): ITotpApi => {
+export const useTotpApi = ({ sendRequest }: Pick<MfaApi, 'sendRequest'>): TotpApi => {
 
     const enable = async (options?: Partial<TotpRequestOptions>): Promise<TotpUpdateResponse> => {
         const data = await sendRequest<TotpUpdateResponse>({
@@ -105,9 +105,9 @@ export const useTotpApi = ({ sendRequest }: Pick<MfaApi, 'sendRequest'>): ITotpA
  * Gets a pre-configured TOTP mfa flow processor
  * @returns A pre-configured TOTP mfa flow processor
  */
-export const totpMfaProcessor = (): IMfaTypeProcessor => {
+export const totpMfaProcessor = (): MfaTypeProcessor => {
 
-    const getContinuation = async (payload: IMfaMessage, state: MfaUpgradeState): Promise<IMfaFlow<'totp'>> => {
+    const getContinuation = async (payload: MfaMessage, state: MfaUpgradeState): Promise<MfaFlow<'totp'>> => {
         return {
             ...payload,
             type: 'totp',
@@ -139,7 +139,7 @@ export interface TotpSubmitCodeOptions {
  * @param options The options for submitting the TOTP code
  * @returns A promise that resolves to the web message response from the server
  */
-export const totpSubmitCode = async (flow: IMfaFlow<'totp'>, options: TotpSubmitCodeOptions): Promise<WebMessage> => {
+export const totpSubmitCode = async (flow: MfaFlow<'totp'>, options: TotpSubmitCodeOptions): Promise<WebMessage> => {
 
     const result = await flow.submit({
         code: options.code,

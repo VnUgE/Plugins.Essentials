@@ -22,46 +22,60 @@ import { trim } from "lodash-es";
 import { useAccount, useAccountRpc } from "../account"
 import { debugLog } from "../helpers/debugLog"
 import type { ApiConfig, WebMessage } from '../types'
-import type { IUserLoginRequest, AccountRpcResponse, AccountRpcGetResult } from "../account/types"
-import type { ITokenResponse } from "../session"
+import type { UserLoginRequest, AccountRpcResponse, AccountRpcGetResult } from "../account/types"
+import type { TokenResponse } from "../session"
 import { mfaGetDataFor, type MfaGetResponse, type MfaApi } from "./config";
 
 /**
- * Represents the server api for loging in with a signed OTP
+ * Represents the server API for logging in with a signed OTP JWT token.
+ * Enables public key-based authentication using registered cryptographic keys.
  */
-export interface PkOtpLogin{
+export interface OtpLogin {
     /**
-     * Authenticates a user with a signed JWT one time password
-     * @param pkiJwt The user input JWT signed one time password for authentication
+     * Authenticates a user with a signed JWT one-time password.
+     * The JWT must be signed with a private key matching a registered public key.
+     * 
+     * @param otpJwt - The user's signed JWT one-time password token
      * @returns A promise that resolves to the login result
      */
-    login<T>(pkiJwt: string): Promise<WebMessage<T>>
+    login<T>(otpJwt: string): Promise<WebMessage<T>>
 
     /**
-     * Gets a value that indicates if the pki login method is enabled 
-     * on the server
+     * Checks if OTP login method is enabled on the server.
+     * 
+     * @param getResponse - RPC method list from server capabilities
+     * @returns True if 'otp.login' method is available
      */
     isEnabled(getResponse: Pick<AccountRpcGetResult, 'rpc_methods'>): boolean;
 }
-export type PkiLogin = PkOtpLogin
 
-export interface PkiPublicKey {
+/**
+ * JWK format public key for OTP authentication.
+ * Represents an elliptic curve public key registered for cryptographic login.
+ */
+export interface OtpPublicKey {
+    /** Key ID - unique identifier for this public key */
     readonly kid: string;
+    /** Algorithm - cryptographic algorithm (e.g., 'ES256', 'ES384', 'ES512') */
     readonly alg: string;
+    /** Key type - typically 'EC' for elliptic curve */
     readonly kty: string;
+    /** Curve - elliptic curve name (e.g., 'P-256', 'P-384', 'P-521') */
     readonly crv: string;
+    /** X coordinate - base64url-encoded x coordinate of the public key */
     readonly x: string;
+    /** Y coordinate - base64url-encoded y coordinate of the public key */
     readonly y: string;
 }
 
-/*
- * Must match the OTP RPC response object
+/**
+ * Must match the OTP RPC response object from the server.
  */
 export interface OtpRpcGetData {
     /**
-     * The list of OTP devices registered for the user
+     * The list of OTP public keys registered for the user
      */
-    readonly keys: PkiPublicKey[]; 
+    readonly keys: OtpPublicKey[]; 
     /**
      * Whether the user can add new keys
      */
@@ -78,73 +92,96 @@ export interface OtpRpcGetData {
     readonly max_size: number;
 }
 
-export interface IOtpRequestOptions extends Record<string, any> {
+/**
+ * Options for OTP key management operations.
+ * Typically requires password verification for security-sensitive operations.
+ */
+export interface OtpManagementOptions extends Record<string, any> {
+    /** User's current password for verification */
     readonly password: string;
 }
 
 /**
- * A base, non-mfa integrated PKI endpoint adapter interface
+ * API for managing OTP public keys and authentication settings.
+ * Provides operations to add, remove, and disable OTP authentication.
  */
 export interface OtpApi {
     /**
-    * Initializes or updates the pki method for the current user
-    * @param publicKey The user's public key to initialize or update the pki method
-    * @param options Optional extended configuration for the pki method. Gets passed to the server
-    */
-    addOrUpdate(publicKey: PkiPublicKey, options?: Partial<IOtpRequestOptions>): Promise<AccountRpcResponse<string>>;
-    /**
-     * Disables the pki method for the current user and passes the given options to the server
+     * Adds a new public key or updates an existing one for OTP authentication.
+     * 
+     * @param publicKey - The user's public key in JWK format
+     * @param options - Optional password and extended configuration
+     * @returns Server response with operation result
      */
-    disable(options?: Partial<IOtpRequestOptions>): Promise<AccountRpcResponse<string>>;
+    addOrUpdate(publicKey: OtpPublicKey, options?: Partial<OtpManagementOptions>): Promise<AccountRpcResponse<string>>;
+    
     /**
-     * Removes a single public key by it's id for the current user
+     * Disables OTP authentication for the current user.
+     * Removes all registered keys and prevents OTP login.
+     * 
+     * @param options - Optional password for verification
+     * @returns Server response with operation result
      */
-    removeKey(key: PkiPublicKey, options?: Partial<IOtpRequestOptions>): Promise<AccountRpcResponse<string>>;
+    disable(options?: Partial<OtpManagementOptions>): Promise<AccountRpcResponse<string>>;
+    
+    /**
+     * Removes a single public key by its key ID.
+     * 
+     * @param key - The public key to remove (uses kid property)
+     * @param options - Optional password for verification
+     * @returns Server response with operation result
+     */
+    removeKey(key: OtpPublicKey, options?: Partial<OtpManagementOptions>): Promise<AccountRpcResponse<string>>;
 }
 
-interface PkiLoginRequest extends IUserLoginRequest{
+interface OtpLoginRequest extends UserLoginRequest {
     login: string;
 }
 
 /**
- * Configuration options for PKI OTP authentication.
+ * Configuration options for OTP cryptographic authentication.
+ * Used to create an {@link OtpLogin} instance via {@link useOtpLogin}.
  */
 export interface OtpAuthOptions {
     /**
-     * Api configuration instance created at app startup.
+     * API configuration instance created at app startup.
      */
     readonly config: ApiConfig;
 }
 
 /**
- * Creates a PKI-based one-time password authentication API.
+ * Creates an OTP-based authentication API for cryptographic login.
  * Enables login via signed JWT tokens using the user's registered public keys.
- * Supports ECDSA and RSA signatures for cryptographic authentication.
+ * Supports ECDSA signatures (ES256, ES384, ES512) for authentication.
  * 
- * @param options - Configuration including api config.
- * @returns PKI OTP login API instance.
+ * @param options - Configuration including API config
+ * @returns OTP login API instance
+ * 
+ * @remarks
+ * This is the login mechanism, not the key management API.
+ * Use {@link useOtpApi} for managing registered public keys.
  */
-export const useOtpAuth = (options: OtpAuthOptions): PkOtpLogin => {
+export const useOtpLogin = (options: OtpAuthOptions): OtpLogin => {
 
     const { config } = options;
     
     const { prepareLogin } = useAccount(config)
     const { exec, isMethodEnabled } = useAccountRpc<'otp.login'>(config)
 
-    const login = async <T>(pkiJwt: string): Promise<WebMessage<T>> => {
+    const login = async <T>(otpJwt: string): Promise<WebMessage<T>> => {
 
         //trim any padding 
-        pkiJwt = trim(pkiJwt);
+        otpJwt = trim(otpJwt);
 
         //try to decode the jwt to confirm its form is valid
-        const jwt = decodeJwt(pkiJwt)
-        debugLog(jwt)
+        const jwt = decodeJwt(otpJwt)
+        debugLog(config, jwt)
 
         //Prepare a login message
-        const loginMessage = await prepareLogin() as PkiLoginRequest;
+        const loginMessage = await prepareLogin() as OtpLoginRequest;
 
         //Set the 'login' field to the otp
-        loginMessage.login = pkiJwt;
+        loginMessage.login = otpJwt;
 
         const data = await exec('otp.login', loginMessage)
 
@@ -152,7 +189,7 @@ export const useOtpAuth = (options: OtpAuthOptions): PkOtpLogin => {
 
         if('token' in data){
             //Finalize the login
-            await loginMessage.finalize(data as ITokenResponse);
+            await loginMessage.finalize(data as TokenResponse);
         }
 
         return data as WebMessage<T>;
@@ -166,13 +203,19 @@ export const useOtpAuth = (options: OtpAuthOptions): PkOtpLogin => {
 }
 
 /**
- * Gets the api for interacting with the the user's pki configuration
- * @param pkiEndpoint The server pki endpoint relative to the base url
- * @returns An object containing the pki api
+ * Creates an API for managing OTP public keys and authentication settings.
+ * Provides operations to add, update, remove keys and disable OTP authentication.
+ * 
+ * @param sendRequest - MFA request sender from {@link useMfaApi}
+ * @returns OTP management API instance
+ * 
+ * @remarks
+ * This is for key management, not authentication.
+ * Use {@link useOtpLogin} for the actual login mechanism.
  */
 export const useOtpApi = ({ sendRequest }: Pick<MfaApi, 'sendRequest'>): OtpApi => {
 
-    const addOrUpdate = async (publicKey: PkiPublicKey, options?: Partial<IOtpRequestOptions>): Promise<AccountRpcResponse<string>> => {
+    const addOrUpdate = async (publicKey: OtpPublicKey, options?: Partial<OtpManagementOptions>): Promise<AccountRpcResponse<string>> => {
         return sendRequest<string>({
             ...options,
             type: 'pkotp',
@@ -181,7 +224,7 @@ export const useOtpApi = ({ sendRequest }: Pick<MfaApi, 'sendRequest'>): OtpApi 
         })
     }
 
-    const disable = (options?: Partial<IOtpRequestOptions>): Promise<AccountRpcResponse<string>> => {
+    const disable = (options?: Partial<OtpManagementOptions>): Promise<AccountRpcResponse<string>> => {
         return sendRequest<string>({
             ...options,
             type: 'pkotp',
@@ -189,7 +232,7 @@ export const useOtpApi = ({ sendRequest }: Pick<MfaApi, 'sendRequest'>): OtpApi 
         })
     }
 
-    const removeKey = (key: PkiPublicKey, options?: Partial<IOtpRequestOptions>): Promise<AccountRpcResponse<string>> => {
+    const removeKey = (key: OtpPublicKey, options?: Partial<OtpManagementOptions>): Promise<AccountRpcResponse<string>> => {
         return sendRequest<string>({
             ...options,
             type: 'pkotp',
