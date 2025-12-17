@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Vaughn Nugent
+// Copyright (c) 2024 Vaughn Nugent
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -17,59 +17,159 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import { isArrayBuffer, isPlainObject, isString } from 'lodash-es';
+import { defaultTo, isArrayBuffer, isNil, isPlainObject, isString, memoize } from 'lodash-es';
 import { ArrayBuffToBase64, Base64ToUint8Array, ArrayToHexString } from './binhelpers';
 
-export const isCryptoSupported = () : boolean => {
-    return !!(window?.isSecureContext && window?.crypto && window?.crypto.subtle);
+type CryptoScope = typeof globalThis & { isSecureContext?: boolean };
+
+/**
+ * Represents a normalized crypto runtime across browsers, Node, and test
+ * environments so higher-level utilities do not reach for globals directly.
+ */
+export interface CryptoContext {
+    /**
+     * The Crypto interface providing random value generation.
+     */
+    readonly crypto: Crypto;
+    
+    /**
+     * The SubtleCrypto interface for cryptographic operations.
+     */
+    readonly subtle: SubtleCrypto;
+    
+    /**
+     * Indicates whether the current runtime is a secure context.
+     */
+    readonly secureContext: boolean;
 }
 
-export const getCryptoOrThrow = () => {
-    if (!isCryptoSupported()) {
-        throw new Error('Your browser does not support the Web Cryptography API');
-    }
-    return window.crypto.subtle;
+const getRuntimeScope = memoize((): CryptoScope | undefined => {
+    return typeof globalThis === 'undefined'
+        ? undefined
+        : globalThis as CryptoScope;
+});
+
+const resolveRuntimeCrypto = (): Crypto | undefined => {
+    const scope = getRuntimeScope();
+    return scope?.crypto as Crypto | undefined;
+};
+
+const resolveSecureFlag = (): boolean => {
+    const scope = getRuntimeScope();
+    return defaultTo(scope?.isSecureContext, true);
+};
+
+/**
+ * Checks whether the current runtime exposes `crypto.subtle` APIs.
+ */
+export const isCryptoSupported = (): boolean => {
+    const runtimeCrypto = resolveRuntimeCrypto();
+    return !isNil(runtimeCrypto?.subtle);
 }
 
 /**
- * Signs the dataBuffer using the specified key and hmac algorithm by its name eg. 'SHA-256'
- * @param {ArrayBuffer | String} dataBuffer The data to sign, either as an ArrayBuffer or a base64 string
- * @param {ArrayBuffer | String} keyBuffer The raw key buffer, or a base64 encoded string
- * @param {String} alg The name of the hmac algorithm to use eg. 'SHA-256'
- * @param {String} [toBase64 = false] The output format, the array buffer data, or true for base64 string
- * @returns {Promise<ArrayBuffer | String>} The signature as an ArrayBuffer or a base64 string
- * @throws An error if the browser does not support the Web Cryptography API
+ * Returns the crypto runtime or throws when the platform cannot satisfy the
+ * Web Crypto API requirements (subtle crypto missing, insecure context, etc.).
  */
-export const hmacSignAsync = async (keyBuffer: ArrayBuffer | string, dataBuffer: ArrayBuffer | string, alg : string, toBase64 = false) 
-: Promise<ArrayBuffer | string> => {
+export const getCryptoContext = (): CryptoContext => {
 
-    const crypto = getCryptoOrThrow()
+    const runtimeCrypto = resolveRuntimeCrypto();
 
-     // Check key argument type
-    const rawKeyBuffer = isString(keyBuffer) ? Base64ToUint8Array(keyBuffer as string) : keyBuffer as ArrayBuffer;
-    
-    // Check data argument type
-    const rawDataBuffer = isString(dataBuffer) ? Base64ToUint8Array(dataBuffer as string) : dataBuffer as ArrayBuffer;
+    if (!runtimeCrypto || !runtimeCrypto.subtle)
+    {
+        throw new Error('Web Cryptography API is not available in this runtime');
+    }
+
+    return {
+        crypto: runtimeCrypto,
+        subtle: runtimeCrypto.subtle,
+        secureContext: resolveSecureFlag()
+    };
+}
+
+/**
+ * Shortcut helper that returns the `SubtleCrypto` interface or throws.
+ */
+export const getCryptoOrThrow = (): SubtleCrypto => getCryptoContext().subtle;
+
+const getRandomBytes = (size: number): Uint8Array => {
+    const { crypto } = getCryptoContext();
+    const buffer = new Uint8Array(size);
+    crypto.getRandomValues(buffer);
+    return buffer;
+};
+
+/**
+ * Converts base64 strings into Uint8Array or passes through ArrayBuffers.
+ */
+const normalizeBinary = (value: ArrayBuffer | string): BufferSource => {
+    return isString(value)
+        ? Base64ToUint8Array(value as string)
+        : value as ArrayBuffer;
+};
+
+/**
+ * Normalizes diverse private key inputs (raw, JWK, CryptoKey) into a CryptoKey instance.
+ */
+const importPrivateKeyAsync = async (
+    algorithm: AlgorithmIdentifier,
+    subtle: SubtleCrypto,
+    privKey: BufferSource | CryptoKey | JsonWebKey
+): Promise<CryptoKey> =>
+{
+    if (privKey instanceof CryptoKey)
+    {
+        return privKey;
+    }
+
+    if (isArrayBuffer(privKey) || ArrayBuffer.isView(privKey))
+    {
+        return subtle.importKey('raw', privKey, algorithm, true, ['decrypt']);
+    }
+
+    if (isPlainObject(privKey))
+    {
+        return subtle.importKey('jwk', privKey as JsonWebKey, algorithm, true, ['decrypt']);
+    }
+
+    throw new TypeError('Unsupported private key format supplied.');
+}
+
+/**
+ * Signs arbitrary data using the provided secret key and HMAC algorithm.
+ * @param keyBuffer Raw key material or a base64 encoded key string.
+ * @param dataBuffer Data to sign as ArrayBuffer or base64 string.
+ * @param alg SubtleCrypto-supported hash algorithm name.
+ * @param toBase64 When true the digest is returned as a base64 string.
+ */
+export const hmacSignAsync = async (
+    keyBuffer: ArrayBuffer | string,
+    dataBuffer: ArrayBuffer | string,
+    alg : string,
+    toBase64 = false
+): Promise<ArrayBuffer | string> => {
+
+    const { subtle } = getCryptoContext();
+
+    const rawKeyBuffer = normalizeBinary(keyBuffer);
+    const rawDataBuffer = normalizeBinary(dataBuffer);
    
     // Get the key
-    const hmacKey = await crypto.importKey('raw', rawKeyBuffer, { name: 'HMAC', hash: alg }, false, ['sign']);
+    const hmacKey = await subtle.importKey('raw', rawKeyBuffer, { name: 'HMAC', hash: alg }, false, ['sign']);
 
     // Sign hmac data
-    const digest = await crypto.sign('HMAC', hmacKey, rawDataBuffer);
+    const digest = await subtle.sign('HMAC', hmacKey, rawDataBuffer);
 
     // Encode to base64 if needed
     return toBase64 ? ArrayBuffToBase64(digest) : digest;
 }
 
 /**
- * @function decryptAsync Decrypts syncrhonous or asyncrhonsous en encypted data
- * asynchronously.
- * @param {any} data The encrypted data to decrypt. (base64 string or ArrayBuffer)
- * @param {any} privKey The key to use for decryption (base64 String or ArrayBuffer).
- * @param {Object} algorithm The algorithm object to use for decryption.
- * @param {Boolean} toBase64 If true, the decrypted data will be returned as a base64 string.
- * @returns {Promise} The decrypted data.
- * @throws An error if the browser does not support the Web Cryptography API
+ * Decrypts binary data using the supplied algorithm and private key reference.
+ * @param algorithm Decryption algorithm descriptor.
+ * @param privKey Raw key material, CryptoKey, or JWK object.
+ * @param data Encrypted payload as ArrayBuffer or base64 string.
+ * @param toBase64 When true the decrypted data is returned as base64.
  */
 export const decryptAsync = async (
     algorithm: AlgorithmIdentifier,
@@ -78,45 +178,20 @@ export const decryptAsync = async (
     toBase64 = false
 ): Promise<string | ArrayBuffer> =>
 {
-    const crypto = getCryptoOrThrow()
-
-    // Check data argument type and decode if needed
-    const dataBuffer = isString(data) ? Base64ToUint8Array(data as string) : data as ArrayBuffer;
-
-    let privateKey = privKey
-    // Check key argument type
-    if (privKey instanceof CryptoKey) {
-        privateKey = privKey
-    }
-    // If key is binary data, then import it as raw data
-    else if (isArrayBuffer(privKey)) {
-        privateKey = await crypto.importKey('raw', privKey, algorithm, true, ['decrypt'])
-    }
-    // If the key is an object, then import it as a jwk
-    else if (isPlainObject(privKey)) {
-        privateKey = await crypto.importKey('jwk', privKey as JsonWebKey, algorithm, true, ['decrypt'])
-    }
+    const { subtle } = getCryptoContext();
+    const dataBuffer = normalizeBinary(data) as ArrayBuffer;
+    const privateKey = await importPrivateKeyAsync(algorithm, subtle, privKey);
 
     // Decrypt the data and return it
-    const decrypted = await crypto.decrypt(algorithm, privateKey as CryptoKey, dataBuffer)
-    return toBase64 ? ArrayBuffToBase64(decrypted) : decrypted
+    const decrypted = await subtle.decrypt(algorithm, privateKey as CryptoKey, dataBuffer);
+    return toBase64 ? ArrayBuffToBase64(decrypted) : decrypted;
 }
 
 /**
- * Gets a random hex string of the specified size
- * @param size The number of bytes to generate
- * @returns A random hex string of the specified size
- * @throws An error if the browser does not support the Web Cryptography API
+ * Creates a random hexadecimal string of the requested byte length.
+ * @param size Number of random bytes to generate.
  */
 export const getRandomHex = (size: number) : string => {
-    if (!isCryptoSupported()) {
-        throw new Error('Your browser does not support the Web Cryptography API');
-    }
-
-    const randBuffer = new Uint8Array(size)
-
-    window.crypto.getRandomValues(randBuffer)
-
-    //Convert the random buffer to a hex string
-    return ArrayToHexString(randBuffer)
+    const randBuffer = getRandomBytes(size);
+    return ArrayToHexString(Array.from(randBuffer));
 }

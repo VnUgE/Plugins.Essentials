@@ -17,7 +17,9 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import type { AxiosInstance, AxiosRequestConfig } from "axios";
+import type { Axios, AxiosInstance, AxiosRequestConfig } from "axios";
+import type { AxiosConfig } from "./axios";
+import { AccountRpcApiConfig } from "./account/types";
 
 /**
  * Represents a uniform message from the server
@@ -58,6 +60,11 @@ export interface ServerValidationError{
 }
 
 export type Awaitable<T> = T | Promise<T>;
+
+/**
+ * Legacy scope token used by deprecated global config helpers. Avoid for new code.
+ */
+export type ConfigScopeToken = symbol;
 
 /**
  * Represents a storage-like interface that can be used to store and retrieve items
@@ -102,45 +109,58 @@ export interface SessionConfig {
      * The algorithm used for generating session keys.
      */
     readonly keyAlgorithm: AlgorithmIdentifier;
+    /**
+     * The size in bytes for OTP nonce generation.
+     * Provides sufficient entropy for single-use tokens.
+     */
+    readonly otpNonceSize: number;
 }
 
 /**
- * Represents the configuration for the account RPC API.
+ * Aggregate API configuration passed to all composables. All defaults are
+ * local to the module and merged during creation.
  */
-export interface AccountRpcApiConfig{
-    /**
-     * The URL of the account RPC API endpoint.
-     */
-    readonly endpointUrl: string;
-}
-
-/**
- * Represents the configuration for the session management API.
- */
-export interface GlobalAxiosConfig extends AxiosRequestConfig {
-    /**
-     * The header name used to send the secondary authentication 
-     * token.
-     */
-    readonly tokenHeader: string;
-    /**
-     * Configures the axios instance with additional settings.
-     * @param axios The axios instance to configure
-     * @returns The configured axios instance
-     */
-    readonly configureAxios?: (axios: AxiosInstance) => AxiosInstance;
-}
-
-export interface GlobalApiConfig {
+export interface ApiConfig {
     readonly session: SessionConfig;
-    readonly axios: GlobalAxiosConfig;
+    readonly axios: AxiosConfig;
     readonly account: AccountRpcApiConfig;
     readonly storage: StorageLikeAsync;
 }
 
-export interface GlobalConfigUpdate {
+/**
+ * Internal extension of ApiConfig with hidden state management.
+ * 
+ * Provides symbol-keyed access to shared, lazily-initialized resources.
+ * Use getInternalState() and setInternalState() helpers from config.ts
+ * instead of accessing this directly.
+ * 
+ * The state container is a generic Map-like structure where modules can
+ * store any type of state they need without predefined schema.
+ * 
+ * @internal - Not for external use
+ */
+export interface ApiConfigInternal extends ApiConfig {
+    /**
+     * Hidden namespace for shared state. Accessed via helper functions
+     * to prevent manual symbol juggling and ensure type safety.
+     * 
+     * Modules can store any value type keyed by string identifiers.
+     */
+    readonly [key: symbol]: Map<string, any>;
+}
+
+/**
+ * Override shape used when creating an ApiConfig instance. Modules merge
+ * provided overrides with their local defaults.
+ */
+export interface ApiConfigOverrides {
     readonly session?: Partial<SessionConfig>;
-    readonly axios?: Partial<GlobalAxiosConfig>;
+    readonly axios?: {
+        readonly instance?: Axios;
+        readonly tokenHeader?: string;
+        readonly axiosConfig?: AxiosRequestConfig;
+        readonly configureInstance?: (axios: AxiosInstance) => AxiosInstance;
+    };
     readonly account?: Partial<AccountRpcApiConfig>;
     readonly storage?: StorageLikeAsync;
-} 
+}

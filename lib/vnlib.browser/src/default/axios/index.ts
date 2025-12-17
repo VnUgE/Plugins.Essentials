@@ -17,87 +17,119 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import { cloneDeep, merge, isObjectLike, defaultTo, memoize } from 'lodash-es'
-import axios, { type Axios, type AxiosRequestConfig, type AxiosResponse } from 'axios'
+import { isObjectLike } from 'lodash-es'
+import { type Axios, type AxiosResponse, type CreateAxiosDefaults } from 'axios'
+import type { ApiConfig } from '../types';
 import { useSession } from '../session'
-import { useLibraryStateInternal } from '../globalState';
-import type { GlobalAxiosConfig } from '../types';
-
-const axiosInternal = memoize(() => {
-    const _config = useLibraryStateInternal();
-    const { generateOneTimeToken } = useSession();
-
-    const axiosConfig = () => _config.get('axios');
-
-    return {
-        axiosConfig,
-        onRequestFulfilled: async (config: any) => {
-            //Get the current global config/token header value
-            const { tokenHeader } = axiosConfig();
-
-            // See if the current session is logged in
-            if (tokenHeader) {
-    
-                const path = `${config.baseURL}${config.url}`
-                let pathName = path;
-    
-                //see if absolute url or relative
-                if (path.match(/https?:\/\//)) {
-                    //Is absolute
-                    pathName = new URL(path).pathname
-                }
-    
-                // Get an otp for the request (may be null if not logged in)
-                const token = await generateOneTimeToken(pathName);
-    
-                if(token){
-                    config.headers[tokenHeader] = token;
-                }
-            }
-    
-            // Return the config
-            return config
-        },
-        // Add response interceptor to add a function to the response to get the 
-        // result or throw an error to match the WebMessage server message
-        onResponseFulfilled: (response: AxiosResponse) => {
-            //Add a function to the response to get the result or throw an error
-            if (isObjectLike(response.data)) {
-                response.data.getResultOrThrow = () => {
-                    if (response.data.success) {
-                        return response.data.result;
-                    } else {
-                        //Throw in apicall format to catch in the catch block
-                        throw { response };
-                    }
-                };
-            }
-            return response;
-        }
-    }
-});
-
-export type useAxiosConfig =  GlobalAxiosConfig | AxiosRequestConfig | undefined | null;
+import { getInternalState } from '../config';
 
 /**
- * Gets a reactive axios instance with the default configuration
- * @param config Optional Axios instance configuration to apply, will be merged with the default config
- * @returns A reactive ref to an axios instance
+ * Axios configuration used by VNLib interceptors. Stores a concrete instance
+ * and metadata required by request decorators.
  */
-export const useAxios = (config?: useAxiosConfig): Axios => {
+export interface AxiosConfig {
+    /**
+     * Pre-configured axios instance that interceptors will attach to.
+     */
+    readonly instance: Axios;
+    /**
+     * Header name used to send the OTP token.
+     */
+    readonly tokenHeader: string;
+}
 
-    const { axiosConfig, onRequestFulfilled, onResponseFulfilled } = axiosInternal();
-    const local = defaultTo(config, {});
-    const merged = merge<GlobalAxiosConfig, useAxiosConfig>(cloneDeep(axiosConfig()), local);
+/**
+ * Returns the default axios request configuration for VNLib API clients.
+ * Defines timeout and credential defaults.
+ */
+export const getDefaultAxiosRequestConfig = (): CreateAxiosDefaults => ({
+    timeout: 60 * 1000,
+    withCredentials: false
+});
 
-    //Exec user configuration callback if it's defined
-    const instance = merged.configureAxios
-        ? merged.configureAxios(axios.create(merged))
-        : axios.create(merged);
+/**
+ * Creates request interceptor that injects OTP tokens into authenticated requests.
+ * The token is generated per-request using the session's HMAC key and includes
+ * the request path to prevent replay attacks.
+ */
+const createRequestInterceptor = (apiConfig: ApiConfig) => {
+    const { generateOneTimeToken } = useSession(apiConfig);
 
-    //Assign interceptors
-    instance.interceptors.request.use(onRequestFulfilled);
-    instance.interceptors.response.use(onResponseFulfilled);
+    const { tokenHeader } = apiConfig.axios;
 
-    return instance
+    return async (request: any) => {
+
+        // Only inject token if header is configured
+        if (tokenHeader) {
+            const path = `${request.baseURL}${request.url}`;
+            let pathName = path;
+
+            // Extract pathname from absolute URLs
+            if (path.match(/https?:\/\//)) {
+                pathName = new URL(path).pathname;
+            }
+
+            // Generate OTP (returns null if not logged in)
+            const token = await generateOneTimeToken(pathName);
+
+            if (token) {
+                request.headers = request.headers ?? {};
+                request.headers[tokenHeader] = token;
+            }
+        }
+
+        return request;
+    };
+};
+
+/**
+ * Creates response interceptor that adds getResultOrThrow() helper to WebMessage responses.
+ * This provides a convenient way to extract successful results or propagate errors
+ * in a consistent format matching server-side validation.
+ */
+const createResponseInterceptor = () => {
+    return (response: AxiosResponse) => {
+        // Add getResultOrThrow helper if response is a structured object
+        if (isObjectLike(response.data)) {
+            response.data.getResultOrThrow = () => {
+                if (response.data.success) {
+                    return response.data.result;
+                } else {
+                    // Throw in API call format for consistent error handling
+                    throw { response };
+                }
+            };
+        }
+        return response;
+    };
+};
+
+/**
+ * Creates an axios instance configured for VNLib server communication.
+ * The instance includes request interceptors for OTP token injection and
+ * response interceptors for WebMessage result extraction.
+ * 
+ * @param config - Optional axios configuration to merge with scoped defaults.
+ * @param scope - Optional config scope token. Uses default scope if omitted.
+ * @returns Configured axios instance with VNLib interceptors attached.
+ */
+export const useAxios = (config: ApiConfig, axiosInstance?: Axios): Axios => {
+
+    const instance = axiosInstance ?? config.axios.instance;
+
+    // Cache a set of instnaces for checking if interceptors have 
+    // been added already
+    const configuredInstances = getInternalState(
+        config, 
+        'axios:state:instances', 
+        () => new WeakSet<Axios>()
+    )
+
+    if (!configuredInstances.has(instance)) {
+        instance.interceptors.request.use(createRequestInterceptor(config));
+        instance.interceptors.response.use(createResponseInterceptor());
+        configuredInstances.add(instance);
+    }
+
+    return instance;
 };

@@ -23,7 +23,7 @@ import { debugLog } from "../helpers/debugLog";
 import { useAccountRpc, useAccount } from "../account";
 import type { ExtendedLoginResponse, UserLoginCredential } from "../account/types";
 import type { ITokenResponse } from "../session";
-import type { WebMessage } from "../types";
+import type { ApiConfig, WebMessage } from "../types";
 
 export type MfaMethod = 'totp' | 'fido' | 'pkotp';
 
@@ -136,12 +136,34 @@ export interface IMfaLoginManager {
     isMfaResponse: (response: WebMessage | IMfaContinuation) => response is IMfaContinuation;
 }
 
-const getMfaProcessor = (handlers: IMfaTypeProcessor[]) =>{
+/**
+ * Configuration options for creating an MFA login manager.
+ */
+export interface MfaLoginOptions {
+    /**
+     * Array of MFA type processors to enable (TOTP, FIDO, PKI OTP).
+     */
+    readonly handlers: IMfaTypeProcessor[];
+    /**
+     * Api configuration instance created at app startup.
+     */
+    readonly config: ApiConfig;
+}
+
+/**
+ * Internal factory for processing MFA upgrade messages.
+ * Manages the MFA continuation flow by coordinating registered handlers
+ * with server-provided capabilities.
+ * 
+ * @param handlers - Array of MFA type processors (TOTP, FIDO, PKI OTP).
+ * @param config - Api configuration instance.
+ */
+const getMfaProcessor = (handlers: IMfaTypeProcessor[], config: ApiConfig) => {
 
     //Store handlers by their mfa type
     const handlerMap = mapKeys(handlers, (h) => h.type)
 
-    const { exec } = useAccountRpc<'mfa.login'>();
+    const { exec } = useAccountRpc<'mfa.login'>(config);
 
     //Creates a submission handler for an mfa upgrade
     const createState = (type: MfaMethod, upgrade : string, finalize: (res: ITokenResponse) => Promise<void>) 
@@ -217,17 +239,22 @@ interface IMfaUpgradeResponse{
 }
 
 /**
- * Gets the mfa login handler for the accounts backend
- * @param handlers A list of mfa handlers to register
- * @returns The configured mfa login handler
+ * Creates an MFA-aware login handler that processes multi-factor authentication flows.
+ * Extends the basic login process to handle MFA upgrade challenges from the server,
+ * coordinating between registered MFA handlers (TOTP, FIDO, PKI) and user credentials.
+ * 
+ * @param options - Configuration including handlers and api config.
+ * @returns MFA login manager with methods for login and capability checking.
  */
-export const useMfaLogin = (handlers: IMfaTypeProcessor[]): IMfaLoginManager => {
+export const useMfaLogin = (options: MfaLoginOptions): IMfaLoginManager => {
+
+     const { handlers, config } = options;
 
     //get the user instance
-    const { login: userLogin } = useAccount()
+    const { login: userLogin } = useAccount(config)
 
     //Get new mfa processor
-    const { processMfa, isSupported } = getMfaProcessor(handlers);
+    const { processMfa, isSupported } = getMfaProcessor(handlers, config);
 
     //Login that passes through logins with mfa
     const login = async <T>(credential: UserLoginCredential): Promise<ExtendedLoginResponse<T> | IMfaContinuation> => {
@@ -256,10 +283,11 @@ export const useMfaLogin = (handlers: IMfaTypeProcessor[]): IMfaLoginManager => 
     }
 
     const isMfaResponse = (response: WebMessage | IMfaContinuation): response is IMfaContinuation => {
-        //Check if the response is an mfa continuation
+        //Check if the response is an mfa continuation 
         return 'methods' in response 
-            && isArray(response.methods) 
-            && response.methods.length > 0;
+            && isArray(response.methods)
+            && response.methods.length > 0
+            && 'expires' in response;
     }
 
     return { login, isSupported, isMfaResponse }

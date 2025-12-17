@@ -34,6 +34,7 @@ import {
 import type { WebMessage } from "../types";
 import { type MfaApi, type MfaGetResponse, mfaGetDataFor } from "./config";
 import type { AccountRpcResponse } from "../account/types";
+import { defaultTo } from "lodash-es";
 
 export type IFidoServerOptions = PublicKeyCredentialCreationOptionsJSON
 
@@ -222,15 +223,7 @@ export const fidoMfaProcessor = () : IMfaTypeProcessor => {
             throw new Error('Fido mfa flow is not supported by the server. This is an internal error.');
         }
 
-        const { fido } = (payload as any) as { fido: PublicKeyCredentialRequestOptionsJSON }; 
-
-            const result = await startAuthentication({ 
-                optionsJSON: fido, 
-                useBrowserAutofill: useAutoFill 
-            }) as IMfaSubmission
-
-            return await onSubmit.submit({ fido: result, ...options });
-        }
+        const { fido } = (payload as any) as { fido: PublicKeyCredentialRequestOptionsJSON };
 
         return Promise.resolve({
             ...payload,
@@ -267,7 +260,10 @@ export interface FidoAuthenticateOptions {
  */
 export const fidoMfaAuthenticate = async <T>(flow: IMfaFlow<'fido'>, options?: FidoAuthenticateOptions): Promise<WebMessage<T>> => {
 
-    const fidoResult = await startAuthentication((flow as IFidoMfaFlow).fido, options?.useAutoFill ?? false);
+     const fidoResult = await startAuthentication({ 
+        optionsJSON: (flow as IFidoMfaFlow).fido, 
+        useBrowserAutofill: defaultTo(options?.useAutoFill, false)
+    })
 
     const result = await flow.submit<T>({ fido: fidoResult, ...options });
     result.getResultOrThrow();

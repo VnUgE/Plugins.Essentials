@@ -19,11 +19,9 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import { type MaybeRef } from 'vue'
-import { get, type StorageLikeAsync } from '@vueuse/core'
+import { get } from '@vueuse/core'
 import { useAxios } from '../axios'
-import { defaultTo, isFunction } from 'lodash-es'
-import type { Axios } from 'axios'
-import type { WebMessage } from '../types'
+import type { ApiConfig, WebMessage } from '../types'
 
 export interface AppDataGetOptions{
     /**
@@ -89,14 +87,33 @@ interface GetUrl{
 }
 
 /**
- * Creates an AppData API for the given endpoint
- * @param endpoint The endpoint to use
- * @param axios The optional axios instance to use for requests
- * @returns The AppData API
+ * Configuration options for app-data API.
  */
-export const useAppDataApi = (endpoint: MaybeRef<string>, axios?: Axios): UserAppDataApi => {
+export interface AppDataApiOptions {
+    /**
+     * App-data service endpoint URL (can be reactive).
+     */
+    readonly endpoint: MaybeRef<string>;
+    /**
+     * Api configuration instance used to create axios when one is not provided.
+     */
+    readonly config: ApiConfig;
+}
 
-    axios = defaultTo(axios, useAxios(null));
+/**
+ * Creates an app-data storage API for server-side user data management.
+ * Provides scoped storage where each scope represents an isolated data partition.
+ * Data is stored server-side and survives across sessions and devices.
+ * 
+ * @param options - Configuration including endpoint and api config.
+ * @returns App-data API with methods for get/set/remove operations.
+ */
+export const useAppDataApi = (options: AppDataApiOptions): UserAppDataApi => {
+
+    const { endpoint, config } = options;
+
+    // Attach interceptors to config-provided axios instance
+    const axiosInstance = useAxios(config);
 
     const getUrl = ({ flush, noCache, scope }: GetUrl) => {
         const fl = flush ? '&flush=true' : ''
@@ -115,7 +132,7 @@ export const useAppDataApi = (endpoint: MaybeRef<string>, axios?: Axios): UserAp
             })
 
             //Handle status code errors manually
-            const response = await axios!.get<T>(url, {
+            const response = await axiosInstance.get<T>(url, {
                 validateStatus: (status) => status >= 200 && status < 500
             })
 
@@ -148,7 +165,7 @@ export const useAppDataApi = (endpoint: MaybeRef<string>, axios?: Axios): UserAp
             })
            
             //Handle status code errors manually
-            const { status, data: responseData } = await axios!.put<WebMessage>(url, data)
+            const { status, data: responseData } = await axiosInstance.put<WebMessage>(url, data)
             switch (status) {
                 case 200:
                 case 202:
@@ -161,7 +178,7 @@ export const useAppDataApi = (endpoint: MaybeRef<string>, axios?: Axios): UserAp
        
         remove: async (scope: string) => {
              //Handle status code errors manually
-            const response = await axios.delete<WebMessage>(getUrl({ scope, noCache: false, flush: false }))
+            const response = await axiosInstance.delete<WebMessage>(getUrl({ scope, noCache: false, flush: false }))
 
             switch (response.status) {
                 case 200:
@@ -176,17 +193,25 @@ export const useAppDataApi = (endpoint: MaybeRef<string>, axios?: Axios): UserAp
 }
 
 /**
- * Creates an AppData API that uses at constant scope for all requests
- * @param endpoint The app-data endpoint to use
- * @param scope The data request scope
- * @param axios The optional axios instance to use for requests
+ * Creates an app-data API bound to a constant scope string.
+ * Provides a simplified interface where the data scope is pre-configured,
+ * eliminating the need to pass it with each operation.
+ * 
+ * @param endpoint - App-data service endpoint URL.
+ * @param dataScope - The data scope identifier (not a config scope).
+ * @param options - Optional axios and config scope configuration.
+ * @returns Scoped app-data API instance.
  */
-export const useScopedAppDataApi = (endpoint: string, scope: string, axios?: Axios): ScopedUserAppDataApi => {
-    const api = useAppDataApi(endpoint, axios);
+export const useScopedAppDataApi = (
+    endpoint: string,
+    dataScope: string,
+    options: { config: ApiConfig }
+): ScopedUserAppDataApi => {
+    const api = useAppDataApi({ endpoint, ...options });
 
     return {
-        get: <T>(options: AppDataGetOptions) => api.get<T>(scope, options),
-        set: <T>(data: T, options: AppDataSetOptions) => api.set(scope, data, options),
-        remove: () => api.remove(scope)
+        get: <T>(options: AppDataGetOptions) => api.get<T>(dataScope, options),
+        set: <T>(data: T, options: AppDataSetOptions) => api.set(dataScope, data, options),
+        remove: () => api.remove(dataScope)
     }
 }

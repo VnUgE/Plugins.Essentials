@@ -17,73 +17,93 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import { defaultsDeep, mapValues, memoize, get as getAt, set as setAt } from 'lodash-es';
-import { manualComputed, type ReadonlyManualRef } from './manualComputed';
-import type { GlobalApiConfig } from '../types'
+import {
+    attempt,
+    defaultsDeep,
+    defaultTo,
+    get as getAt,
+    isError,
+    isFunction,
+    mapValues,
+    memoize,
+    set as setAt
+} from 'lodash-es';
+import type { StorageLikeAsync } from '../types';
 
+/**
+ * Projects each property of the supplied type into an async getter/setter pair.
+ */
 export type AsyncStorageItem<T> = {
     [K in keyof T]: {
         /**
-         * Gets the stored value of the slot asynchonously if necessary
-         * @returns The value of the slot
+         * Gets the stored value of the slot asynchronously if necessary
          */
         get: () => Promise<T[K]>;
         /**
-         * Sets the value of the slot
-         * @param value The value to set the slot to
+         * Persists the supplied value for the slot
          */
         set: (value: T[K]) => Promise<void>;
     };
 };
 
+
 /**
- * Creates a context-persistent storage slot that can be used to store
- * and retrieve values asynchronously.
+ * Projects an object model onto the configured async storage provider where
+ * each property exposes typed async getters/setters.
  */
-export const useStorageSlot = <T extends object>(
-    globalState: ReadonlyManualRef<Pick<GlobalApiConfig, 'storage'>>, 
-    key: string, 
+export const createStorageSlot = <T extends object>(
+    storage: StorageLikeAsync,
+    key: string,
     defaultValue: T
 ): AsyncStorageItem<T> => {
 
-    const backend = manualComputed(() => globalState.get('storage'));
+    const writeObj = async (value: T): Promise<void> => {
+        const serialized = JSON.stringify(value);
+        await storage.setItem(key, serialized);
+    }
 
-    const writeObj = (value: T) => {
-        const val = JSON.stringify(value);
-        return backend.get()?.setItem(key, val);
+    const parseStoredValue = (raw: string | null | undefined): object => {
+        const parsed = attempt(JSON.parse, defaultTo(raw, '{}'));
+        return isError(parsed) ? {} : parsed;
     }
 
     const readObj = async (): Promise<T> => {
-        const val = await backend.get()?.getItem(key);
-        const obj = JSON.parse(val || '{}');
-        return defaultsDeep(obj, defaultValue);
+        const storedValue = await storage.getItem(key);
+        const parsedValue = parseStoredValue(storedValue) as Partial<T>;
+        return defaultsDeep(parsedValue, defaultValue);
     }
 
-    const storage = memoize(readObj);
+    // memoize() gives us a single outstanding read promise per slot key
+    const getSnapshot = memoize(readObj);
 
-    const clearCache = () => {
-        if (storage.cache.clear) {
-            storage.cache.clear();
+    const clearCache = (): void => {
+        const cache = getSnapshot.cache as Map<unknown, Promise<T>> & { clear?: () => void };
+
+        if (isFunction(cache.clear))
+        {
+            cache.clear();
+            return;
         }
+
+        // Memoize cache falls back to Map, so deleting the single key is sufficient
+        cache.delete(undefined);
     }
 
-    return mapValues<T>(defaultValue, (_val: unknown, key: string) => {
+    return mapValues(defaultValue, (_val: unknown, slotKey: string) => {
 
         const get = async (): Promise<any> => {
-            const stored = await storage()
-            return getAt(stored, key) as any;
+            const stored = await getSnapshot();
+            return getAt(stored, slotKey);
         }
 
         const set = async (value: unknown): Promise<void> => {
-            const stored = await storage();
-            setAt<T>(stored, key, value);
+            const stored = await getSnapshot();
+            setAt(stored, slotKey, value);
 
-            //Write localstorage
             await writeObj(stored);
-
             clearCache();
         }
 
-        return { get, set }
-    }) as unknown as AsyncStorageItem<T>;
+        return { get, set };
+    }) as AsyncStorageItem<T>;
 }

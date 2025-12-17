@@ -21,7 +21,7 @@ import { decodeJwt } from "jose"
 import { trim } from "lodash-es";
 import { useAccount, useAccountRpc } from "../account"
 import { debugLog } from "../helpers/debugLog"
-import type { WebMessage } from '../types'
+import type { ApiConfig, WebMessage } from '../types'
 import type { IUserLoginRequest, AccountRpcResponse, AccountRpcGetResult } from "../account/types"
 import type { ITokenResponse } from "../session"
 import { mfaGetDataFor, type MfaGetResponse, type MfaApi } from "./config";
@@ -107,12 +107,29 @@ interface PkiLoginRequest extends IUserLoginRequest{
 }
 
 /**
- * Creates a pki login api that allows for authentication with a signed JWT
+ * Configuration options for PKI OTP authentication.
  */
-export const useOtpAuth = (): PkOtpLogin =>{
+export interface OtpAuthOptions {
+    /**
+     * Api configuration instance created at app startup.
+     */
+    readonly config: ApiConfig;
+}
 
-    const { prepareLogin } = useAccount()
-    const { exec, isMethodEnabled } = useAccountRpc<'otp.login'>()
+/**
+ * Creates a PKI-based one-time password authentication API.
+ * Enables login via signed JWT tokens using the user's registered public keys.
+ * Supports ECDSA and RSA signatures for cryptographic authentication.
+ * 
+ * @param options - Configuration including api config.
+ * @returns PKI OTP login API instance.
+ */
+export const useOtpAuth = (options: OtpAuthOptions): PkOtpLogin => {
+
+    const { config } = options;
+    
+    const { prepareLogin } = useAccount(config)
+    const { exec, isMethodEnabled } = useAccountRpc<'otp.login'>(config)
 
     const login = async <T>(pkiJwt: string): Promise<WebMessage<T>> => {
 

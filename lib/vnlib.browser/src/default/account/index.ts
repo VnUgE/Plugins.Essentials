@@ -18,11 +18,10 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import { filter, isNil } from 'lodash-es'
+import { filter, isNil, get, some } from 'lodash-es'
 import { useSession, type ITokenResponse } from '../session'
 import { useAxios } from '../axios'
-import { useLibraryStateInternal } from '../globalState'
-import type { WebMessage } from '../types'
+import type { ApiConfig, WebMessage } from '../types'
 import type { 
     AccountApi, 
     UserProfile, 
@@ -31,31 +30,41 @@ import type {
     AccountRpcApi,
     AccountRpcResponse,
     AccountRpcGetResult,
-    UserProfileApi
+    ProfileApi,
+    AccountRpcApiConfig
 } from './types'
 import { useJrpc } from '../helpers/jrpc'
-import { debugLog } from '../helpers/debugLog'
-
-export type * from './types'
 
 /**
- * Gets the rpc api for interacting with the user's account/profile 
- * login, mfa, and other account related functions
+ * Returns the default account RPC configuration.
+ * Defines the default endpoint URL for account-related operations.
  */
-export const useAccountRpc = <TMethod extends string>(): AccountRpcApi<TMethod> => {
-    
-    const gConfig = useLibraryStateInternal();
-    const { get } = useAxios();
+export const getDefaultAccountConfig = (): AccountRpcApiConfig => ({
+    endpointUrl: '/account'
+});
 
-    const endpoint = () => {
-        const { endpointUrl } = gConfig.get('account');
-        return endpointUrl;
-    }
+/**
+ * Gets the RPC API for interacting with the user's account/profile 
+ * login, MFA, and other account-related functions.
+ * 
+ * @template TMethod - The union of RPC method names supported by this API instance
+ * @param config - Api configuration instance.
+ * @returns Account RPC API instance with methods for executing RPC calls
+ */
+export const useAccountRpc = <TMethod extends string>(config: ApiConfig): AccountRpcApi<TMethod> => {
 
-    const { request } = useJrpc<TMethod>({ endpoint, version: '2.0.0' });
+    const axios = useAxios(config);
+
+    const { request } = useJrpc<TMethod>({
+        endpoint: () => config.account.endpointUrl,
+        version: '2.0.0',
+        config
+    })
 
     const getData = async (): Promise<AccountRpcGetResult> => {
-        const { data } = await get<AccountRpcGetResult>(endpoint());
+        const ep = config.account.endpointUrl;
+
+        const { data } = await axios.get<AccountRpcGetResult>(ep);
         return data;
     }
 
@@ -70,13 +79,20 @@ export const useAccountRpc = <TMethod extends string>(): AccountRpcApi<TMethod> 
     return { getData, exec, isMethodEnabled }
 }
 
-type UserAccountMethods = 'login' | 'logout' | 'password.reset' | 'heartbeat';
+type UserAccountMethods = 'login' | 'logout' | 'profile.get' | 'password.reset' | 'heartbeat'
 
-export const useAccount = (): AccountApi => {
+/**
+ * Creates the main account API for managing user authentication and sessions.
+ * Provides methods for login, logout, profile retrieval, password reset, and heartbeat.
+ * 
+ * @param config - Api configuration instance created at app startup.
+ * @returns Account API instance with methods for user authentication and session management
+ */
+export const useAccount = (config: ApiConfig): AccountApi => {
 
-    const { updateCredentials, getClientSecInfo, KeyStore } = useSession();
+    const { updateCredentials, getClientSecInfo, resetClientSecInfo } = useSession(config);
 
-    const { exec } = useAccountRpc<UserAccountMethods>();
+    const { exec } = useAccountRpc<UserAccountMethods>(config);
 
     const prepareLogin = async () => {
         //Store a copy of the session data and the current time for the login request
@@ -103,8 +119,8 @@ export const useAccount = (): AccountApi => {
      
         const result = await exec('logout');
 
-        //regen session credentials on successful logout
-        await KeyStore.regenerateKeysAsync()
+        //Ensure local credentials are rotated on logout
+        await resetClientSecInfo()
 
         // return the response
         return result;
@@ -130,12 +146,19 @@ export const useAccount = (): AccountApi => {
             }
         }
 
-        debugLog('Account login response', data);
-
         return {
             ...data,
             finalize: prepped.finalize
         }
+    }
+
+    const getProfile = async <T extends UserProfile>(): Promise<T> => {
+
+        // Get the user's profile from the profile endpoint
+        const data = await exec<T>('profile.get');
+
+        // return response data
+        return data.getResultOrThrow();
     }
 
     const resetPassword = async (current: string, newPass: string, args: object): Promise<WebMessage> => {
@@ -166,59 +189,64 @@ export const useAccount = (): AccountApi => {
         prepareLogin,
         logout,
         login,
+        getProfile,
         resetPassword,
         heartbeat
     }
 }
 
-type UserProfileMethods = 'profile.get' | 'profile.update';
-
 /**
- * Gets the user profile api for getting and updating the user's profile
- * @returns An object containing the user profile api for getting and updating the user's profile
+ * Creates a profile API for managing user profile operations using RPC methods.
+ * Provides methods to get and update user profiles, along with capability checks.
+ * 
+ * @param config - Api configuration instance created at app startup.
+ * @returns Profile API instance with methods for profile management
  */
-export const useProfile = () : UserProfileApi => {
+export const useProfile = (config: ApiConfig): ProfileApi => {
 
-    const { exec, isMethodEnabled } = useAccountRpc<UserProfileMethods>();
-
-    const canGetProfile = (accData: Pick<AccountRpcGetResult, 'rpc_methods'>): boolean => {
-        return isMethodEnabled(accData, 'profile.get');
-    }
-
-    const canUpdateProfile = (accData: Pick<AccountRpcGetResult, 'rpc_methods'>): boolean => {
-        return isMethodEnabled(accData, 'profile.update');
-    }
+    const { exec } = useAccountRpc<'profile.get' | 'profile.update'>(config);
 
     const getProfile = async <T extends UserProfile>(): Promise<T> => {
-        // Get the user's profile from the profile endpoint
         const data = await exec<T>('profile.get');
         return data.getResultOrThrow();
     }
 
-    const updateProfile = async <T extends UserProfile>(profile: Partial<T>): Promise<WebMessage> => {
-        return exec<T>('profile.update', profile);
+    const updateProfile = async <T extends UserProfile>(profile: Partial<T>): Promise<WebMessage<T>> => {
+        return await exec<T>('profile.update', profile);
+    }
+
+    const canGetProfile = (data: Pick<AccountRpcGetResult, 'rpc_methods'>): boolean => {
+        return some(data.rpc_methods, m => m.method === 'profile.get');
+    }
+
+    const canUpdateProfile = (data: Pick<AccountRpcGetResult, 'rpc_methods'>): boolean => {
+        return some(data.rpc_methods, m => m.method === 'profile.update');
     }
 
     return {
-        canGetProfile,
-        canUpdateProfile,
         getProfile,
-        updateProfile
+        updateProfile,
+        canGetProfile,
+        canUpdateProfile
     }
 }
 
 /**
- * Reads an account status object and returns true if the user is logged in
- * as indicated by the server
+ * Checks whether the user is currently authenticated based on account RPC data.
+ * 
+ * @param data - Account RPC result containing authentication status
+ * @returns True if user is authenticated, false otherwise
  */
-export const isLoggedIn = (data: Pick<AccountRpcGetResult, 'status'>) : boolean => {
-    return data?.status?.authenticated === true;
+export const isLoggedIn = (data: Pick<AccountRpcGetResult, 'status'>): boolean => {
+    return get(data, 'status.authenticated', false) as boolean;
 }
 
 /**
- * Reads an account status object and returns true if the user is a local account
- * as indicated by the server
+ * Checks whether the authenticated user has a local account (not a social/federated account).
+ * 
+ * @param data - Account RPC result containing account type information
+ * @returns True if user has a local account, false otherwise
  */
 export const isLocalAccount = (data: Pick<AccountRpcGetResult, 'status'>): boolean => {
-    return data?.status?.is_local_account === true;
+    return get(data, 'status.is_local_account', false) as boolean;
 }

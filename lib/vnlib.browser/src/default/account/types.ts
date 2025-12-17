@@ -21,6 +21,16 @@ import type { WebMessage } from "../types"
 import type { ITokenResponse } from "../session"
 
 /**
+ * Represents the configuration for the account RPC API.
+ */
+export interface AccountRpcApiConfig{
+    /**
+     * The URL of the account RPC API endpoint.
+     */
+    readonly endpointUrl: string;
+}
+
+/**
  * Represents a user login credential
  */
 export interface UserLoginCredential{
@@ -48,6 +58,10 @@ export interface AccountApi {
      */
     login<T>(credential: UserLoginCredential): Promise<ExtendedLoginResponse<T>>
     /**
+     * Gets the user profile from the server
+     */
+    getProfile<T extends UserProfile>(): Promise<T>
+    /**
      * Resets the password for the current user
      * @param current the user's current password
      * @param newPass the user's new password
@@ -61,37 +75,6 @@ export interface AccountApi {
     heartbeat(): Promise<void>
 }
 
-/**
- * Represents the user profile api for getting and updating 
- * the user's profile
- */
-export interface UserProfileApi {
-    /**
-     * Determines if the user can get their profile
-     * @param accData The account data to check against
-     * @returns true if the user can get their profile, false otherwise
-     */
-    canGetProfile(accData: Pick<AccountRpcGetResult, 'rpc_methods'>): boolean;
-    /**
-     * Determines if the user can update their profile
-     * @param accData The account data to check against
-     * @returns true if the user can update their profile, false otherwise
-     */
-    canUpdateProfile(accData: Pick<AccountRpcGetResult, 'rpc_methods'>): boolean;
-    /**
-     * Gets the user profile from the server
-     */
-    getProfile<T extends UserProfile>(): Promise<T>
-    /**
-      * Updates the user profile with the given data
-      * @param data The data to update the user profile with
-      */
-    updateProfile<T extends UserProfile>(data: Partial<T>): Promise<WebMessage>
-}
-
-/**
- * Represents a request to finalize a user login
- */
 export interface IUserLoginRequest {
     /**
      * Finalizes a login process with the given response from the server
@@ -104,37 +87,22 @@ export interface ExtendedLoginResponse<T> extends WebMessage<T> {
     finalize: (response : ITokenResponse) => Promise<void>
 }
 
-/**
- * Represents the minimal user profile supported/returned 
- * from the server
- */
 export interface UserProfile {
     readonly email: string | undefined;
 }
 
-/**
- * Represents an RPC method that can be called on the 
- * account rpc server
- */
 export interface AccountRpcMethod {
     readonly method: string;
     readonly options: string[];
 }
 
-/**
- * Represents the basic response template from an account
- * rpc method
- */
 export interface AccountRpcResponse<T> extends WebMessage<T> {
     readonly id: string;
     readonly code: number;
     readonly method?: string;
 }
 
-/**
- * Represents a basic request to an account rpc method
- */
-export interface AccountRpcRequest {
+export interface AccountRpcRequest{
     readonly id: string;
     readonly method: string;
     readonly args: object;
@@ -142,8 +110,7 @@ export interface AccountRpcRequest {
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE'
 
-// Must match Essentials.Accounts rpc server GET response
-export interface AccountRpcGetResult {
+export interface AccountRpcGetResult{
     readonly http_methods: HttpMethod[];
     readonly rpc_methods: AccountRpcMethod[];
     readonly accept_content_type: string;
@@ -156,27 +123,47 @@ export interface AccountRpcGetResult {
     }
 }
 
-/**
- * Represents the account rpc api interacting with the rpc server
-*/
 export interface AccountRpcApi<TMethod>{
-    /**
-     * Determines if the account rpc api is enabled on the server
-     * @param rpcData The account rpc data returned from a call to getData()
-     */
     getData(): Promise<AccountRpcGetResult>;
-    /**
-     * Executes the given account rpc method with the given arguments
-     * @param method The account rpc method to execute
-     * @param args The arguments to pass to the method
-     * @return A promise that resolves to the account rpc response
-     */
     exec<T = any>(method: AccountRpcMethod | TMethod, args?: object): Promise<AccountRpcResponse<T>>;
-    /**
-     * Determines if the given method is enabled on the server
-     * @param data The account rpc data returned from a call to getData()
-     * @param method The method to check for
-     * @return true if the method is enabled, false otherwise
-     */
     isMethodEnabled(data: Pick<AccountRpcGetResult, 'rpc_methods'>, method: TMethod): boolean;
+}
+
+export interface AccountRpcApiConfig{
+    readonly endpointUrl: string;
+}
+
+/**
+ * Represents the profile management API for retrieving and updating user profiles.
+ */
+export interface ProfileApi {
+    /**
+     * Retrieves the current user's profile from the server.
+     * @template T - The profile type extending UserProfile
+     * @returns Promise resolving to the user's profile
+     * @throws Error if profile cannot be retrieved or user is not authenticated
+     */
+    getProfile<T extends UserProfile>(): Promise<T>;
+    
+    /**
+     * Updates the current user's profile on the server.
+     * @template T - The profile type extending UserProfile
+     * @param profile - Partial profile object containing fields to update
+     * @returns Promise resolving to a web message with the updated profile
+     */
+    updateProfile<T extends UserProfile>(profile: Partial<T>): Promise<WebMessage<T>>;
+    
+    /**
+     * Checks if the profile.get RPC method is available/enabled.
+     * @param data - Account RPC result containing available methods
+     * @returns True if profile retrieval is supported
+     */
+    canGetProfile(data: Pick<AccountRpcGetResult, 'rpc_methods'>): boolean;
+    
+    /**
+     * Checks if the profile.update RPC method is available/enabled.
+     * @param data - Account RPC result containing available methods
+     * @returns True if profile updates are supported
+     */
+    canUpdateProfile(data: Pick<AccountRpcGetResult, 'rpc_methods'>): boolean;
 }

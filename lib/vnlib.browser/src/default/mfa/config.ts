@@ -18,6 +18,7 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import { useAccountRpc } from '../account';
+import type { ApiConfig } from '../types';
 import type { MfaMethod } from "./login"
 import type { AccountRpcGetResult, AccountRpcResponse } from '../account/types';
 import { find } from 'lodash-es';
@@ -67,13 +68,16 @@ export interface MfaApi{
 type MfaRpcMethod = 'mfa.rpc' | 'mfa.get';
 
 /**
- * Gets the api for interacting with the the user's mfa configuration
- * @param mfaEndpoint The server mfa endpoint relative to the base url
- * @returns An object containing the mfa api
+ * Creates an API for managing user MFA configuration on the server.
+ * Provides methods to query enabled MFA methods, retrieve user-specific
+ * MFA settings, and send configuration RPC requests.
+ * 
+ * @param config - Api configuration instance created at app startup.
+ * @returns MFA configuration API instance.
  */
-export const useMfaApi = (): MfaApi =>{
+export const useMfaApi = (config: ApiConfig): MfaApi => {
 
-    const { exec, isMethodEnabled } = useAccountRpc<MfaRpcMethod>();
+    const { exec, isMethodEnabled } = useAccountRpc<MfaRpcMethod>(config);
    
     const isEnabled = (getData: Pick<AccountRpcGetResult, 'rpc_methods'>): boolean => {
         return isMethodEnabled(getData, 'mfa.get');

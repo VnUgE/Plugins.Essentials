@@ -20,7 +20,10 @@
 import { defaultTo, filter, isNil } from "lodash-es";
 import { useAccountRpc, useAccount } from "../account";
 import { useSession, type ITokenResponse } from "../session";
+import type { ApiConfig } from "../types";
 import type { AccountRpcGetResult, AccountRpcResponse } from "../account/types";
+
+type ProcedureName = 'upgrade' | 'authenticate' | 'logout';
 
 /**
  * A social OAuth portal that defines a usable server 
@@ -57,8 +60,11 @@ export interface LogoutResponse {
 
 export interface SocialLoginApi{
     /**
-     * Gets enabled social login methods
-     * @param rpcData The account rpc data returned from a call to getData()
+     * Retrieves enabled OAuth portals from server configuration.
+     * Filters account RPC data to extract social login methods configured by the server.
+     * 
+     * @param rpcData - Account RPC properties containing social OAuth config.
+     * @returns Array of enabled social authentication portals.
      */
     getPortals(rpcData: Pick<AccountRpcGetResult, 'properties'>): SocialOAuthMethod[]
     /**
@@ -96,10 +102,14 @@ type UpgradeResponse = {
     readonly auth_url: string;
 }
 
-type ProcedureName = 'upgrade' | 'authenticate' | 'logout';
-
-const useSocialRpc = () => {
-    const rpc = useAccountRpc();
+/**
+ * Internal helper for social OAuth RPC communication.
+ * Wraps the account RPC to provide social-specific method execution.
+ * 
+ * @param config - Api configuration instance.
+ */
+const useSocialRpc = (config: ApiConfig) => {
+    const rpc = useAccountRpc(config);
 
     const execRaw = async <T>(procedure: ProcedureName, args?: object): Promise<AccountRpcResponse<T>> => {
         const result = await rpc.exec<T>('social_oauth', { procedure, args });
@@ -120,14 +130,24 @@ const useSocialRpc = () => {
 }
 
 /**
- * Creates a new social login api for the given methods
+ * Configuration options for social OAuth login.
  */
-export const useOauthLogin = (): SocialLoginApi => {
+export type OauthLoginOptions = Record<string, never>;
 
-    const { exec, execRaw } = useSocialRpc();
-    const { prepareLogin } = useAccount();
-    const { clearLoginState } = useSession();
-    const { isMethodEnabled } = useAccountRpc<'social_oauth'>();
+/**
+ * Creates a social OAuth login API for third-party authentication flows.
+ * Supports OAuth2 flows with server-side portal configuration, including
+ * authorization URL generation, callback handling, and session management.
+ * 
+ * @param config - Api configuration instance created at app startup.
+ * @returns Social login API with methods for OAuth flow management.
+ */
+export const useOauthLogin = (config: ApiConfig, _options?: OauthLoginOptions): SocialLoginApi => {
+
+    const { exec, execRaw } = useSocialRpc(config);
+    const { prepareLogin, } = useAccount(config);
+    const session = useSession(config);
+    const { isMethodEnabled } = useAccountRpc<'social_oauth'>(config);
 
     const getPortals = ({ properties } : Pick<AccountRpcGetResult, 'properties'>): SocialOAuthMethod[] => {
         if (!properties) {
@@ -177,17 +197,19 @@ export const useOauthLogin = (): SocialLoginApi => {
             const { finalize } = await prepareLogin();
             await finalize(result as ITokenResponse);
         }
-        else{
+        else {
             throw new Error('The server did not return a valid login response');
         }
     }
 
     const logout = async (args?: LogoutArguments): Promise<LogoutResponse | undefined> => {
         const response = await exec<LogoutResponse | undefined>('logout');
-        clearLoginState();
+        
+        // Rotate client credentials after logout to avoid reuse
+        await session.resetClientSecInfo();
 
         // If the server returned a redirect url, redirect the user to it
-        if(args?.autoRedirect === true) {
+        if (args?.autoRedirect === true) {
 
             // If the user specified an override redirect url, use it 
             // otherwise use the server provided redirect url

@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Vaughn Nugent
+// Copyright (c) 2025 Vaughn Nugent
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -19,44 +19,72 @@
 
 import { useAxios } from '../axios'
 import { getRandomHex } from './webcrypto'
-import type { WebMessage } from '../types'
+import type { ApiConfig, WebMessage } from '../types'
 
+/**
+ * Configuration for creating a JSON-RPC client instance.
+ */
 export interface RpcMethodArgs {
     /**
-     * The json rpc version to use for the request
+     * The JSON-RPC protocol version to use for requests.
+     * Version 2.0.0 is recommended for modern implementations.
      */
-    readonly version: '1.0.0' | '2.0.0'
+    readonly version: '1.0.0' | '2.0.0';
     /**
-     * The endpoint to send the request to
+     * Api config created at app startup. Supplies the axios instance and token metadata.
+     */
+    readonly config: ApiConfig;
+    /**
+     * Function that returns the RPC endpoint URL.
+     * Allows dynamic endpoint resolution at request time.
      */
     endpoint(): string;
 }
 
+/**
+ * JSON-RPC client interface providing notification and request methods.
+ * Supports both fire-and-forget notifications and request-response patterns.
+ */
 export interface RpcClient<TMethod extends string> {
     /**
-     * Sends a notification to the server
-     * @param method The method to send
-     * @param data The data to send with the method
+     * Sends a notification to the server (no response expected).
+     * Use for fire-and-forget operations where the client doesn't need a response.
+     * 
+     * @param method - The RPC method name to invoke.
+     * @param data - Optional parameters to send with the method.
+     * @returns Promise resolving to the raw server response (if any).
      */
     notify(method: TMethod, data?: object): Promise<any>;
     /**
-     * Sends a request to the server
-     * @param method The method to send
-     * @param data The data to send with the method
+     * Sends a request to the server and waits for a response.
+     * Includes a unique request ID for correlation. Use for operations
+     * requiring confirmation or return values.
+     * 
+     * @param method - The RPC method name to invoke.
+     * @param data - Optional parameters to send with the method.
+     * @returns Promise resolving to the WebMessage response.
      */
     request<T extends WebMessage>(method: TMethod, data?: object): Promise<T>;
 }
 
 /**
- * Creates a json rpc client for the specified endpoint
- * @param args The arguments to create the client with
- * @returns A json rpc client
+ * Creates a JSON-RPC 2.0 client for VNLib server communication.
+ * The client automatically injects OTP tokens via axios interceptors
+ * and provides both notification and request-response patterns.
+ * 
+ * @param args - RPC configuration including endpoint, version, and api config.
+ * @returns JSON-RPC client with typed method names.
  */
 export const useJrpc = <TMethod extends string>(args: RpcMethodArgs): RpcClient<TMethod> => {
 
-    const { endpoint, version } = args;
-    const { post } = useAxios()
-
+    const { endpoint, version, config } = args;
+    
+    // Attach interceptors to the config-provided axios instance
+    const { post } = useAxios(config);
+ 
+    /**
+     * Sends a JSON-RPC notification (no ID, no response expected).
+     */
     const notify = async (method: TMethod, data?: object): Promise<any> => {
         const { data: result } = await post<WebMessage>(endpoint(), {
             version,
@@ -67,13 +95,17 @@ export const useJrpc = <TMethod extends string>(args: RpcMethodArgs): RpcClient<
         return result;
     }
 
+    /**
+     * Sends a JSON-RPC request with a unique ID for response correlation.
+     * The server must respond with a matching ID.
+     */
     const request = async <T extends WebMessage>(method: TMethod, data?: object): Promise<T> => {
 
         const { data: result } = await post<T>(endpoint(), {
             version,
             method,
             data,
-            id: getRandomHex(8) //Id is required for request functions
+            id: getRandomHex(8) // Unique request ID required for RPC requests
         });
 
         return result;
