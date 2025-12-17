@@ -21,9 +21,32 @@
     VUE EXPORTS
 *************************/
 
-export * from './vue/useApiCall';
-export * from './vue/validation';
-export * from './vue/toast';
-export * from './vue/useAppDataStorage';
-export * from './vue/useConfirm';
-export * from './vue/usePassConfirm';
+// useApiCall - Wrapper for making API calls with loading state
+export type { UseApiCallArgs, UseApiCallReturn } from './vue/useApiCall';
+export { useApiCall } from './vue/useApiCall';
+
+// validation - Form validation utilities
+export type { 
+    IValidator, 
+    VuelidateInstance, 
+    ValidateFunction, 
+    VuelidateOrValidator 
+} from './vue/validation';
+export { validateForm } from './vue/validation';
+
+// useAppDataStorage - StorageLikeAsync adapter for UserAppDataApi
+export { useAppDataAsyncStorage } from './vue/useAppDataStorage';
+
+// usePassConfirm - Password-protected API calls
+export type { IElevatedCallPassThrough } from './vue/usePassConfirm';
+export { usePassConfirm } from './vue/usePassConfirm';
+
+// toast - Agnostic toast notification system
+export type { 
+    ToastAdapter, 
+    Toaster, 
+    ToastMessage, 
+    ToastType 
+} from './vue/toaster';
+
+export { createToaster } from './vue/toaster';
