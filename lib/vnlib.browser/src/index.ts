@@ -60,6 +60,7 @@ export type {
     AccountRpcGetResult,
     AccountRpcRequest,
     AccountRpcResponse,
+    AccountRpcMethod,
     ExtendedLoginResponse,
     UserLoginRequest,
     ProfileApi,
