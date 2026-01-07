@@ -25,42 +25,57 @@ import { find } from 'lodash-es';
 
 export type UserArg = object;
 
+/**
+ * Server representation of a single MFA method for the current user.
+ */
 export interface MfaMethodResponse{
     readonly type: MfaMethod;
     readonly enabled: boolean;
     readonly data: any;
 }
 
+/**
+ * Full MFA configuration returned from the server.
+ */
 export interface MfaGetResponse{
     readonly supported_methods: MfaMethod[];
     readonly methods: MfaMethodResponse[];
 }
 
+/**
+ * Outgoing MFA RPC request payload.
+ */
 export interface MfaRequestJson extends Record<string, any>{
+    /** MFA method being configured or executed. */
     readonly type: MfaMethod;
+    /** Server-side action name (enable, disable, verify, etc.). */
     readonly action: string;
+    /** Optional password to satisfy sensitive operations. */
     readonly password?: string;
 }
 
 
 /**
- * Represents the server api for interacting with the user's 
- * mfa configuration
+ * Represents the server API for interacting with the user's
+ * MFA configuration.
  */
 export interface MfaApi{
     /**
-     * Determines if the mfa rpc api is available
-     * and enabled on the server
+     * Determines if the MFA RPC API is available
+     * and enabled on the server.
+     * @param getData - Account RPC data containing available methods
+     * @returns True if MFA is enabled on the server
      */
     isEnabled(getData: Pick<AccountRpcGetResult, 'rpc_methods'>): boolean;
     /**
-     * Gets the mfa data for the current user
+     * Retrieves MFA configuration for the current user.
+     * @returns Promise resolving to the user's MFA settings
      */
     getData(): Promise<MfaGetResponse>;
     /**
-     * Sends an mfa rpc request to the server
-     * @param request The rpc request to send
-     * @returns A promise that resolves to the server response
+     * Sends an MFA RPC request to the server.
+     * @param request - The RPC request to send
+     * @returns Promise resolving to the server response
      */
     sendRequest<T>(request: MfaRequestJson): Promise<AccountRpcResponse<T>>;
 }

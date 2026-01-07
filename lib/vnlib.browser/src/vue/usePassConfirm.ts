@@ -23,39 +23,35 @@ import { AxiosError } from "axios";
 import { isEqual, isNil, memoize } from "lodash-es";
 
 /**
- * Extended API pass-through interface for password-protected operations.
- * Includes the user-provided password for elevated access.
+ * Pass-through payload for password-protected operations.
+ * Carries the user-supplied password from the confirmation dialog.
  */
 export interface IElevatedCallPassThrough  {
     readonly password: string;
 }
 
 /**
- * Configuration for password-protected API calls.
- * Extends UseApiCallArgs with a confirm dialog instance.
- * @template T - Type of data returned from the confirm dialog
+ * Configuration for password-protected API calls, including the confirm dialog instance.
+ * @template T - Dialog data type captured from the prompt.
  */
 export interface UsePassConfirmArgs<T> extends UseApiCallArgs {
     readonly dialog: ReturnType<typeof useConfirmDialog<T>>
 }
 
 /**
- * Gets the shared password prompt object and the elevated api call method handler 
- * to allow for elevated api calls that require a password.
- * @param args - Configuration object containing toaster for notifications
- * @returns {Object} The password prompt configuration object, and the elevated api call method
+ * Builds a password confirmation prompt with retry-aware API execution.
+ * @param args - Toaster and confirm dialog instances used by the prompt flow.
+ * @returns Combined dialog helpers plus `elevatedApiCall` for protected operations.
  */
 export const usePassConfirm = <T>(args: UsePassConfirmArgs<T>) => {
 
     const apiCall = useApiCall(args); 
 
     /**
-     * Displays the password prompt and executes the api call with the password
-     * captured from the prompt. If the api call returns a 401 error, the password
-     * prompt is re-displayed and the server error message is displayed.
-     * @template TResult - The return type of the elevated API call
-     * @param callback - The async callback method that invokes the elevated api call
-     * @returns A promise that resolves to the result of the async function, or undefined if canceled
+     * Prompts for a password, executes the protected call, and retries on 401.
+     * @template TResult - Return type of the protected API call.
+     * @param callback - Async callback that receives the captured password.
+     * @returns Result of the protected call, or undefined when canceled.
      */
     const elevatedApiCall = <TResult>(callback: (api: IElevatedCallPassThrough) => Promise<TResult>): Promise<TResult | undefined> => {
         //Invoke api call method but handle 401 errors by re-displaying the password prompt

@@ -38,6 +38,7 @@ import { useJrpc } from '../helpers/jrpc'
 /**
  * Returns the default account RPC configuration.
  * Defines the default endpoint URL for account-related operations.
+ * @returns Default account RPC configuration with standard endpoint
  */
 export const getDefaultAccountConfig = (): AccountRpcApiConfig => ({
     endpointUrl: '/account'

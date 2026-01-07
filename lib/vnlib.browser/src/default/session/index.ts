@@ -94,59 +94,50 @@ export interface SessionConfig {
 }
 
 /**
- * Represents the current server/client session state with consolidated
- * credential management helpers. Provides a unified API for credential
- * lifecycle (get/reset/clear), cryptographic operations (decrypt/hash),
- * and server authentication (OTP token generation).
+ * Session manager for handling authentication state and credentials.
  */
 export interface Session {
     /**
-     * Ensures client credentials exist, generating them if necessary.
-     * Returns the browser identifier and public key for server registration.
-     * Safe to call repeatedly; will not regenerate existing credentials.
+     * Gets the client security credentials for server registration.
+     * @returns Client credentials
      */
     getClientSecInfo(): Promise<ClientCredential>;
 
     /**
-     * Rotates all client credentials as part of logout or security reset.
-     * Generates a fresh browser ID and RSA keypair, invalidating any
-     * server-side sessions tied to the old credentials. Use when the
-     * client security context must be fully reset.
+     * Resets all client credentials for security purposes.
+     * @returns New client credentials
      */
     resetClientSecInfo(): Promise<ClientCredential>;
 
     /**
-     * Performs a hard-clear of all stored credentials without regeneration.
-     * Use when the user explicitly logs out and should not be automatically
-     * re-enrolled. All session state (browser ID, keys, tokens) is deleted.
+     * Clears all stored session data.
      */
     clearClientSecInfo(): Promise<void>;
 
     /**
-     * Decrypts server-encrypted payloads using the client's private RSA key.
-     * The server encrypts sensitive data (like HMAC keys) with the client's
-     * public key; only this method can recover the plaintext.
+     * Decrypts data received from the server.
+     * @param data - Encrypted data to decrypt
+     * @returns Decrypted data
      */
     decryptPayload(data: string | ArrayBuffer): Promise<ArrayBuffer>;
 
     /**
-     * Decrypts a payload and returns its SHA-256 digest as base64.
-     * Used for integrity verification without exposing the plaintext,
-     * particularly useful for password or token validation flows.
+     * Decrypts data and returns a verification hash.
+     * @param data - Encrypted data to decrypt and hash
+     * @returns Hash of the decrypted data
      */
     decryptAndHash(data: string | ArrayBuffer): Promise<string>;
 
     /**
-     * Stores the server-provided session token after decrypting it.
-     * This token (typically an HMAC key) is used to sign OTP requests.
-     * Must be called after successful login to enable authenticated requests.
+     * Updates session credentials from the server response.
+     * @param response - Server response containing session token
      */
     updateCredentials(response: TokenResponse): Promise<void>;
 
     /**
-     * Generates a signed JWT one-time token for authenticated API calls.
-     * Returns null if no session token is available (user not logged in).
-     * The token includes a nonce, path, and audience to prevent replay attacks.
+     * Generates an authentication token for API requests.
+     * @param path - Request path for the token
+     * @returns Token string, or null if not authenticated
      */
     generateOneTimeToken(path: string): Promise<string | null>;
 }
@@ -154,6 +145,7 @@ export interface Session {
 /**
  * Returns the default session configuration for browser-based VNLib clients.
  * Defines defaults for browser ID size, OTP nonce size, signature/key algorithms.
+ * @returns Default session configuration with secure cryptographic parameters
  */
 export const getDefaultSessionConfig = (): SessionConfig => ({
     browserIdSize: 32,

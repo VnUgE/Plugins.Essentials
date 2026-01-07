@@ -38,13 +38,23 @@ import { defaultTo } from "lodash-es";
 
 export type FidoServerOptions = PublicKeyCredentialCreationOptionsJSON
 
+/**
+ * Options for FIDO operations requiring password verification.
+ */
 export interface FidoRequestOptions extends Record<string, any>{
+    /** User's current password for sensitive operations */
     readonly password: string;
 }
 
+/**
+ * Represents a registered FIDO device for the current user.
+ */
 export interface FidoDevice{
+    /** Friendly name for the device */
     readonly n: string;
+    /** Unique device identifier */
     readonly id: string;
+    /** COSE algorithm identifier */
     readonly alg: number;
 }
 
@@ -82,61 +92,78 @@ interface FidoRegistration{
     readonly attestationObject?: string;
 }
 
-export interface FidoApi {   
-     /*
-    * Checks if the current browser supports the FIDO authentication API
-    */
+/**
+ * API for managing FIDO2/WebAuthn hardware security keys and biometric authentication.
+ */
+export interface FidoApi {
+    /**
+     * Checks if the current browser supports the FIDO authentication API.
+     * @returns True if WebAuthn is supported in the current browser
+     */
     isSupported(): boolean;
 
     /**
-     * Gets fido credential options from the server for a currently logged-in user
-     * @returns A promise that resolves to the server options for the FIDO API
+     * Gets FIDO credential options from the server for a currently logged-in user.
+     * @param options - Optional password and request configuration
+     * @returns Promise resolving to server options for the FIDO API
      */
     beginRegistration: (options?: Partial<FidoRequestOptions>) => Promise<PublicKeyCredentialCreationOptionsJSON>;
 
     /**
-     * Creates a new credential for the currently logged-in user
-     * @param credential The credential to create
-     * @returns A promise that resolves to a web message
+     * Creates a new credential for the currently logged-in user.
+     * @param credential - The credential registration response from the authenticator
+     * @param commonName - Friendly name for this device
+     * @returns Promise resolving to operation status
      */
     registerCredential: (credential: RegistrationResponseJSON, commonName: string) => Promise<AccountRpcResponse<string>>;
     
     /**
-     * Registers the default device for the currently logged-in user
-     * @returns A promise that resolves to a web message status of the operation
+     * Registers the default device for the currently logged-in user.
+     * @param commonName - Friendly name for this device
+     * @param options - Optional password for verification
+     * @returns Promise resolving to operation status
      */
     registerDefaultDevice: (commonName: string, options?: Partial<FidoRequestOptions>) => Promise<AccountRpcResponse<string>>;
 
     /**
      * Disables a device for the currently logged-in user.
-     * May require a password to be passed in the options
-     * @param device The device descriptor to disable
-     * @param options The options to pass to the server
-     * @returns A promise that resolves to a web message status of the operation
+     * May require a password to be passed in the options.
+     * @param device - The device descriptor to disable
+     * @param options - Optional password for verification
+     * @returns Promise resolving to operation status
      */
     disableDevice: (device: FidoDevice, options?: Partial<FidoRequestOptions>) => Promise<AccountRpcResponse<string>>;
 
     /**
      * Disables all devices for the currently logged-in user.
-     * May require a password to be passed in the options
-     * @param options The options to pass to the server
-     * @returns A promise that resolves to a web message status of the operation
+     * May require a password to be passed in the options.
+     * @param options - Optional password for verification
+     * @returns Promise resolving to operation status
      */
     disableAllDevices: (options?: Partial<FidoRequestOptions>) => Promise<AccountRpcResponse<string>>;
 }
 
+/**
+ * Overloaded function signature for creating FIDO API with optional request sender.
+ */
 export interface UseFidoApi {
     /**
-     * Creates a minimal fido api for checking browser support 
+     * Creates a minimal FIDO API for checking browser support.
+     * @returns FIDO API with only isSupported method
      */
     (): Pick<FidoApi, 'isSupported'>;
+    /**
+     * Creates a full FIDO API with server communication capabilities.
+     * @param options - MFA request sender for server operations
+     * @returns Complete FIDO API instance
+     */
     (options: Pick<MfaApi, 'sendRequest'>): FidoApi;
 }
 
- /**
- * Creates a fido api for configuration and management of fido client devices
- * @param sendRequest The function to send a request to the server
- * @returns An object containing the fido api
+/**
+ * Creates a FIDO API for configuration and management of FIDO client devices.
+ * @param options - Optional MFA request sender from useMfaApi
+ * @returns FIDO API instance with device management methods
  */
 export const useFidoApi: UseFidoApi = (options?: Pick<MfaApi, 'sendRequest'>): FidoApi =>{
 
@@ -212,10 +239,10 @@ interface IFidoMfaFlow extends MfaFlow<'fido'> {
 }
 
 /**
- * Enables fido as a supported multi-factor authentication method
- * @returns A mfa login processor for fido multi-factor
+ * Enables FIDO as a supported multi-factor authentication method.
+ * @returns MFA login processor for FIDO multi-factor authentication
  */
-export const fidoMfaProcessor = () : MfaTypeProcessor => {
+export const fidoMfaProcessor = (): MfaTypeProcessor => {
 
     const getContinuation = (payload: MfaMessage, state: MfaUpgradeState) : Promise<IFidoMfaFlow> => {
 
@@ -240,23 +267,26 @@ export const fidoMfaProcessor = () : MfaTypeProcessor => {
     }
 }
 
+/**
+ * Options for authenticating with FIDO during MFA login flow.
+ */
 export interface FidoAuthenticateOptions {
     /**
-     * Whether to use autofill for the FIDO authentication
-     * @default false
+     * Whether to use browser autofill for FIDO authentication.
+     * @defaultValue false
      */
     useAutoFill?: boolean;
     /**
-     * Optional request options to pass to the FIDO authentication request
+     * Optional password and request configuration.
      */
     options?: Partial<FidoRequestOptions>;
 }
 
 /**
- * Authenticates a user using FIDO multi-factor authentication from a pending mfa flow
- * @param flow The mfa flow to authenticate with
- * @param options Optional options for the FIDO authentication
- * @return A promise that resolves to a web message containing the authentication result
+ * Authenticates a user using FIDO multi-factor authentication from a pending MFA flow.
+ * @param flow - The MFA flow to authenticate with
+ * @param options - Optional autofill and request configuration
+ * @returns Promise resolving to authentication result
  */
 export const fidoMfaAuthenticate = async <T>(flow: MfaFlow<'fido'>, options?: FidoAuthenticateOptions): Promise<WebMessage<T>> => {
 

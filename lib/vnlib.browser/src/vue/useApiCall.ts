@@ -21,22 +21,23 @@ import { type Ref, readonly, ref } from '@vue/reactivity';
 import { defaultTo, isArray, isNil, first, isString } from 'lodash-es';
 import type { Toaster } from './toaster';
 
+/**
+ * Minimal dependencies required to build an API call wrapper.
+ */
 export interface UseApiCallArgs {
+    /** Toaster used for surfacing user-friendly error messages. */
     readonly toaster: Toaster
 }
 
+/**
+ * API call wrapper with built-in waiting state and toast-based error handling.
+ */
 export interface UseApiCallReturn {
-    /**
-     * The api call function object {apiCall: Promise }
-     */
+    /** Executes the provided async callback with error handling. */
     <TR>(callback: () => Promise<TR | undefined>): Promise<TR | undefined>;
-    /**
-     * The api call function object {apiCall: Promise }
-     */
+    /** Explicit alias for invoking the wrapped callback. */
     invoke<TR>(callback: () => Promise<TR | undefined>): Promise<TR | undefined>;
-    /**
-     * The waiting flag that indicates if the api call is in progress
-     */
+    /** Reactive flag indicating an in-flight request. */
     readonly waiting: Readonly<Ref<boolean>>;
 }
 
@@ -45,10 +46,9 @@ type ValidationError = { property: string, message: string }
 type ErrorResponse = ValidationError | string
 
 /**
- * Provides a wrapper method for making remote api calls to a server
- * while capturing context and errors and common api arguments.
- * @param args - 
- * @returns API call wrapper with waiting state
+ * Provides a wrapper for remote API calls with standardized toast errors and waiting state.
+ * @param args - Toaster dependency injected by the caller.
+ * @returns Callable wrapper with waiting state exposure.
  */
 export const useApiCall = ({ toaster }: UseApiCallArgs): UseApiCallReturn => {
     

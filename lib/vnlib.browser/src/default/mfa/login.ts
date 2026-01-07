@@ -29,109 +29,117 @@ export type MfaMethod = 'totp' | 'fido' | 'pkotp';
 
 export interface MfaSubmission {
     /**
-     * TOTP code submission
+     * Verification code from authenticator app.
      */
     readonly code?:  number;
-
+    
+    /**
+     * FIDO security key credential.
+     */
     readonly fido?: any;
 }
 
 /**
- * The mfa upgrade message that is signed and sent to the client
- * to complete the mfa upgrade process
+ * MFA challenge issued by the server during login.
  */
 export interface MfaMessage extends JWTPayload {
     /**
-     * The supported mfa methods for the user
+     * Available MFA methods for this user.
      */
     readonly capabilities: MfaMethod[];
+    
     /**
-     * The time in seconds that the mfa upgrade is valid for
+     * How long the challenge remains valid (seconds).
      */
     readonly expires?: number;
 }
 
 export interface MfaFlow<T extends MfaMethod>{
     /**
-     * The mfa method this continuation is for 
+     * The MFA method for this flow.
      */
     readonly type: T;
+    
     /**
-     * Sumits the mfa message to the server and attempts to complete 
-     * a login process
-     * @param message The mfa submission to send to the server
-     * @returns A promise that resolves to a login result
+     * Submits the MFA response to complete login.
+     * @param message - MFA verification data
+     * @returns Server response with authentication result
      */
     submit: <T>(message: MfaSubmission) => Promise<WebMessage<T>>;
 }
 
 /**
- * Retuned by the login API to signal an MFA upgrade is 
- * required to continue the login process
+ * MFA challenge that requires additional verification to complete login.
  */
 export interface MfaContinuation {
     /**
-   * The time in seconds that the mfa upgrade is valid for
-   */
+     * How long the challenge remains valid (seconds).
+     */
     readonly expires?: number;
+    
     /**
-     * The mfa methods that are supported by the user
-     * to continue the login process
+     * Available verification methods.
      */
     readonly methods: MfaFlow<MfaMethod>[]
 }
 
 /**
- * Interface for handling mfa upgrade submissions to the server
+ * Handler for submitting MFA verification responses.
  */
 export interface MfaUpgradeState {
     /**
-     * Submits an mfa upgrade submission to the server
-     * @param submission The mfa upgrade submission to send to the server to complete an mfa login
+     * Submits MFA verification to the server.
+     * @param submission - MFA verification data
+     * @returns Server response
      */
     submit<T>(submission: MfaSubmission): Promise<WebMessage<T>>;
 
+    /**
+     * RPC command executor for server communication.
+     */
     execRpcCommand: ReturnType<typeof useAccountRpc>['exec'];
 }
 
 /**
- * Interface for processing mfa messages from the server of a given 
- * mfa type
+ * Handler for a specific MFA method.
  */
 export interface MfaTypeProcessor {
     readonly type: MfaMethod;
+    
     /**
-     * Determines if the current runtime supports login with this method
-     * @returns True if the mfa type is supported by the client
+     * Checks if this MFA method is supported on this device.
+     * @returns True if supported
      */
     readonly isSupported: () => boolean;
 
     /**
-    * Processes an MFA message payload of the registered mfa type
-    * @param payload The mfa message from the server as a string
-    * @param state The submission handler to use to submit the mfa upgrade
-    * @returns A promise that resolves to a Login request
-    */
+     * Prepares the MFA verification flow.
+     * @param payload - Server challenge data
+     * @param state - Submission handler
+     * @returns MFA flow for this method
+     */
     getContinuation: (payload: MfaMessage, state: MfaUpgradeState) => Promise<MfaFlow<MfaMethod>>
 }
 
 export interface MfaLoginManager {
     /**
-     * Gets a value that indicates if the given mfa method is supported by the client
-     * @param method The mfa method to check for support
-     * @returns True if the mfa method is supported by the client
+     * Checks if an MFA method is supported on this device.
+     * @param method - MFA method to check
+     * @returns True if the method is supported
      */
     isSupported(method: MfaMethod): boolean;
+    
     /**
-     * Logs a user in with the given username and password, and returns a login result
-     * or a mfa flow continuation depending on the login flow
-     * @param credential The login credential to for the user (username and password)
+     * Authenticates a user, handling MFA if required.
+     * @param credential - User login credentials
+     * @returns Login result or MFA continuation
      */
     login(credential: UserLoginCredential): Promise<WebMessage | MfaContinuation>;
+    
     /**
-     * Checks if the given response is an mfa continuation response
-     * @param response The response to check
-     * @returns True if the response is an mfa continuation response
+     * Checks if a response requires MFA verification.
+     * @param response - Server response to check
+     * @returns True if MFA is required
      */
     isMfaResponse: (response: WebMessage | MfaContinuation) => response is MfaContinuation;
 }
@@ -268,10 +276,8 @@ export const useMfaLogin = (options: MfaLoginOptions): MfaLoginManager => {
         if (mfa && upgrade && mfa === true){
 
             /**
-             * Gets all contiuations from the server's list of supported 
-             * mfa upgrade types. This table will be the union of all 
-             * enabled client handlers and the mfa methods the user has
-             * enabled on their account for continuation of the login process
+             * Builds all continuations for the intersection of client-enabled
+             * handlers and server-declared MFA capabilities for this user.
              */
             const continuations = await processMfa(upgrade, response.finalize);
 

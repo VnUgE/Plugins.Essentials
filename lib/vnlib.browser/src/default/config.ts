@@ -124,6 +124,8 @@ const resolveDefaultStorage = (): StorageLikeAsync => {
  * Creates an isolated API configuration with module-local defaults merged
  * with user overrides. The returned config must be passed explicitly to
  * composables (e.g., useSession(config)) to ensure side-effect-free usage.
+ * @param overrides - Optional configuration overrides for session, axios, account, and storage
+ * @returns Fully configured API instance ready for use with library composables
  */
 export const createApiConfig = (overrides?: ApiConfigOverrides): ApiConfig => {
     

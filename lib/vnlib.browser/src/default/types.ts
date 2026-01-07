@@ -23,43 +23,48 @@ import type { AccountRpcApiConfig } from "./account/types";
 import type { SessionConfig } from "./session";
 
 /**
- * Represents a uniform message from the server
+ * Standard response format for server API calls.
  */
 export interface WebMessage<T = unknown> {
     /**
-     * The result of the operation, or an error message
-     * if the sucess value is false
+     * The result data when successful, or an error message when failed.
      */
-    readonly result : T | string;
+    readonly result: T | string;
+    
     /**
-     * True if the operation was successful, false otherwise
+     * Whether the operation succeeded.
      */
-    readonly success : boolean;
+    readonly success: boolean;
+    
     /**
-     * Validation errors, if any occured
+     * Validation errors if the request was rejected.
      */
-    readonly errors?: ServerValidationError[]
+    readonly errors?: ServerValidationError[];
 
     /**
-     * Returns the result, or throws an error if the operation was not successful
+     * Gets the result or throws an error if the operation failed.
+     * @returns The result data
+     * @throws Error if the operation failed
      */
-    getResultOrThrow() : T;
+    getResultOrThrow(): T;
 }
 
 /**
- * Represents a validation error from the server for a specific property
+ * Validation error for a specific property.
  */
 export interface ServerValidationError{
     /**
-     * The property that failed validation
+     * The property that failed validation.
      */
-    readonly property : string;
+    readonly property: string;
+    
     /**
-     * The error message
+     * Error message describing the validation failure.
      */
     readonly message: string;
 }
 
+/** Value that may be delivered synchronously or via a Promise. */
 export type Awaitable<T> = T | Promise<T>;
 
 /**
@@ -214,7 +219,7 @@ export interface ApiConfigOverrides {
          * Useful for sharing instances or applying custom interceptors.
          * 
          * @remarks
-         * When provided, the library will provision the instance to work woth vnlib apis
+         * When provided, the library will provision the instance to work with VNLib APIs.
          */
         readonly instance?: Axios;
         
@@ -296,7 +301,7 @@ export interface ApiConfigOverrides {
      * If provided, the library will call this function with debug messages.
      * Useful for development and troubleshooting.
      * 
-     * @remarks NOTE: Mey print client-side sensitive data (altough it's avoided)
+    * @remarks NOTE: May print client-side sensitive data (although it's avoided)
      * 
      * @example
      * // Simple console logging

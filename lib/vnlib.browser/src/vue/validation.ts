@@ -23,35 +23,37 @@ import { get } from '@vueuse/core';
 import { type Toaster } from "./toaster";
 
 /**
- * Represents a generic validator interface that can be used
- * for form validation.
+ * Represents a generic validator interface that can be used for form validation.
  */
 export interface IValidator {
     /**
-     * Performs asynchronous validation and returns a boolean
-     * indicating if the validation was successful
+     * Performs asynchronous validation and returns a boolean indicating success.
+     * @returns Promise resolving to true if validation passes
      */
     validate(): Promise<boolean>;
     /**
-     * Returns the first error message in the validation list
+     * Returns the first error message in the validation list.
+     * @returns Error object with the first validation failure message
      */
     firstError(): Error;
 }
 
 /**
- * Represents a validator that performs validation and returns a boolean
- * along with an error message if the validation fails
+ * Represents a Vuelidate validator instance with validation methods and error tracking.
  */
 export interface VuelidateInstance {
-     /**
-     * Computes the validation of the wrapped validator and captures the results.
-     * If the validation fails, the first error message is displayed in a toast notification.
-     * @returns The result of the validation
+    /**
+     * Computes validation and captures results.
+     * @returns Promise resolving to true if all validations pass
      */
-    $validate: () => Promise<boolean>;
+     $validate: () => Promise<boolean>;
+    /** Array of validation error messages */
     $errors: Array<{ $message: MaybeRef<string> }>;
 }
 
+/**
+ * Function signature for validating forms with optional toast notifications.
+ */
 export interface ValidateFunction {
     (validator: MaybeRef<VuelidateInstance>, toaster?: Toaster): Promise<boolean>;
     (validator: MaybeRef<IValidator>, toaster?: Toaster): Promise<boolean>;
@@ -89,7 +91,9 @@ const wrapVuelidate = (validator: MaybeRef<VuelidateInstance | IValidator>): IVa
     };
 }
 
-//Define any type that has a $validate method and an $errors property
+/**
+ * Union type accepting either Vuelidate or custom validator instances.
+ */
 export type VuelidateOrValidator = VuelidateInstance | IValidator;
 
 /**
@@ -97,8 +101,8 @@ export type VuelidateOrValidator = VuelidateInstance | IValidator;
  * if the validation fails.
  * @template T - Validator type extending VuelidateInstance
  * @param toaster - Toaster instance to display error messages
- * @param validator - The validator to use for validation, can be a VuelidateInstance or IValidator
- * @returns A promise that resolves to true if the validation is successful, false otherwise
+ * @param validator - The validator to use for validation (Vuelidate or IValidator)
+ * @returns Promise resolving to true if validation succeeds, false otherwise
  */
 export const validateForm = async <T extends VuelidateInstance>(toaster: Toaster, validator: MaybeRef<T>)
    : Promise<boolean> => {

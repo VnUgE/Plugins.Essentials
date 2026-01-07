@@ -61,6 +61,7 @@ const resolveSecureFlag = (): boolean => {
 
 /**
  * Checks whether the current runtime exposes `crypto.subtle` APIs.
+ * @returns True if Web Crypto API is available
  */
 export const isCryptoSupported = (): boolean => {
     const runtimeCrypto = resolveRuntimeCrypto();
@@ -70,6 +71,8 @@ export const isCryptoSupported = (): boolean => {
 /**
  * Returns the crypto runtime or throws when the platform cannot satisfy the
  * Web Crypto API requirements (subtle crypto missing, insecure context, etc.).
+ * @returns Normalized crypto context with subtle API and secure flag
+ * @throws Error if Web Crypto API is unavailable
  */
 export const getCryptoContext = (): CryptoContext => {
 
@@ -89,6 +92,8 @@ export const getCryptoContext = (): CryptoContext => {
 
 /**
  * Shortcut helper that returns the `SubtleCrypto` interface or throws.
+ * @returns SubtleCrypto interface for cryptographic operations
+ * @throws Error if Web Crypto API is unavailable
  */
 export const getCryptoOrThrow = (): SubtleCrypto => getCryptoContext().subtle;
 

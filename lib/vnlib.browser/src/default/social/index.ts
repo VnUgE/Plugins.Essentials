@@ -26,74 +26,101 @@ import type { AccountRpcGetResult, AccountRpcResponse } from "../account/types";
 type ProcedureName = 'upgrade' | 'authenticate' | 'logout';
 
 /**
- * A social OAuth portal that defines a usable server 
- * enabled authentication method
+ * A social OAuth portal that defines a usable server-enabled authentication method.
  */
 export interface SocialOAuthMethod {
+    /** Whether this method is supported by the server */
     readonly supported: boolean;
+    /** Unique identifier for this OAuth method */
     readonly method_id: string;
+    /** Method configuration and display data */
     readonly data:{
+        /** Whether this method is currently enabled */
         readonly enabled: boolean;
+        /** Display name for UI presentation */
         readonly friendly_name: string;
+        /** Optional icon URL for branding */
         readonly icon_url?: string;
     }
 }
 
+/**
+ * Server response containing available OAuth procedures and configured methods.
+ */
 export interface SocialLoginRpcResponse{
+    /** List of OAuth RPC procedures supported by the server */
     readonly supported_procedures : ProcedureName[]
+    /** List of configured OAuth methods/providers */
     readonly methods: SocialOAuthMethod[]
 }
 
+/**
+ * Arguments for initiating a social OAuth login flow.
+ * @template T - Whether auto-redirect is enabled (default true)
+ */
 export type BeginFlowArgs<T = true> = {
+    /** The OAuth method/provider to use */
     readonly method: SocialOAuthMethod;
+    /** Whether to automatically redirect to the provider (default true) */
     readonly autoRedirect?: T;
 }
 
+/**
+ * Options for social OAuth logout operations.
+ */
 export interface LogoutArguments {
+    /** Whether to automatically redirect after logout */
     readonly autoRedirect?: boolean;
+    /** Override URL to use instead of server-provided redirect */
     readonly overrideRedirectUrl?: string;
 }
 
+/**
+ * Server response from social OAuth logout operation.
+ */
 export interface LogoutResponse {
+    /** Optional redirect URL provided by the OAuth provider */
     readonly redirect_url?: string;
 }
 
+/**
+ * API for managing OAuth2 social login flows with third-party providers.
+ */
 export interface SocialLoginApi{
     /**
      * Retrieves enabled OAuth portals from server configuration.
      * Filters account RPC data to extract social login methods configured by the server.
-     * 
-     * @param rpcData - Account RPC properties containing social OAuth config.
-     * @returns Array of enabled social authentication portals.
+     * @param rpcData - Account RPC properties containing social OAuth config
+     * @returns Array of enabled social authentication portals
      */
     getPortals(rpcData: Pick<AccountRpcGetResult, 'properties'>): SocialOAuthMethod[]
     /**
-     * Begins an OAuth2 social web authentication flow against the server
-     * handling encryption and redirection of the browser
-     * @param method The desired method to use for login
+     * Begins an OAuth2 social login flow (optionally without auto-redirect).
+     * @param args - Social method to use and autoRedirect preference
+     * @returns Promise resolving when redirected (or void if autoRedirect is false)
      */
     beginLoginFlow(args: BeginFlowArgs): Promise<void>;
     /**
-     * Begins an OAuth2 social web authentication flow against the server
-     * handling encryption and redirection of the browser
-     * @param method The desired method to use for login
+     * Begins an OAuth2 social login flow and returns the auth URL instead of redirecting.
+     * @param args - Social method to use with autoRedirect disabled
+     * @returns Promise resolving to the authorization URL
      */
     beginLoginFlow(args: BeginFlowArgs<false>): Promise<{ authUrl: string }>;
     /**
-     * Completes a login flow if authorized, otherwise throws an error
-     * with the message from the server
-     * @returns A promise that resolves when the login is complete 
+     * Completes the OAuth2 callback exchange and finalizes login.
+     * @returns Promise resolving when login is finalized
      */
     completeLogin(): Promise<void>;
     /**
-     * Logs out of the current session
-     * @returns A promise that resolves to true if the logout could be handled by 
-     * the current method, otherwise false
+     * Logs out of the current session and optionally redirects to the provider.
+     * @param args - Optional redirect configuration
+     * @returns Promise resolving to logout response with optional redirect URL
      */
     logout(args?: LogoutArguments): Promise<LogoutResponse | undefined>;
     /**
-     * Gets a value indicating if this service is enabled on the server
-     * @param rpcData The account rpc data returned from a call to getData()
+     * Checks if social OAuth is enabled on the server.
+     * @param rpcData - Account RPC data containing available methods
+     * @returns True if social OAuth is enabled
      */
     isEnabled(rpcData: Pick<AccountRpcGetResult, 'rpc_methods'>): boolean;
 }
@@ -105,8 +132,8 @@ type UpgradeResponse = {
 /**
  * Internal helper for social OAuth RPC communication.
  * Wraps the account RPC to provide social-specific method execution.
- * 
- * @param config - Api configuration instance.
+ * @param config - Api configuration instance
+ * @returns Social RPC execution helpers with typed method calls
  */
 const useSocialRpc = (config: ApiConfig) => {
     const rpc = useAccountRpc(config);
@@ -130,7 +157,7 @@ const useSocialRpc = (config: ApiConfig) => {
 }
 
 /**
- * Configuration options for social OAuth login.
+ * Configuration options for social OAuth login (reserved for future use).
  */
 export type OauthLoginOptions = Record<string, never>;
 
@@ -138,9 +165,9 @@ export type OauthLoginOptions = Record<string, never>;
  * Creates a social OAuth login API for third-party authentication flows.
  * Supports OAuth2 flows with server-side portal configuration, including
  * authorization URL generation, callback handling, and session management.
- * 
- * @param config - Api configuration instance created at app startup.
- * @returns Social login API with methods for OAuth flow management.
+ * @param config - Api configuration instance created at app startup
+ * @param _options - Reserved for future configuration options
+ * @returns Social login API with methods for OAuth flow management
  */
 export const useOauthLogin = (config: ApiConfig, _options?: OauthLoginOptions): SocialLoginApi => {
 

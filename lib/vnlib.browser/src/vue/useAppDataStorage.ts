@@ -22,9 +22,10 @@ import type { StorageLikeAsync } from "@vueuse/core"
 import type { UserAppDataApi } from "../default/app-data"
 
 /**
- * Creates a StorageLikeAsync object that uses the given UserAppDataApi
- * @param api The UserAppDataApi instance to use
- * @returns The StorageLikeAsync object
+ * Adapts a UserAppDataApi to the StorageLikeAsync contract (get/set/remove).
+ * Values are stored as single-element arrays to preserve raw strings over axios.
+ * @param api - User app data API instance from useUserAppDataApi
+ * @returns StorageLikeAsync adapter compatible with VueUse storage composables
  */
 export const useAppDataAsyncStorage = (api: UserAppDataApi): StorageLikeAsync => {
     return{
