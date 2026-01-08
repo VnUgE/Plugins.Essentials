@@ -25,21 +25,8 @@
 export type { UseApiCallArgs, UseApiCallReturn } from './vue/useApiCall';
 export { useApiCall } from './vue/useApiCall';
 
-// validation - Form validation utilities
-export type { 
-    IValidator, 
-    VuelidateInstance, 
-    ValidateFunction, 
-    VuelidateOrValidator 
-} from './vue/validation';
-export { validateForm } from './vue/validation';
-
 // useAppDataStorage - StorageLikeAsync adapter for UserAppDataApi
 export { useAppDataAsyncStorage } from './vue/useAppDataStorage';
-
-// usePassConfirm - Password-protected API calls
-export type { IElevatedCallPassThrough } from './vue/usePassConfirm';
-export { usePassConfirm } from './vue/usePassConfirm';
 
 // toast - Agnostic toast notification system
 export type { 
