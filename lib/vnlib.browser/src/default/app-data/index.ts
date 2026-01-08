@@ -194,16 +194,13 @@ export const useAppDataApi = (options: AppDataApiOptions): UserAppDataApi => {
  * @param options - Optional axios and config scope configuration.
  * @returns Scoped app-data API instance.
  */
-export const useScopedAppDataApi = (
-    endpoint: string,
-    dataScope: string,
-    options: { config: ApiConfig }
-): ScopedUserAppDataApi => {
-    const api = useAppDataApi({ endpoint, ...options });
+export const useScopedAppDataApi = (config: { dataScope: string } & AppDataApiOptions): ScopedUserAppDataApi => {
+
+    const api = useAppDataApi(config);
 
     return {
-        get: <T>(options: AppDataGetOptions) => api.get<T>(dataScope, options),
-        set: <T>(data: T, options: AppDataSetOptions) => api.set(dataScope, data, options),
-        remove: () => api.remove(dataScope)
+        get: <T>(options: AppDataGetOptions) => api.get<T>(config.dataScope, options),
+        set: <T>(data: T, options: AppDataSetOptions) => api.set(config.dataScope, data, options),
+        remove: () => api.remove(config.dataScope)
     }
 }
