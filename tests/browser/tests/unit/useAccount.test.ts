@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { 
+import {
   useAccount,
   useAccountRpc,
   useProfile,
@@ -11,16 +11,16 @@ import {
   type UserLoginRequest
 } from '@vnuge/vnlib.browser'
 
-import { vnlib } from '../../main'
+import { vnlib } from '../../fixtures'
 
 describe('Account API - Unit Tests', () => {
 
   describe('useAccountRpc - API Structure', () => {
     it('should create account RPC instance with correct type', () => {
       const accountRpc: AccountRpcApi<string> = useAccountRpc<string>(vnlib)
-      
+
       expect(accountRpc).toBeDefined()
-      
+
       expect(accountRpc.getData).toBeDefined()
       expect(accountRpc.getData).toBeTypeOf('function')
 
@@ -33,7 +33,7 @@ describe('Account API - Unit Tests', () => {
 
     it('should properly check if method is enabled', () => {
       const accountRpc: AccountRpcApi<'login' | 'logout'> = useAccountRpc<'login' | 'logout'>(vnlib)
-      
+
       const mockData: Pick<AccountRpcGetResult, 'rpc_methods'> = {
         rpc_methods: [
           { method: 'login', options: [] },
@@ -47,7 +47,7 @@ describe('Account API - Unit Tests', () => {
 
     it('should handle method checking with empty methods list', () => {
       const { isMethodEnabled } = useAccountRpc<'mfa.get'>(vnlib)
-      
+
       const mockData: Pick<AccountRpcGetResult, 'rpc_methods'> = {
         rpc_methods: []
       }
@@ -59,7 +59,7 @@ describe('Account API - Unit Tests', () => {
       // Test that the generic parameter properly constrains method types
       type MfaMethods = 'mfa.get' | 'mfa.rpc'
       const { isMethodEnabled } = useAccountRpc<MfaMethods>(vnlib)
-      
+
       const mockData: Pick<AccountRpcGetResult, 'rpc_methods'> = {
         rpc_methods: [
           { method: 'mfa.get', options: ['auth_required'] },
@@ -73,7 +73,7 @@ describe('Account API - Unit Tests', () => {
 
     it('should work with single method type', () => {
       const { isMethodEnabled } = useAccountRpc<'profile.get'>(vnlib)
-      
+
       const mockData: Pick<AccountRpcGetResult, 'rpc_methods'> = {
         rpc_methods: [
           { method: 'profile.get', options: [] }
@@ -85,10 +85,10 @@ describe('Account API - Unit Tests', () => {
 
     it('should handle undefined or null rpc_methods gracefully', () => {
       const { isMethodEnabled } = useAccountRpc<'test.method'>(vnlib)
-      
+
       // Test with empty array
       expect(isMethodEnabled({ rpc_methods: [] }, 'test.method')).toBe(false)
-      
+
       // The function should handle edge cases gracefully
       const mockData: Pick<AccountRpcGetResult, 'rpc_methods'> = {
         rpc_methods: [
@@ -102,7 +102,7 @@ describe('Account API - Unit Tests', () => {
   describe('useAccount - API Structure', () => {
     it('should create account instance with proper types', () => {
       const account: AccountApi = useAccount(vnlib)
-      
+
       expect(account).toBeDefined()
       expect(account.prepareLogin).toBeDefined()
       expect(account.login).toBeDefined()
@@ -113,9 +113,9 @@ describe('Account API - Unit Tests', () => {
 
     it('should prepare login request properly', async () => {
       const { prepareLogin } = useAccount(vnlib)
-      
+
       const loginRequest: UserLoginRequest = await prepareLogin()
-      
+
       expect(loginRequest).toBeDefined()
       expect(loginRequest.finalize).toBeDefined()
       expect(loginRequest.finalize).toBeTypeOf('function')
@@ -123,7 +123,7 @@ describe('Account API - Unit Tests', () => {
 
     it('should handle heartbeat functionality', () => {
       const { heartbeat } = useAccount(vnlib)
-      
+
       expect(heartbeat).toBeDefined()
       expect(heartbeat).toBeTypeOf('function')
     })
@@ -132,7 +132,7 @@ describe('Account API - Unit Tests', () => {
   describe('useProfile - API Structure', () => {
     it('should create profile API with correct methods', () => {
       const profileApi = useProfile(vnlib)
-      
+
       expect(profileApi).toBeDefined()
       expect(profileApi.getProfile).toBeDefined()
       expect(profileApi.canGetProfile).toBeDefined()
@@ -142,7 +142,7 @@ describe('Account API - Unit Tests', () => {
 
     it('should check if profile can be retrieved', () => {
       const { canGetProfile } = useProfile(vnlib)
-      
+
       const mockData: Pick<AccountRpcGetResult, 'rpc_methods'> = {
         rpc_methods: [
           { method: 'profile.get', options: ['auth_required'] }
@@ -154,7 +154,7 @@ describe('Account API - Unit Tests', () => {
 
     it('should check if profile can be updated', () => {
       const { canUpdateProfile } = useProfile(vnlib)
-      
+
       const mockData: Pick<AccountRpcGetResult, 'rpc_methods'> = {
         rpc_methods: [
           { method: 'profile.update', options: ['auth_required'] }

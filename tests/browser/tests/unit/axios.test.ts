@@ -1,12 +1,10 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { 
+import {
   useAxios,
   getDefaultAxiosRequestConfig,
   createApiConfig,
-  type AxiosConfig,
-  type WebMessage
+  type AxiosConfig
 } from '@vnuge/vnlib.browser'
-import type { AxiosRequestConfig } from 'axios';
 
 describe('Axios Integration - Unit Tests', () => {
 
@@ -20,12 +18,12 @@ describe('Axios Integration - Unit Tests', () => {
   describe('getDefaultAxiosRequestConfig', () => {
     it('should return default axios request config', () => {
       const defaultConfig = getDefaultAxiosRequestConfig()
-      
+
       expect(defaultConfig).toBeDefined()
-      
+
       expect(defaultConfig.timeout).toBeDefined()
       expect(defaultConfig.timeout).toBeTypeOf('number')
-      
+
       expect(defaultConfig.withCredentials).toBeDefined()
       expect(defaultConfig.withCredentials).toBeTypeOf('boolean')
     })
@@ -44,7 +42,7 @@ describe('Axios Integration - Unit Tests', () => {
   describe('useAxios - API Structure', () => {
     it('should return axios instance from config', () => {
       const axios = useAxios(config)
-      
+
       expect(axios).toBeDefined()
       expect(axios.get).toBeDefined()
       expect(axios.post).toBeDefined()
@@ -55,13 +53,13 @@ describe('Axios Integration - Unit Tests', () => {
 
     it('should configure interceptors only once per instance', () => {
       const axios = useAxios(config)
-      
+
       // Call useAxios again with same config
       const axios2 = useAxios(config)
-      
+
       // Should return same instance (due to config.axios.instance being reused)
       expect(axios2).toBe(axios)
-      
+
       // Verify interceptors are configured (both exist)
       expect(axios.interceptors.request).toBeDefined()
       expect(axios.interceptors.response).toBeDefined()
@@ -75,9 +73,9 @@ describe('Axios Integration - Unit Tests', () => {
           }
         }
       })
-      
+
       const axios = useAxios(customAxiosConfig)
-      
+
       expect(axios).toBeDefined()
       expect(axios.defaults.baseURL).toBe('https://custom.example.com')
     })
@@ -86,9 +84,9 @@ describe('Axios Integration - Unit Tests', () => {
   describe('AxiosConfig Type', () => {
     it('should have correct structure', () => {
       const axiosConfig: AxiosConfig = config.axios
-      
+
       expect(axiosConfig.instance).toBeDefined()
-      
+
       expect(axiosConfig.tokenHeader).toBeDefined()
       expect(axiosConfig.tokenHeader).toBeTypeOf('string')
       expect(axiosConfig.tokenHeader).toBe('X-Web-Token')
@@ -100,7 +98,7 @@ describe('Axios Integration - Unit Tests', () => {
           tokenHeader: 'X-Custom-OTP'
         }
       })
-      
+
       expect(customConfig.axios.tokenHeader).toBe('X-Custom-OTP')
     })
   })
@@ -115,22 +113,22 @@ describe('Axios Integration - Unit Tests', () => {
           }
         }
       })
-      
+
       const axios = useAxios(customConfig)
-      
+
       expect(axios.defaults.baseURL).toBe('https://api.example.com')
       expect(axios.defaults.timeout).toBe(30000)
     })
 
     it('should allow configureInstance callback', () => {
       const configureSpy = vi.fn((instance) => instance)
-      
+
       const customConfig = createApiConfig({
         axios: {
           configureInstance: configureSpy
         }
       })
-      
+
       expect(configureSpy).toHaveBeenCalledOnce()
       expect(configureSpy).toHaveBeenCalledWith(customConfig.axios.instance)
     })

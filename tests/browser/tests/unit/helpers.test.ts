@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { 
+import {
   useJrpc,
   createStorageSlot,
   debugLog,
@@ -7,7 +7,7 @@ import {
   type RpcMethodArgs,
   type AsyncStorageItem
 } from '@vnuge/vnlib.browser'
-import { vnlib } from '../../main';
+import { vnlib } from '../../fixtures';
 
 describe('Helper Functions - Unit Tests', () => {
 
@@ -18,14 +18,14 @@ describe('Helper Functions - Unit Tests', () => {
         config: vnlib,
         endpoint: () => '/rpc'
       }
-      
+
       const client: RpcClient<'test.method'> = useJrpc<'test.method'>(rpcArgs)
-      
+
       expect(client).toBeDefined()
-      
+
       expect(client.notify).toBeDefined()
       expect(client.notify).toBeTypeOf('function')
-      
+
       expect(client.request).toBeDefined()
       expect(client.request).toBeTypeOf('function')
     })
@@ -36,7 +36,7 @@ describe('Helper Functions - Unit Tests', () => {
         config: vnlib,
         endpoint: () => '/rpc'
       }
-      
+
       const client = useJrpc(rpcArgs)
       expect(client).toBeDefined()
     })
@@ -47,23 +47,23 @@ describe('Helper Functions - Unit Tests', () => {
         config: vnlib,
         endpoint: () => '/rpc'
       }
-      
+
       const client = useJrpc(rpcArgs)
       expect(client).toBeDefined()
     })
 
     it('should accept dynamic endpoint function', () => {
       let currentEndpoint = '/rpc-v1'
-      
+
       const rpcArgs: RpcMethodArgs = {
         version: '2.0.0',
         config: vnlib,
         endpoint: () => currentEndpoint
       }
-      
+
       const client = useJrpc(rpcArgs)
       expect(client).toBeDefined()
-      
+
       // Endpoint can change dynamically
       currentEndpoint = '/rpc-v2'
       expect(rpcArgs.endpoint()).toBe('/rpc-v2')
@@ -71,15 +71,15 @@ describe('Helper Functions - Unit Tests', () => {
 
     it('should support typed method names', () => {
       type MyMethods = 'user.get' | 'user.update' | 'user.delete'
-      
+
       const rpcArgs: RpcMethodArgs = {
         version: '2.0.0',
         config: vnlib,
         endpoint: () => '/api/rpc'
       }
-      
+
       const client: RpcClient<MyMethods> = useJrpc<MyMethods>(rpcArgs)
-      
+
       expect(client).toBeDefined()
     })
 
@@ -89,10 +89,10 @@ describe('Helper Functions - Unit Tests', () => {
         config: vnlib,
         endpoint: () => '/test'
       }
-      
+
       expect(args.version).toBe('2.0.0')
       expect(args.config).toBe(vnlib)
-      
+
       expect(args.endpoint).toBeTypeOf('function')
       expect(args.endpoint()).toBe('/test')
     })
@@ -123,21 +123,21 @@ describe('Helper Functions - Unit Tests', () => {
         theme: 'light',
         notifications: true
       }
-      
+
       const slot: AsyncStorageItem<Settings> = createStorageSlot(
         mockStorage,
         'settings',
         defaultValue
       )
-      
+
       expect(slot).toBeDefined()
-      
+
       expect(slot.theme).toBeDefined()
       expect(slot.theme.get).toBeDefined()
       expect(slot.theme.get).toBeTypeOf('function')
       expect(slot.theme.set).toBeDefined()
       expect(slot.theme.set).toBeTypeOf('function')
-      
+
       expect(slot.notifications).toBeDefined()
       expect(slot.notifications.get).toBeDefined()
       expect(slot.notifications.get).toBeTypeOf('function')
@@ -161,13 +161,13 @@ describe('Helper Functions - Unit Tests', () => {
         profile: { name: '', email: '' },
         settings: { darkMode: false, fontSize: 14 }
       }
-      
+
       const slot: AsyncStorageItem<UserPrefs> = createStorageSlot(
         mockStorage,
         'user-prefs',
         defaultValue
       )
-      
+
       expect(slot.profile).toBeDefined()
       expect(slot.settings).toBeDefined()
     })
@@ -184,9 +184,9 @@ describe('Helper Functions - Unit Tests', () => {
         message: 'default',
         enabled: false
       }
-      
+
       const slot = createStorageSlot(mockStorage, 'simple', defaultValue)
-      
+
       expect(slot.count).toBeDefined()
       expect(slot.message).toBeDefined()
       expect(slot.enabled).toBeDefined()
@@ -199,13 +199,13 @@ describe('Helper Functions - Unit Tests', () => {
         'test',
         { value: 42 }
       )
-      
+
       // Verify type structure at runtime
       expect(slot.value).toBeDefined()
-      
+
       expect(slot.value.get).toBeTypeOf('function')
       expect(slot.value.set).toBeTypeOf('function')
-      
+
       // Verify get returns a Promise
       const getPromise = slot.value.get()
       expect(getPromise).toBeInstanceOf(Promise)
@@ -230,7 +230,7 @@ describe('Helper Functions - Unit Tests', () => {
 
     it('should not throw when debugLog is not provided', () => {
       const configWithoutLogger = { ...vnlib }
-      
+
       // Should be a no-op, not throw
       expect(() => debugLog(configWithoutLogger, 'test', 123)).not.toThrow()
     })
@@ -277,7 +277,7 @@ describe('Helper Functions - Unit Tests', () => {
       const _rpcClient: RpcClient<string> = {} as RpcClient<string>
       const _rpcArgs: RpcMethodArgs = {} as RpcMethodArgs
       const _storageItem: AsyncStorageItem<{ test: string }> = {} as AsyncStorageItem<{ test: string }>
-      
+
       expect(_rpcClient).toBeDefined()
       expect(_rpcArgs).toBeDefined()
       expect(_storageItem).toBeDefined()
@@ -287,7 +287,7 @@ describe('Helper Functions - Unit Tests', () => {
       // Test that generic parameter properly constrains method names
       type CustomMethods = 'method1' | 'method2'
       const _client: RpcClient<CustomMethods> = {} as RpcClient<CustomMethods>
-      
+
       expect(_client).toBeDefined()
     })
 
@@ -296,9 +296,9 @@ describe('Helper Functions - Unit Tests', () => {
         prop1: string
         prop2: number
       }
-      
+
       const _item: AsyncStorageItem<TestData> = {} as AsyncStorageItem<TestData>
-      
+
       // Type system should project each property into get/set pair
       expect(_item).toBeDefined()
     })
