@@ -1,12 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applications, scopes } from "../../../../plugins/VNLib.Plugins.Essentials.Oauth.ClientApps/src/Essentials.Oauth.ClientApps.json"
 import { useAccount, useAccountRpc, useAxios } from '@vnuge/vnlib.browser'
-const { getData } = useAccountRpc()
-const { login, logout } = useAccount()
-
-const testUser = { userName: 'test@test.com', password: 'Password12!' }
-const testApp = { name: 'Test App', description: 'This is a test app', permissions: "account:read,account:write" }
-const axios = useAxios()
+import { vnlib, testUser } from '../../fixtures'
 
 export interface OAuth2Application {
     readonly Id: string,
@@ -18,124 +13,134 @@ export interface OAuth2Application {
     readonly LastModified: Date,
 }
 
+describe('Oauth2 Client Applications API - E2E Tests', () => {
 
-describe('When a user wants to log in', () => {
+    const { getData } = useAccountRpc(vnlib)
+    const { login, logout } = useAccount(vnlib)
+    const testApp = { name: 'Test App', description: 'This is a test app', permissions: "account:read,account:write" }
+    const axios = useAxios(vnlib)
 
-    it('Logs in the user', async () => {
-      await expect(login<any>(testUser))
-        .resolves
-        .toMatchObject({ code: 200, success: true })
+    describe('When a user wants to log in', () => {
+
+        it('Logs in the user', async () => {
+            await expect(login<any>(testUser))
+                .resolves
+                .toMatchObject({ code: 200, success: true })
+        })
+
+        it('Ensures the server returns an authenticated status result', async () => {
+            const { status } = await getData();
+            expect(status)
+                .toMatchObject({
+                    authenticated: true,
+                    is_local_account: true
+                });
+        })
+
     })
 
-    it('Ensures the server returns an authenticated status result', async () => {
-      const { status } = await getData();
-      expect(status)
-          .toMatchObject({ 
-            authenticated: true, 
-            is_local_account: true 
-        });
-    })
+    describe('When a user gets their client applications', () => {
 
-})
+        it('Checks application scopes', async () => {
+            const { status, data } = await axios.get<string[]>(scopes.path);
+            expect(status).toBe(200);
+            expect(data).toEqual(expect.arrayContaining(scopes.scopes));
+        })
 
-describe('When a user gets their client applications', () => {
+        it('Gets the client applications', async () => {
+            const { data, status } = await axios.get<OAuth2Application[]>(applications.path);
 
-    it('Checks application scopes', async () => {
-      await expect(axios.get<string[]>(scopes.path))
-        .resolves
-        .toMatchObject({ status: 200, data: scopes.scopes })
-    })
+            expect(status).toBe(200);
+            expect(data).toMatchObject([]);
+        })
 
-    it('Gets the client applications', async () => {
-        const { data, status } = await axios.get<OAuth2Application[]>(applications.path);
+        it('Adds a new client application', async () => {
+            await expect(axios.post<OAuth2Application>(`${applications.path}?action=create`, { ...testApp }))
+                .resolves
+                .toMatchObject({
+                    status: 201, data: {
+                        name: testApp.name,
+                        raw_secret: expect.any(String),
+                    }
+                })
+        })
 
-        expect(status).toBe(200);
-        expect(data).toMatchObject([]);
-    })
+        it('Gets the client applications after adding a new one', async () => {
+            await expect(axios.get<OAuth2Application[]>(applications.path))
+                .resolves
+                .toMatchObject({
+                    status: 200,
+                    data: expect.arrayContaining([expect.objectContaining(testApp)])
+                })
+        })
 
-    it('Adds a new client application', async () => {
-        await expect(axios.post<OAuth2Application>(`${applications.path}?action=create`, { ...testApp }))
-            .resolves
-            .toMatchObject({ status: 201, data: {
-                name: testApp.name,
-                raw_secret: expect.any(String),
-            }})
-    })
+        it('tests for illegal characters in fields', async () => {
 
-    it('Gets the client applications after adding a new one', async () => {
-        await expect(axios.get<OAuth2Application[]>(applications.path))
-            .resolves
-            .toMatchObject({ 
-                status: 200, 
-                data: expect.arrayContaining([ expect.objectContaining(testApp) ]) 
+            const illegal1 = axios.post<OAuth2Application>(`${applications.path}?action=create`, {
+                name: "Illegal app !*",
+                description: "This is a test app",
+                permissions: "account:read,account:write"
+            });
+
+            const illegal2 = axios.post<OAuth2Application>(`${applications.path}?action=create`, {
+                name: "Test App",
+                description: "This is a test ** app",
+                permissions: "account:read,account:write"
             })
-    })
 
-    it('tests for illegal characters in fields', async () => {
+            const illegal3 = axios.post<OAuth2Application>(`${applications.path}?action=create`, {
+                name: "Test App",
+                description: "This is a test app",
+                permissions: "account:read,account:w*rite,account:delete"
+            })
 
-        const illegal1 = axios.post<OAuth2Application>(`${applications.path}?action=create`, { 
-            name: "Illegal app !*", 
-            description: "This is a test app", 
-            permissions: "account:read,account:write" 
-        });
+            await expect(illegal1)
+                .rejects
+                .toMatchObject({ response: { status: 422 } })
 
-        const illegal2 = axios.post<OAuth2Application>(`${applications.path}?action=create`,{
-            name: "Test App", 
-            description: "This is a test ** app", 
-            permissions: "account:read,account:write"
+            await expect(illegal2)
+                .rejects
+                .toMatchObject({ response: { status: 422 } })
+
+            await expect(illegal3)
+                .rejects
+                .toMatchObject({ response: { status: 422 } })
         })
 
-        const illegal3 = axios.post<OAuth2Application>(`${applications.path}?action=create`,{
-            name: "Test App", 
-            description: "This is a test app", 
-            permissions: "account:read,account:w*rite,account:delete"
+        it('Gets the test application by its id', async () => {
+            const apps = await axios.get<OAuth2Application[]>(applications.path)
+            const app = apps.data.find(a => a.name === testApp.name)
+            if (!app) return expect.fail('Test app not found');
+
+            await expect(axios.get(`${applications.path}?Id=${app.Id}`))
+                .resolves
+                .toMatchObject({ status: 200, data: testApp })
         })
 
-        await expect(illegal1)
-            .rejects
-            .toMatchObject({ response: { status: 422 }})
+        it('Deletes the client application', async () => {
+            const apps = await axios.get<OAuth2Application[]>(applications.path)
+            const app = apps.data.find(a => a.name === testApp.name)
+            if (!app) return expect.fail('Test app not found');
 
-        await expect(illegal2)
-            .rejects
-            .toMatchObject({ response: { status: 422 } })
+            await expect(axios.post(`${applications.path}?action=delete`, { password: testUser.password, Id: app.Id }))
+                .resolves
+                .toMatchObject({ status: 204 })
+        })
 
-        await expect(illegal3)
-            .rejects
-            .toMatchObject({ response: { status: 422 } })
+        it('Ensures the client application was deleted', async () => {
+            await expect(axios.get<OAuth2Application[]>(applications.path))
+                .resolves
+                .toMatchObject({ status: 200, data: expect.not.arrayContaining([testApp]) })
+        })
     })
 
-    it('Gets the test application by its id', async () => {
-        const apps = await axios.get<OAuth2Application[]>(applications.path)
-        const app = apps.data.find(a => a.name === testApp.name)
-        if (!app) return expect.fail('Test app not found');
-        
-        await expect(axios.get(`${applications.path}?Id=${app.Id}`))
-            .resolves
-            .toMatchObject({ status: 200, data: testApp })
+    describe('When a user has completed oauth2 modifications', () => {
+
+        it('Logs the user out', async () => {
+            await expect(logout())
+                .resolves
+                .toMatchObject({ code: 200, success: true })
+        })
     })
 
-    it('Deletes the client application', async () => {
-        const apps = await axios.get<OAuth2Application[]>(applications.path)
-        const app = apps.data.find(a => a.name === testApp.name)
-        if (!app) return expect.fail('Test app not found');
-
-        await expect(axios.post(`${applications.path}?action=delete`, { password: testUser.password, Id: app.Id }))
-            .resolves
-            .toMatchObject({ status: 204 })
-    })
-
-    it('Ensures the client application was deleted', async () => {
-        await expect(axios.get<OAuth2Application[]>(applications.path))
-            .resolves
-            .toMatchObject({ status: 200, data: expect.not.arrayContaining([testApp]) })
-    })
-})
-
-describe('When a user has completed oauth2 modifications', () => {
-
-      it('Logs the user out', async () => {
-        await expect(logout())
-              .resolves
-              .toMatchObject({ code: 200, success: true })
-      })
-})
+});

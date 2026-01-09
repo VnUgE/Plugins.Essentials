@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "test:unit": "vitest run --no-color --config=vitest.unit.ts",
-    "test:e2e": "vitest --config=vitest.dev.ts",
-    "test:dev": "vitest --config=vitest.dev.ts",
+    "test:e2e": "vitest run --no-color --config=vitest.e2e.ts",
+    "test:dev": "vitest --config=vitest.e2e.ts",
     "test:ci": "vitest run --no-color --config=vitest.headless.ts"
   },
   "repository": "https://git.vaughnnugent.com/cgit/vnuge/plugins.essentials/tree/tests/api-tests",

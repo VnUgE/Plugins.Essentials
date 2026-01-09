@@ -2,6 +2,9 @@ import { defineConfig } from 'vitest/config'
 import { webdriverio } from '@vitest/browser-webdriverio'
 
 export default defineConfig({
+  resolve: {
+    extensions: ['.ts', '.tsx', '.js', '.jsx', '.json']
+  },
   test: {
       name: 'e2e-tests',
       setupFiles: ['./setup.ts'],
@@ -24,7 +27,7 @@ export default defineConfig({
         target: 'https://localhost:8089',
         changeOrigin: true,
         secure: false,
-        rewrite: (path) => path.replace(/^\/test/, '/'),
+        rewrite: (path) => path.replace(/^\/test/, ''),
         headers: {
           "sec-fetch-mode": "cors",
           "referer": "https://localhost:8089",

@@ -1,18 +1,22 @@
 import { describe, expect, it } from 'vitest';
 
 import { useAccountRpc, useOauthLogin } from '@vnuge/vnlib.browser'
-const { getData } = useAccountRpc()
+import { vnlib } from '../../fixtures';
 
-const { getPortals, isEnabled } = useOauthLogin();
+describe('OAuth Login - E2E Tests', () => {
 
-describe('Social OAuth', () => {
+  const { getData } = useAccountRpc(vnlib)
+  const { getPortals, isEnabled } = useOauthLogin(vnlib);
+
+  describe('Social OAuth', () => {
     it('should get the list of social login portals', async () => {
-        const accData = await getData();
+      const accData = await getData();
 
-        expect(isEnabled(accData))
-          .toBe(true);
-          
-        expect(getPortals(accData))
-          .toBeDefined();
+      expect(isEnabled(accData))
+        .toBe(true);
+
+      expect(getPortals(accData))
+        .toBeDefined();
     });
+  });
 });
