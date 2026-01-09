@@ -22,10 +22,10 @@ import { filter, isNil, get, some } from 'lodash-es'
 import { useSession, type TokenResponse } from '../session'
 import { useAxios } from '../axios'
 import type { ApiConfig, WebMessage } from '../types'
-import type { 
-    AccountApi, 
-    UserProfile, 
-    ExtendedLoginResponse, 
+import type {
+    AccountApi,
+    UserProfile,
+    ExtendedLoginResponse,
     UserLoginCredential,
     AccountRpcApi,
     AccountRpcResponse,
@@ -117,7 +117,7 @@ export const useAccount = (config: ApiConfig): AccountApi => {
     }
 
     const logout = async (): Promise<WebMessage> => {
-     
+
         const result = await exec('logout');
 
         //Ensure local credentials are rotated on logout
@@ -153,15 +153,6 @@ export const useAccount = (config: ApiConfig): AccountApi => {
         }
     }
 
-    const getProfile = async <T extends UserProfile>(): Promise<T> => {
-
-        // Get the user's profile from the profile endpoint
-        const data = await exec<T>('profile.get');
-
-        // return response data
-        return data.getResultOrThrow();
-    }
-
     const resetPassword = async (current: string, newPass: string, args: object): Promise<WebMessage> => {
 
         // Send a post to the reset password endpoint
@@ -190,7 +181,6 @@ export const useAccount = (config: ApiConfig): AccountApi => {
         prepareLogin,
         logout,
         login,
-        getProfile,
         resetPassword,
         heartbeat
     }

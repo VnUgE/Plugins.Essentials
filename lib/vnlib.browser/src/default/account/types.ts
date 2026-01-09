@@ -23,7 +23,7 @@ import type { TokenResponse } from "../session"
 /**
  * Configuration for the account RPC API endpoint.
  */
-export interface AccountRpcApiConfig{
+export interface AccountRpcApiConfig {
     /**
      *  Absolute or relative URL for account RPC operations. 
      */
@@ -33,7 +33,7 @@ export interface AccountRpcApiConfig{
 /**
  * Username/password credential used for primary authentication.
  */
-export interface UserLoginCredential{
+export interface UserLoginCredential {
     /** Username or email, depending on server policy. */
     readonly userName: string;
     /** Plain-text password entered by the user. */
@@ -49,26 +49,20 @@ export interface AccountApi {
      * @returns Prepared login request
      */
     prepareLogin(): Promise<UserLoginRequest>
-    
+
     /**
      * Logs the current user out of their session.
      * @returns Server response
      */
     logout(): Promise<WebMessage>
-    
+
     /**
      * Authenticates a user with the server using the specified credentials.
      * @param credential - User's login credentials
      * @returns Login result, may include MFA requirements
      */
     login<T>(credential: UserLoginCredential): Promise<ExtendedLoginResponse<T>>
-    
-    /**
-     * Gets the current user's profile information.
-     * @returns User profile data
-     */
-    getProfile<T extends UserProfile>(): Promise<T>
-    
+
     /**
      * Changes the current user's password.
      * @param current - Current password
@@ -77,7 +71,7 @@ export interface AccountApi {
      * @returns Server response
      */
     resetPassword(current: string, newPass: string, args: object): Promise<WebMessage>
-    
+
     /**
      * Keeps the user's session active with the server.
      */
@@ -127,7 +121,7 @@ export interface AccountRpcResponse<T> extends WebMessage<T> {
 /**
  * JSON-RPC request payload for account operations.
  */
-export interface AccountRpcRequest{
+export interface AccountRpcRequest {
     readonly id: string;
     readonly method: string;
     readonly args: object;
@@ -135,7 +129,7 @@ export interface AccountRpcRequest{
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE'
 
-export interface AccountRpcGetResult{
+export interface AccountRpcGetResult {
     /** 
      * HTTP methods supported by the server.
      */
@@ -151,8 +145,8 @@ export interface AccountRpcGetResult{
     /** 
      * Server feature configuration
      */
-    readonly properties: object & { 
-        readonly type: string 
+    readonly properties: object & {
+        readonly type: string
     }[];
     /**
      * Current authentication status. 
@@ -166,13 +160,13 @@ export interface AccountRpcGetResult{
 /**
  * RPC client for account operations.
  */
-export interface AccountRpcApi<TMethod>{
+export interface AccountRpcApi<TMethod> {
     /**
      * Gets server configuration and available methods.
      * @returns Server configuration and RPC methods
      */
     getData(): Promise<AccountRpcGetResult>;
-    
+
     /**
      * Executes an RPC method on the server.
      * @param method - RPC method name
@@ -180,7 +174,7 @@ export interface AccountRpcApi<TMethod>{
      * @returns Server response
      */
     exec<T = any>(method: AccountRpcMethod | TMethod, args?: object): Promise<AccountRpcResponse<T>>;
-    
+
     /**
      * Checks if a method is available on the server.
      * @param data - Server RPC configuration
@@ -201,7 +195,7 @@ export interface ProfileApi {
      * @throws Error if profile cannot be retrieved or user is not authenticated
      */
     getProfile<T extends UserProfile>(): Promise<T>;
-    
+
     /**
      * Updates the current user's profile on the server.
      * @template T - The profile type extending UserProfile
@@ -209,14 +203,14 @@ export interface ProfileApi {
      * @returns Promise resolving to a web message with the updated profile
      */
     updateProfile<T extends UserProfile>(profile: Partial<T>): Promise<WebMessage<T>>;
-    
+
     /**
      * Checks if the profile.get RPC method is available/enabled.
      * @param data - Account RPC result containing available methods
      * @returns True if profile retrieval is supported
      */
     canGetProfile(data: Pick<AccountRpcGetResult, 'rpc_methods'>): boolean;
-    
+
     /**
      * Checks if the profile.update RPC method is available/enabled.
      * @param data - Account RPC result containing available methods
