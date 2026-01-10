@@ -18,7 +18,7 @@
   "license": "MIT",
   "dependencies": {
     "@simplewebauthn/browser": "^13.x.x",
-    "@vueuse/core": "^13.x",
+    "@vueuse/core": "^14.x",
     "axios": "^1.x",
     "jose": "^6.0.8",
     "lodash-es": "^4.x",
@@ -27,7 +27,7 @@
   },
   "devDependencies": {
     "@types/lodash-es": "^4.14.x",
-    "@types/node": "^22.x",
+    "@types/node": "^25.x",
     "typescript": "^5.8.3"
   }
 }

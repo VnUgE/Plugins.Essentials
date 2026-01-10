@@ -18,7 +18,8 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import { MaybeRef, get, type StorageLikeAsync } from '@vueuse/core'
+import { type MaybeRef } from 'vue'
+import { get, type StorageLikeAsync } from '@vueuse/core'
 import { useAxios } from '../axios'
 import { defaultTo, first } from 'lodash-es'
 import type { Axios } from 'axios'

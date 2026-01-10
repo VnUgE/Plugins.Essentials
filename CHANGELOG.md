@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] - 2026-01-10
+
+### Changed
+
+- Update Serilog.Sinks.Console to version 6.1.1 - (deps) [80f1a1c](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=80f1a1c40b7ca53ac4feef292378011efedf23bc)
+- Update vnlib.core, extensions, and vncache to v0.1.4 - (deps) [4bcbf8f](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=4bcbf8f76a28c70e54b0a64ebca00c6c464bbde9)
+- Update npm packages - (deps) [329bf08](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=329bf082a0c19a942bce817ae9bbe275cd952882)
+- Update Yubico.YubiKey to version 1.15.0 - (deps) [1b7699f](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=1b7699fbb33b33dc5f5ae9cd58923d0b443fd87c)
+
+### Fixed
+
+- Rename session provider config json file in tests and update it's reference. Also add some comments to config loader - [ba4149d](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=ba4149d6b8ce3ae25430729c02716e8050616ae2)
+
 ## [0.1.4-rc.1] - 2025-10-24
 
 ### Changed
@@ -155,6 +168,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Breaking Change:** Disable users auto "migrate" & add json config type - [a5fa032](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=a5fa032810c4f5e4afde43cea157e28fa1547561)
 
+[0.1.4]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.4&id2=v0.1.4-rc.1
 [0.1.4-rc.1]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.4-rc.1&id2=v0.1.3
 [0.1.3]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.3&id2=v0.1.2
 [0.1.2]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.2&id2=v0.1.2-rc.7
