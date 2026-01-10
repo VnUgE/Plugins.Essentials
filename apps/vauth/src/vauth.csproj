@@ -50,7 +50,7 @@
     </PackageReference>
     <PackageReference Include="Serilog" Version="4.3.0" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
-    <PackageReference Include="Yubico.YubiKey" Version="1.14.1" />
+    <PackageReference Include="Yubico.YubiKey" Version="1.15.0" />
   </ItemGroup>
   
   <ItemGroup>
