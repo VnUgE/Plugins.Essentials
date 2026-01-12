@@ -18,7 +18,7 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import { decodeJwt } from "jose"
-import { trim } from "lodash-es";
+import { isNil, trim } from "lodash-es";
 import { useAccount, useAccountRpc } from "../account"
 import { debugLog } from "../helpers/debugLog"
 import type { ApiConfig, WebMessage } from '../types'
@@ -75,7 +75,7 @@ export interface OtpRpcGetData {
     /**
      * The list of OTP public keys registered for the user
      */
-    readonly keys: OtpPublicKey[]; 
+    readonly keys: OtpPublicKey[];
     /**
      * Whether the user can add new keys
      */
@@ -114,7 +114,7 @@ export interface OtpApi {
      * @returns Server response with operation result
      */
     addOrUpdate(publicKey: OtpPublicKey, options?: Partial<OtpManagementOptions>): Promise<AccountRpcResponse<string>>;
-    
+
     /**
      * Disables OTP authentication for the current user.
      * Removes all registered keys and prevents OTP login.
@@ -123,7 +123,7 @@ export interface OtpApi {
      * @returns Server response with operation result
      */
     disable(options?: Partial<OtpManagementOptions>): Promise<AccountRpcResponse<string>>;
-    
+
     /**
      * Removes a single public key by its key ID.
      * 
@@ -164,7 +164,7 @@ export interface OtpAuthOptions {
 export const useOtpLogin = (options: OtpAuthOptions): OtpLogin => {
 
     const { config } = options;
-    
+
     const { prepareLogin } = useAccount(config)
     const { exec, isMethodEnabled } = useAccountRpc<'otp.login'>(config)
 
@@ -185,18 +185,23 @@ export const useOtpLogin = (options: OtpAuthOptions): OtpLogin => {
 
         const data = await exec('otp.login', loginMessage)
 
-        data.getResultOrThrow();
+        // Check the response has a token, if login was successful, 
+        // this should be present
+        if (data.success === true && 'token' in data) {
 
-        if('token' in data){
-            //Finalize the login
-            await loginMessage.finalize(data as TokenResponse);
+            // If the server returned a token, complete the login
+            if (!isNil(data.token)) {
+                await loginMessage.finalize(data as TokenResponse);
+            }
         }
+
+        data.getResultOrThrow();
 
         return data as WebMessage<T>;
     }
 
     const isEnabled = (getResponse: Pick<AccountRpcGetResult, 'rpc_methods'>): boolean => {
-       return isMethodEnabled(getResponse, 'otp.login');
+        return isMethodEnabled(getResponse, 'otp.login');
     }
 
     return { login, isEnabled }
@@ -250,6 +255,6 @@ export const useOtpApi = ({ sendRequest }: Pick<MfaApi, 'sendRequest'>): OtpApi 
  * @param mfaData The mfa data object returned from the server
  * @returns The OTP mfa data for the user, or undefined if not found
  */
-export const otpGetMfaData = (mfaData : MfaGetResponse): OtpRpcGetData | undefined => {
+export const otpGetMfaData = (mfaData: MfaGetResponse): OtpRpcGetData | undefined => {
     return mfaGetDataFor<OtpRpcGetData>(mfaData, 'pkotp');
 }
