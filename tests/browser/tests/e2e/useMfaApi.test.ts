@@ -154,7 +154,7 @@ describe('MFA API - E2E Tests', () => {
 
     const { registerDefaultDevice, disableDevice, disableAllDevices } = useFidoApi({ sendRequest })
 
-    it('Ensures the server supports pkotp', async () => {
+    it('Ensures the server supports fido', async () => {
       await expect(getData())
         .resolves
         .toMatchObject({ supported_methods: expect.arrayContaining(['fido']) })
