@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2025 Vaughn Nugent
+* Copyright (c) 2026 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts.AppData
@@ -24,8 +24,9 @@
 
 using System.Text.Json.Serialization;
 
+using FluentValidation;
+
 using VNLib.Plugins.Extensions.Loading;
-using VNLib.Plugins.Extensions.Loading.Configuration;
 
 namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores
 {
@@ -36,7 +37,15 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores
 
         public virtual void OnValidate()
         {
-            Validate.NotNull(Type, "Store 'type' is required");
+            InlineValidator<StorageConfigJson> val = new ();
+
+            val.RuleFor(x => x.Type)
+                .NotEmpty()
+                .WithMessage("Storage type must be specified.")
+                .Matches("^(sql)$")
+                .WithMessage("Storage type must be 'sql'.");
+
+            val.ValidateAndThrow(this);
         }
     }
 }

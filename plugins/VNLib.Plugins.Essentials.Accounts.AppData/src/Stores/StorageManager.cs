@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2025 Vaughn Nugent
+* Copyright (c) 2026 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts.AppData
@@ -32,6 +32,8 @@ using System.Text.Json.Serialization;
 
 using MemoryPack;
 
+using FluentValidation;
+
 using VNLib.Hashing;
 using VNLib.Utils.Logging;
 using VNLib.Data.Caching;
@@ -40,7 +42,6 @@ using VNLib.Plugins.Essentials.Accounts.AppData.Model;
 using VNLib.Plugins.Essentials.Accounts.AppData.Stores.Sql;
 using VNLib.Plugins.Extensions.VNCache;
 using VNLib.Plugins.Extensions.VNCache.DataModel;
-using VNLib.Plugins.Extensions.Loading.Configuration;
 
 namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores
 {
@@ -133,7 +134,12 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores
         }
 
         ///<inheritdoc/>
-        public Task<UserRecordData?> GetRecordAsync(string userId, string recordKey, RecordOpFlags flags, CancellationToken cancellation)
+        public Task<UserRecordData?> GetRecordAsync(
+            string userId, 
+            string recordKey, 
+            RecordOpFlags flags, 
+            CancellationToken cancellation
+        )
         {
             AppDataRequest adr = new(userId, recordKey);
 
@@ -151,7 +157,14 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores
         }
 
         ///<inheritdoc/>
-        public Task SetRecordAsync(string userId, string recordKey, byte[] data, ulong checksum, RecordOpFlags flags, CancellationToken cancellation)
+        public Task SetRecordAsync(
+            string userId, 
+            string recordKey, 
+            byte[] data, 
+            ulong checksum, 
+            RecordOpFlags flags, 
+            CancellationToken cancellation
+        )
         {
             AppDataRequest adr = new (userId, recordKey);
 
@@ -288,7 +301,20 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores
                     return;
                 }
 
-                Validate.Range2(CacheTTL, 1, 86400, "Cache TTL must be between 1 seconds and 24 hours");
+                InlineValidator<CacheConfig> val = [];
+
+                val.RuleFor(x => x.CacheTTL)
+                    .GreaterThan(0)
+                    .WithMessage("'cache.ttl' must be greater than 0 seconds");
+
+                val.RuleFor(x => x.Prefix)
+                    .MaximumLength(32)
+                    .WithMessage("'cache.prefix' must be less than 32 characters")
+                    .Matches("^[a-zA-Z0-9_-]*$")
+                    .WithMessage("'cache.prefix' can only contain alphanumeric characters, hyphens, and underscores")
+                    .When(x => !string.IsNullOrWhiteSpace(x.Prefix));
+
+                val.ValidateAndThrow(this);
             }
         }
     }

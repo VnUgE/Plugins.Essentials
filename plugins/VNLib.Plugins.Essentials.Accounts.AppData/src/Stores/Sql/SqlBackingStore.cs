@@ -161,7 +161,7 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores.Sql
             /// on startup. Defaults to true.
             /// </summary>
             [JsonPropertyName("run_db_init")]
-            public bool RunDbInit { get; init; } = true;        
+            public bool RunDbInit { get; init; } = true;
         }
     }
 }

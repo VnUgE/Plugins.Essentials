@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2025 Vaughn Nugent
+* Copyright (c) 2026 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts.AppData
@@ -37,7 +37,8 @@ using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Validation;
 using VNLib.Plugins.Extensions.Loading.Routing;
 using VNLib.Plugins.Extensions.Loading.Routing.Mvc;
-using VNLib.Plugins.Extensions.Loading.Configuration;
+
+using FluentValidation;
 
 using VNLib.Plugins.Essentials.Accounts.AppData.Model;
 using VNLib.Plugins.Essentials.Accounts.AppData.Stores;
@@ -211,10 +212,23 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Endpoints
 
             public void OnValidate()
             {
-                Validate.Range(MaxDataSize, 1, 64 * 1024);
+                InlineValidator<EndpointConfigJson> validator = [];
 
-                Validate.NotNull(AllowedScopes, "Config property 'allowed_scopes' must not be empty");
-                Validate.Assert(AllowedScopes.Any(string.IsNullOrWhiteSpace), "Config property 'allowed_scopes' contains a null or empty string");
+                validator.RuleFor(x => x.MaxDataSize)
+                    .InclusiveBetween(1, 64 * 1024)
+                    .WithMessage("Config property 'max_data_size' must be between 1 and 65536 bytes");
+
+                validator.RuleFor(x => x.AllowedScopes)
+                    .NotNull()
+                    .WithMessage("Config property 'allowed_scopes' must not be empty");
+
+                validator.RuleForEach(x => x.AllowedScopes)
+                    .NotEmpty()
+                    .WithMessage("Config property 'allowed_scopes' contains a null or empty string")
+                    .Matches(@"^\S+$")
+                    .WithMessage("Config property 'allowed_scopes' contains an invalid scope id");
+
+                validator.ValidateAndThrow(this);
             }
         }
     }
