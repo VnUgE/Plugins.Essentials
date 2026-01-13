@@ -51,9 +51,9 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Endpoints
     [EndpointLogName("Endpoint")]
     [ConfigurationName("web_endpoint")]
     internal sealed class WebEndpoint(PluginBase plugin, IConfigScope config) : IHttpController
-    {    
+    {
         private readonly StorageManager _store = plugin.GetOrCreateSingleton<StorageManager>();
-        private readonly EndpointConfigJson _confg = config.DeserialzeAndValidate<EndpointConfigJson>();      
+        private readonly EndpointConfigJson _config = config.DeserialzeAndValidate<EndpointConfigJson>();
 
         ///<inheritdoc/>
         public ProtectionSettings GetProtectionSettings() => default;
@@ -120,7 +120,7 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Endpoints
 
             FileUpload data = entity.Files[0];
 
-            if (webm.AssertError(data.Length <= _confg.MaxDataSize, ["Data too large"]))
+            if (webm.AssertError(data.Length <= _config.MaxDataSize, ["Data too large"]))
             {
                 return VirtualClose(entity, webm, HttpStatusCode.RequestEntityTooLarge);
             }
@@ -194,7 +194,7 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Endpoints
         }
 
         private bool IsScopeAllowed(string scopeId) 
-            => _confg.AllowedScopes.Contains(scopeId, StringComparer.OrdinalIgnoreCase);
+            => _config.AllowedScopes.Contains(scopeId, StringComparer.OrdinalIgnoreCase);
 
         private static string? GetScopeId(HttpEntity entity)
             => entity.QueryArgs.GetValueOrDefault("scope");
@@ -202,11 +202,22 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Endpoints
         private static bool NoCacheQuery(HttpEntity entity)
             => entity.QueryArgs.ContainsKey("no_cache");
 
+        /// <summary>
+        /// Configuration model for the web endpoint with validation rules
+        /// </summary>
         private sealed class EndpointConfigJson : IOnConfigValidation
         {
+            /// <summary>
+            /// Maximum allowed size for uploaded data in bytes. Must be between 1 and 65536.
+            /// Defaults to 8KB.
+            /// </summary>
             [JsonPropertyName("max_data_size")]
             public int MaxDataSize { get; set; } = 8 * 1024;
 
+            /// <summary>
+            /// Array of allowed scope identifiers that clients can access.
+            /// Scope IDs must be non-empty and contain no whitespace.
+            /// </summary>
             [JsonPropertyName("allowed_scopes")]
             public string[] AllowedScopes { get; set; } = [];
 

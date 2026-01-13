@@ -30,20 +30,26 @@ using VNLib.Plugins.Extensions.Loading;
 
 namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores
 {
+    /// <summary>
+    /// Base configuration model for storage backend selection and validation
+    /// </summary>
     internal class StorageConfigJson : IOnConfigValidation
     {
+        /// <summary>
+        /// The storage backend type. Currently only 'sql' is supported.
+        /// </summary>
         [JsonPropertyName("type")]
         public string Type { get; set; } = "sql";
 
         public virtual void OnValidate()
         {
-            InlineValidator<StorageConfigJson> val = new ();
+            InlineValidator<StorageConfigJson> val = [];
 
             val.RuleFor(x => x.Type)
                 .NotEmpty()
-                .WithMessage("Storage type must be specified.")
+                .WithMessage("Config property 'storage.type' must be specified.")
                 .Matches("^(sql)$")
-                .WithMessage("Storage type must be 'sql'.");
+                .WithMessage("Config property 'storage.type' must be 'sql'.");
 
             val.ValidateAndThrow(this);
         }

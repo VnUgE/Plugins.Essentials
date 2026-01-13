@@ -280,17 +280,33 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores
             }
         }
 
+        /// <summary>
+        /// Configuration model for optional caching layer with validation rules
+        /// </summary>
         private sealed class CacheConfig : IOnConfigValidation
         {
+            /// <summary>
+            /// Whether caching is enabled. When false, all data operations go directly to storage.
+            /// </summary>
             [JsonPropertyName("enabled")]
             public bool Enabled { get; init; } = true;
 
+            /// <summary>
+            /// Cache time-to-live in seconds. Must be greater than 0.
+            /// </summary>
             [JsonPropertyName("ttl")]
             public long CacheTTL { get; init; } = 120;    //max age in seconds
 
+            /// <summary>
+            /// When true, write operations will wait for data to be written to backing storage.
+            /// When false, writes complete after cache update (write-through vs write-back).
+            /// </summary>
             [JsonPropertyName("force_write_back")]
             public bool WriteBack { get; init; } = false;
 
+            /// <summary>
+            /// Optional cache key prefix for namespacing. Max 32 characters, alphanumeric with hyphens and underscores only.
+            /// </summary>
             [JsonPropertyName("prefix")]
             public string? Prefix { get; set; }
 
@@ -305,13 +321,13 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores
 
                 val.RuleFor(x => x.CacheTTL)
                     .GreaterThan(0)
-                    .WithMessage("'cache.ttl' must be greater than 0 seconds");
+                    .WithMessage("Config property 'cache.ttl' must be greater than 0 seconds");
 
                 val.RuleFor(x => x.Prefix)
                     .MaximumLength(32)
-                    .WithMessage("'cache.prefix' must be less than 32 characters")
+                    .WithMessage("Config property 'cache.prefix' must be less than 32 characters")
                     .Matches("^[a-zA-Z0-9_-]*$")
-                    .WithMessage("'cache.prefix' can only contain alphanumeric characters, hyphens, and underscores")
+                    .WithMessage("Config property 'cache.prefix' can only contain alphanumeric characters, hyphens, and underscores")
                     .When(x => !string.IsNullOrWhiteSpace(x.Prefix));
 
                 val.ValidateAndThrow(this);
