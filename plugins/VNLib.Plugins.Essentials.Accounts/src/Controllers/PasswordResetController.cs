@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2024 Vaughn Nugent
+* Copyright (c) 2025 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
@@ -116,8 +116,15 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
 
                 //TODO Enable mfa auth
 
+                ERRNO updateResult = await Users.UpdatePasswordAsync(
+                    user,
+                    password: pwReset.NewPassword!,
+                    hashingProvider: Users.GetHashProvider(),
+                    cancellation: entity.EventCancellation
+                );
+
                 //Update the user's password
-                if (await Users.UpdatePasswordAsync(user, pwReset.NewPassword!, entity.EventCancellation) < 1)
+                if (updateResult < 1)
                 {
                     webm.Result = "Your password could not be updated";
                     return RpcCommandResult.Okay(webm);
@@ -135,15 +142,15 @@ namespace VNLib.Plugins.Essentials.Accounts.Controllers
                 public PwResetMessageVal()
                 {
                     RuleFor(static pw => pw.Current)
-                    .NotEmpty()
-                    .WithMessage("You must specify your current password")
-                    .Length(8, 100);
+                        .NotEmpty()
+                        .WithMessage("You must specify your current password")
+                        .Length(8, 100);
 
                     //Use centralized password validator for new passwords
                     RuleFor(static pw => pw.NewPassword)
                          .NotEmpty()
                          .NotEqual(static pm => pm.Current)
-                         .WithMessage("Your new password may not equal your new current password")
+                         .WithMessage("Your new password may not equal your current password")
                          .SetValidator(AccountValidations.PasswordValidator);
                 }
             }

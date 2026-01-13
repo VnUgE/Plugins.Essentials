@@ -17,8 +17,8 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import { isRef, type Ref } from "vue";
-import { useIntervalFn, syncRef, get, type MaybeRef } from "@vueuse/core";
+import { isRef, type Ref, type MaybeRef } from "vue";
+import { useIntervalFn, syncRef, get } from "@vueuse/core";
 import { useAccount } from "../account";
 import { useSession } from "../session";
 

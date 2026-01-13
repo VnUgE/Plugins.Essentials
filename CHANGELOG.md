@@ -5,6 +5,72 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] - 2026-01-10
+
+### Changed
+
+- Update Serilog.Sinks.Console to version 6.1.1 - (deps) [80f1a1c](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=80f1a1c40b7ca53ac4feef292378011efedf23bc)
+- Update vnlib.core, extensions, and vncache to v0.1.4 - (deps) [4bcbf8f](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=4bcbf8f76a28c70e54b0a64ebca00c6c464bbde9)
+- Update npm packages - (deps) [329bf08](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=329bf082a0c19a942bce817ae9bbe275cd952882)
+- Update Yubico.YubiKey to version 1.15.0 - (deps) [1b7699f](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=1b7699fbb33b33dc5f5ae9cd58923d0b443fd87c)
+
+### Fixed
+
+- Rename session provider config json file in tests and update it's reference. Also add some comments to config loader - [ba4149d](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=ba4149d6b8ce3ae25430729c02716e8050616ae2)
+
+## [0.1.4-rc.1] - 2025-10-24
+
+### Changed
+
+- Update SimpleWebAuthn to v13 and implement changes - (deps) [0068386](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=0068386187c1a6606551781f07d6648bc6deed2b)
+
+### Fixed
+
+- Limit webauthn AttestationType to `none` or `direct` for correct protocol compatability. - (webauthn) [d59b50f](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=d59b50f4e3683958c418691a450bd73002b18940)
+
+## [0.1.3] - 2025-10-16
+
+### Changed
+
+- Update vnlib.core to v0.1.3 - (deps) [477c291](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=477c291649dbb04e06d375d278c6adc95b509a14)
+- Update vnlib.plugins.extensions to v0.1.3 - (deps) [c6a2a00](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=c6a2a009c0a516c666c734bc07da918674c2d03b)
+- Update vnlib.data.caching to v0.1.3 - (deps) [26501dc](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=26501dc029eacaeeac9040126fdae7800fc1aa26)
+- Update npm dependencies - (deps) [3af4f7d](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=3af4f7db9290c41cebfe3e918c0b057dfb44d0b1)
+- Update build scripts to support Task v3.45 cross platform syntax - [a40ecff](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=a40ecffcf39cc0e9eee4864e0434f88c3683da31)
+
+## [0.1.2] - 2025-09-21
+
+### Changed
+
+- Update npm depdendencies for vnlib.browser - (deps) [64d34f0](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=64d34f02d55803dc6e019f3fe5998ab327b0f84d)
+- Update vnlib.core to v0.1.2 - (deps) [2b96707](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=2b9670749624610708303053011dad66dfdde3d2)
+- Update vnlib.plugins.extensions to v0.1.2 - (deps) [903edfb](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=903edfba877a049452cb6fccbbf2fb3e5da8d60a)
+- Update vnlib.data.caching to v0.1.2 - (deps) [5b0f45c](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=5b0f45c6c56e588a9910ebbc51bf5e8c3a163e42)
+
+## [0.1.2-rc.7] - 2025-09-11
+
+### Changed
+
+- Update vnlib.core to `v0.1.2-rc.10` - (deps) [5a68c23](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=5a68c236115c69debb3357f2279d8d781d02dfe5)
+- Update vnlib.plugins.extensions to `v0.1.2-rc.8` - (deps) [9955bc9](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=9955bc9e6287181a64f055387907f905bcfcc3b3)
+- Update vnlib.data.caching to `v0.1.2-rc.8` - (deps) [98321df](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=98321dfa70c159c5b5f048c9578e911025d44f33)
+- Update npm library packages - (deps) [62272c3](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=62272c3b5b2a13b8fb91537f533ec9740f2c7852)
+
+## [0.1.2-rc.6] - 2025-08-30
+
+### Changed
+
+- Update MSTest to v3.10.3 - (deps) [cdb06ed](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=cdb06edd842d736e9c3848e57b66fcca24e2283c)
+- Centralize MSBuild config via Directory.Build.props; drop MS_ARGS - [b997dc6](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=b997dc68dd5e1af1cb99d527e069b7cb01eb1790)
+- Update `vnlib.core` to v0.1.2-rc.9 - (deps) [062259c](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=062259c1a71fea2eac10d11b84f9283e00eb6350)
+- Update vnlib.plugins.extensions` to v0.1.2-rc.7 - (deps) [58d4fd1](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=58d4fd1a1a2ef54746c5a8232d101c2bfddc581c)
+- Update `vnlib.data.caching` to v0.1.2-rc.7 - (deps) [663fd2c](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=663fd2c94909d61af0d93e526df4504262f68646)
+- Update vnlib.browser dependencies and api-test packages - (deps) [c20a511](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=c20a511e046e47ccf314ed8888dec00b8265e1d7)
+
+### Fixed
+
+- Update usage of obsolete `Users.UpdatePasswordAsync` extension function - (accounts) [b977eee](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=b977eee50c55024314a3e5952f96c8413424d499)
+
 ## [0.1.2-rc.5] - 2025-08-15
 
 ### Added
@@ -48,7 +114,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update and audit vnlib.browser npm dependencies - (deps) [43b53c6](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=43b53c6461ac0693fc526d66d3bfa299d2588c1b)
 - Update vnlib.data.caching to v0.1.2-rc.5 - (deps) [65ccaa7](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=65ccaa7cada215a17301699c4e0dce8d51a75cc1)
 - Update library readme to include latest vnlib information - (readme) [0a5bdc5](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=0a5bdc5a927a115e584a8aec80ca9fa73edf5b87)
-- Update changelog and fix urls - (changelog) [522cc98](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=522cc980fdbcfb34a4096998d07d0b2e5d039c23)
 
 ### Fixed
 
@@ -103,7 +168,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Breaking Change:** Disable users auto "migrate" & add json config type - [a5fa032](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=a5fa032810c4f5e4afde43cea157e28fa1547561)
 
-[0.1.2-rc.5]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=vv0.1.2-rc.5&id2=v0.1.2-rc.4
+[0.1.4]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.4&id2=v0.1.4-rc.1
+[0.1.4-rc.1]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.4-rc.1&id2=v0.1.3
+[0.1.3]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.3&id2=v0.1.2
+[0.1.2]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.2&id2=v0.1.2-rc.7
+[0.1.2-rc.7]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.2-rc.7&id2=v0.1.2-rc.6
+[0.1.2-rc.6]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.2-rc.6&id2=v0.1.2-rc.5
+[0.1.2-rc.5]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.2-rc.5&id2=v0.1.2-rc.4
 [0.1.2-rc.4]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.2-rc.4&id2=v0.1.2-rc.3
 [0.1.2-rc.3]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.2-rc.3&id2=v0.1.2-rc.2
 [0.1.2-rc.2]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.2-rc.2&id2=v0.1.1

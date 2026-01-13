@@ -12,33 +12,44 @@ version: '3'
 vars:
   TARGET_FRAMEWORK: '{{ .TARGET_FRAMEWORK | default "net8.0" }}'
   BINARY_DIR: '{{ .BINARY_DIR | default "bin" }}'
-  RELEASE_DIR: "{{ .BINARY_DIR }}/release/{{ .TARGET_FRAMEWORK }}/publish"
+  RELEASE_DIR: "./bin/release/{{ .TARGET_FRAMEWORK }}/publish"
+  TARGET_DIR: '{{ .USER_WORKING_DIR }}/{{ .BINARY_DIR }}'
 
 tasks:
-  
+
   default:
-    desc: 'Builds a single managed library when run from a project root'
-    dir: '{{ .USER_WORKING_DIR }}'
+    desc: 'When run from a library directory, builds the managed project'
+    dir: "{{ .USER_WORKING_DIR }}"
     vars:
       CONFIGURATION: '{{ .CONFIGURATION | default "release" }}'
     cmds:
-      - cmd: dotnet build -c {{ .CONFIGURATION }} {{ .CLI_ARGS }}
+     - cmd: cd src/ && 
+        dotnet build 
+        --configuration {{ .CONFIGURATION }} 
+        --verbosity detailed
+        {{ .CLI_ARGS }}
+    
 
   #when build succeeds, archive the output into a tgz 
   postbuild_success:
     dir: '{{ .USER_WORKING_DIR }}'
     cmds:
-     #pack up source code
-     - task: packsource
+     #remove unnecessary files from the release dir
+     - cmd: powershell -Command "Get-ChildItem -Recurse '{{ .RELEASE_DIR }}/' -Include *.pdb,*.xml | Remove-Item"
+       platforms: [ "windows" ]
+     - cmd: cd '{{ .RELEASE_DIR }}' && rm -f *.pdb *.xml
+       platforms: [ "linux", "darwin" ]
 
-     #run post in debug mode
+     - task: pack-parallel
+
+  pack-parallel:
+    internal: true
+    deps:
+     - task: packsource
+     
      - task: postbuild
        vars: { BUILD_MODE: debug }
-
-     #remove uncessary files from the release dir
-     - cmd: powershell -Command "Get-ChildItem -Recurse '{{ .RELEASE_DIR }}/' -Include *.pdb,*.xml | Remove-Item"
-
-     #run post in release mode
+     
      - task: postbuild
        vars: { BUILD_MODE: release }
 
@@ -53,14 +64,12 @@ tasks:
     internal: true
     vars:
       #the build output directory
-      BUILD_OUT: "{{ .BINARY_DIR }}/{{ .BUILD_MODE }}/{{ .TARGET_FRAMEWORK }}/publish" 
-
+      BUILD_OUT: "{{ .BINARY_DIR }}/{{ .BUILD_MODE }}/{{ .TARGET_FRAMEWORK }}/publish"
     cmds:
-     #copy license and readme to target
-     - cmd: powershell cp '../build.readme.md' '{{ .BUILD_OUT }}/readme.md'
+     - cmd: cp '../build.readme.md' '{{ .BUILD_OUT }}/readme.md'
 
      #tar outputs
-     - cmd: cd "{{ .BUILD_OUT }}" && tar -czf "{{ .USER_WORKING_DIR }}/{{ .BINARY_DIR }}/{{ .BUILD_MODE }}.tgz" .
+     - cmd: cd "{{ .BUILD_OUT }}" && tar{{ if eq OS "windows" }}.exe{{ end }} -czf "{{ .TARGET_DIR }}/{{ .BUILD_MODE }}.tgz" .
  
   packsource:
     dir: '{{ .USER_WORKING_DIR }}'
@@ -70,13 +79,14 @@ tasks:
         --exclude="bin"
         --exclude="obj"
     cmds:
-    #copy source code to target
-    - cmd: tar {{ .EXCLUDES }} -czf '{{ .BINARY_DIR }}/src.tgz' .
+      #pack up source code and put in output
+     - cmd: tar{{ if eq OS "windows" }}.exe{{ end }}
+         {{ .EXCLUDES }} -czf '{{ .USER_WORKING_DIR }}/{{ .BINARY_DIR }}/src.tgz' .
 
 #Remove the output dirs on clean
   clean:
     dir: '{{ .USER_WORKING_DIR }}'
     ignore_error: true
     cmds:
-     - for: ['bin/', 'obj/']
-       cmd: powershell rm -Recurse '{{ .ITEM }}'
+    - for: [ bin/, obj/ ]
+      cmd: rm -rf '{{ .ITEM }}'
