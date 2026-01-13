@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2025 Vaughn Nugent
+* Copyright (c) 2026 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts.AppData
@@ -32,6 +32,8 @@ using System.Text.Json.Serialization;
 
 using MemoryPack;
 
+using FluentValidation;
+
 using VNLib.Hashing;
 using VNLib.Utils.Logging;
 using VNLib.Data.Caching;
@@ -43,6 +45,7 @@ using VNLib.Plugins.Extensions.VNCache.DataModel;
 
 namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores
 {
+
     [ConfigurationName("storage")]
     internal sealed class StorageManager : IAppDataStore
     {
@@ -52,21 +55,23 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores
 
         public StorageManager(PluginBase plugin, IConfigScope config)
         {
-            string storeType = config.GetRequiredProperty<string>("type").ToLower(null);
+            StorageConfigJson conf = config.DeserialzeAndValidate<StorageConfigJson>();
 
             _logger = plugin.Log.CreateScope("STORE");
 
-            switch (storeType)
+            switch (conf.Type.ToLower(null))
             {
                 case "sql":
                     _backingStore = plugin.GetOrCreateSingleton<SqlBackingStore>();
                     plugin.Log.Information("Using SQL based backing store");
                     break;
+
                 default:
-                    throw new NotSupportedException($"Storage type {storeType} is not supported");
+                    throw new ConfigurationException($"Storage 'type': '{conf.Type}' is not supported");
             }
 
             CacheConfig? cConfig = config.GetValueOrDefault<CacheConfig?>("cache", defaultValue: null);
+            cConfig?.OnValidate();
 
             if (cConfig is null || !cConfig.Enabled)
             {
@@ -75,10 +80,9 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores
             }
 
             ICacheClient? cache = plugin.GetDefaultGlobalCache();
-
             if (cache is null)
             {
-                _logger.Warn("Cache was enabled, but no global cache library was loaded. Caching disabled");
+                _logger.Warn("Cache was enabled, but no global cache library was loaded. Continuing without cache");
                 return;
             }
 
@@ -130,7 +134,12 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores
         }
 
         ///<inheritdoc/>
-        public Task<UserRecordData?> GetRecordAsync(string userId, string recordKey, RecordOpFlags flags, CancellationToken cancellation)
+        public Task<UserRecordData?> GetRecordAsync(
+            string userId, 
+            string recordKey, 
+            RecordOpFlags flags, 
+            CancellationToken cancellation
+        )
         {
             AppDataRequest adr = new(userId, recordKey);
 
@@ -148,7 +157,14 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores
         }
 
         ///<inheritdoc/>
-        public Task SetRecordAsync(string userId, string recordKey, byte[] data, ulong checksum, RecordOpFlags flags, CancellationToken cancellation)
+        public Task SetRecordAsync(
+            string userId, 
+            string recordKey, 
+            byte[] data, 
+            ulong checksum, 
+            RecordOpFlags flags, 
+            CancellationToken cancellation
+        )
         {
             AppDataRequest adr = new (userId, recordKey);
 
@@ -264,19 +280,58 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Stores
             }
         }
 
-        private sealed class CacheConfig
+        /// <summary>
+        /// Configuration model for optional caching layer with validation rules
+        /// </summary>
+        private sealed class CacheConfig : IOnConfigValidation
         {
+            /// <summary>
+            /// Whether caching is enabled. When false, all data operations go directly to storage.
+            /// </summary>
             [JsonPropertyName("enabled")]
-            public bool Enabled { get; set; } = true;
+            public bool Enabled { get; init; } = true;
 
+            /// <summary>
+            /// Cache time-to-live in seconds. Must be greater than 0.
+            /// </summary>
             [JsonPropertyName("ttl")]
-            public long CacheTTL { get; set; } = 120;    //max age in seconds
+            public long CacheTTL { get; init; } = 120;    //max age in seconds
 
+            /// <summary>
+            /// When true, write operations will wait for data to be written to backing storage.
+            /// When false, writes complete after cache update (write-through vs write-back).
+            /// </summary>
             [JsonPropertyName("force_write_back")]
-            public bool WriteBack { get; set; } = false;
+            public bool WriteBack { get; init; } = false;
 
+            /// <summary>
+            /// Optional cache key prefix for namespacing. Max 32 characters, alphanumeric with hyphens and underscores only.
+            /// </summary>
             [JsonPropertyName("prefix")]
             public string? Prefix { get; set; }
+
+            public void OnValidate()
+            {
+                if (!Enabled)
+                {
+                    return;
+                }
+
+                InlineValidator<CacheConfig> val = [];
+
+                val.RuleFor(x => x.CacheTTL)
+                    .GreaterThan(0)
+                    .WithMessage("Config property 'cache.ttl' must be greater than 0 seconds");
+
+                val.RuleFor(x => x.Prefix)
+                    .MaximumLength(32)
+                    .WithMessage("Config property 'cache.prefix' must be less than 32 characters")
+                    .Matches("^[a-zA-Z0-9_-]*$")
+                    .WithMessage("Config property 'cache.prefix' can only contain alphanumeric characters, hyphens, and underscores")
+                    .When(x => !string.IsNullOrWhiteSpace(x.Prefix));
+
+                val.ValidateAndThrow(this);
+            }
         }
     }
 }
