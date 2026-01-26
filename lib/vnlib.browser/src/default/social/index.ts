@@ -41,6 +41,8 @@ export interface SocialOAuthMethod {
         readonly friendly_name: string;
         /** Optional icon URL for branding */
         readonly icon_url?: string;
+        /** Optional error message if the method is not enabled */
+        readonly error?: string;
     }
 }
 
