@@ -31,10 +31,6 @@ export interface RpcMethodArgs {
      */
     readonly version: '1.0.0' | '2.0.0';
     /**
-     * Api config created at app startup. Supplies the axios instance and token metadata.
-     */
-    readonly config: ApiConfig;
-    /**
      * Function that returns the RPC endpoint URL.
      * Allows dynamic endpoint resolution at request time.
      */
@@ -72,12 +68,13 @@ export interface RpcClient<TMethod extends string> {
  * The client automatically injects OTP tokens via axios interceptors
  * and provides both notification and request-response patterns.
  * 
- * @param args - RPC configuration including endpoint, version, and api config.
+ * @param config - Api configuration instance created at app startup.
+ * @param args - RPC configuration including endpoint and version.
  * @returns JSON-RPC client with typed method names.
  */
-export const useJrpc = <TMethod extends string>(args: RpcMethodArgs): RpcClient<TMethod> => {
+export const useJrpc = <TMethod extends string>(config: ApiConfig, args: RpcMethodArgs): RpcClient<TMethod> => {
 
-    const { endpoint, version, config } = args;
+    const { endpoint, version } = args;
     
     // Attach interceptors to the config-provided axios instance
     const { post } = useAxios(config);

@@ -159,7 +159,8 @@ const useSocialRpc = (config: ApiConfig) => {
 /**
  * Configuration options for social OAuth login (reserved for future use).
  */
-export type OauthLoginOptions = Record<string, never>;
+export interface OauthLoginOptions {
+}
 
 /**
  * Creates a social OAuth login API for third-party authentication flows.

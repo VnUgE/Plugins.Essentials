@@ -90,20 +90,19 @@ interface GetUrl{
 export interface AppDataApiOptions {
     /** App-data service endpoint URL (may be reactive for multi-tenant scenarios). */
     readonly endpoint: MaybeRef<string>;
-    /** Api configuration used to provision axios and OTP headers. */
-    readonly config: ApiConfig;
 }
 
 /**
  * Creates an app-data API for server-side user data management.
  * Scopes isolate data partitions that persist across sessions and devices.
  * 
- * @param options - Configuration including endpoint and api config.
+ * @param config - Api configuration instance created at app startup.
+ * @param options - Configuration including endpoint options.
  * @returns App-data API with methods for get/set/remove operations.
  */
-export const useAppDataApi = (options: AppDataApiOptions): UserAppDataApi => {
+export const useAppDataApi = (config: ApiConfig, options: AppDataApiOptions): UserAppDataApi => {
 
-    const { endpoint, config } = options;
+    const { endpoint } = options;
 
     // Attach interceptors to config-provided axios instance
     const axiosInstance = useAxios(config);
@@ -189,18 +188,17 @@ export const useAppDataApi = (options: AppDataApiOptions): UserAppDataApi => {
  * Creates an app-data API bound to a fixed scope string.
  * Avoids repeatedly supplying the scope for get/set/remove calls.
  * 
- * @param endpoint - App-data service endpoint URL.
- * @param dataScope - The data scope identifier (not a config scope).
- * @param options - Optional axios and config scope configuration.
+ * @param config - Api configuration instance created at app startup.
+ * @param options - Endpoint and scope configuration.
  * @returns Scoped app-data API instance.
  */
-export const useScopedAppDataApi = (config: { dataScope: string } & AppDataApiOptions): ScopedUserAppDataApi => {
+export const useScopedAppDataApi = (config: ApiConfig, apiOptions: { dataScope: string } & AppDataApiOptions): ScopedUserAppDataApi => {
 
-    const api = useAppDataApi(config);
+    const api = useAppDataApi(config, apiOptions);
 
     return {
-        get: <T>(options: AppDataGetOptions) => api.get<T>(config.dataScope, options),
-        set: <T>(data: T, options: AppDataSetOptions) => api.set(config.dataScope, data, options),
-        remove: () => api.remove(config.dataScope)
+        get: <T>(options: AppDataGetOptions) => api.get<T>(apiOptions.dataScope, options),
+        set: <T>(data: T, options: AppDataSetOptions) => api.set(apiOptions.dataScope, data, options),
+        remove: () => api.remove(apiOptions.dataScope)
     }
 }

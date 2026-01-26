@@ -56,10 +56,9 @@ export const useAccountRpc = <TMethod extends string>(config: ApiConfig): Accoun
 
     const axios = useAxios(config);
 
-    const { request } = useJrpc<TMethod>({
+    const { request } = useJrpc<TMethod>(config, {
         endpoint: () => config.account.endpointUrl,
-        version: '2.0.0',
-        config
+        version: '2.0.0'
     })
 
     const getData = async (): Promise<AccountRpcGetResult> => {

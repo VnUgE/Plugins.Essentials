@@ -152,10 +152,6 @@ export interface MfaLoginOptions {
      * Array of MFA type processors to enable (TOTP, FIDO, PKI OTP).
      */
     readonly handlers: MfaTypeProcessor[];
-    /**
-     * Api configuration instance created at app startup.
-     */
-    readonly config: ApiConfig;
 }
 
 /**
@@ -251,12 +247,13 @@ interface IMfaUpgradeResponse{
  * Extends the basic login process to handle MFA upgrade challenges from the server,
  * coordinating between registered MFA handlers (TOTP, FIDO, PKI) and user credentials.
  * 
- * @param options - Configuration including handlers and api config.
+ * @param config - Api configuration instance created at app startup.
+ * @param options - Configuration including handlers.
  * @returns MFA login manager with methods for login and capability checking.
  */
-export const useMfaLogin = (options: MfaLoginOptions): MfaLoginManager => {
+export const useMfaLogin = (config: ApiConfig, options: MfaLoginOptions): MfaLoginManager => {
 
-     const { handlers, config } = options;
+    const { handlers } = options;
 
     //get the user instance
     const { login: userLogin } = useAccount(config)

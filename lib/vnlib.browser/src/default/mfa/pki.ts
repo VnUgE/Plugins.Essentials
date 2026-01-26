@@ -140,13 +140,8 @@ interface OtpLoginRequest extends UserLoginRequest {
 
 /**
  * Configuration options for OTP cryptographic authentication.
- * Used to create an {@link OtpLogin} instance via {@link useOtpLogin}.
  */
 export interface OtpAuthOptions {
-    /**
-     * API configuration instance created at app startup.
-     */
-    readonly config: ApiConfig;
 }
 
 /**
@@ -154,16 +149,15 @@ export interface OtpAuthOptions {
  * Enables login via signed JWT tokens using the user's registered public keys.
  * Supports ECDSA signatures (ES256, ES384, ES512) for authentication.
  * 
- * @param options - Configuration including API config
+ * @param config - Api configuration instance created at app startup.
+ * @param _options - Reserved for future configuration options
  * @returns OTP login API instance
  * 
  * @remarks
  * This is the login mechanism, not the key management API.
  * Use {@link useOtpApi} for managing registered public keys.
  */
-export const useOtpLogin = (options: OtpAuthOptions): OtpLogin => {
-
-    const { config } = options;
+export const useOtpLogin = (config: ApiConfig, _options?: OtpAuthOptions): OtpLogin => {
 
     const { prepareLogin } = useAccount(config)
     const { exec, isMethodEnabled } = useAccountRpc<'otp.login'>(config)
