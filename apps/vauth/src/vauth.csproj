@@ -16,7 +16,7 @@
     <Company>Vaughn Nugent</Company>
     <Product>vauth aka OTPAuthenticator</Product>
     <Description>A .NET 8.0 command line tool for generating certificate-based, signed, One-Time-Passwords for web/service authentication, with YubiKey support by default.</Description>
-    <Copyright>Copyright © 2025 Vaughn Nugent</Copyright>
+    <Copyright>Copyright © 2026 Vaughn Nugent</Copyright>
     <PackageProjectUrl>https://www.vaughnnugent.com/resources/software/modules/Plugins.Essentials</PackageProjectUrl>
     <RepositoryUrl>https://github.com/VnUgE/Plugins.Essentials/tree/master/apps/vauth</RepositoryUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>

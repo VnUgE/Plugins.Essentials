@@ -1,7 +1,7 @@
 {
   "name": "@vnuge/vnlib.plugins.essentials.tests.api",
   "description": "Basic api testing for plugins.essentials.accounts",
-  "copyright": "Copyright © 2025 Vaughn Nugent",
+  "copyright": "Copyright © 2026 Vaughn Nugent",
   "type": "module",
   "scripts": {
     "test:dev": "vitest --workspace=vitest.dev.ts",

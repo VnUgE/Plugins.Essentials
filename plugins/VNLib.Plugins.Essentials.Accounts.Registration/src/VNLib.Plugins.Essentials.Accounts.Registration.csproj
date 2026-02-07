@@ -21,7 +21,7 @@
     <Company>Vaughn Nugent</Company>
     <Product>Essentials email registration plugin</Product>
     <Description>An essentials plugin that provides endpoints for registering, local user accounts via transactional emails</Description>
-    <Copyright>Copyright © 2024 Vaughn Nugent</Copyright>
+    <Copyright>Copyright © 2026 Vaughn Nugent</Copyright>
     <PackageProjectUrl>https://www.vaughnnugent.com/resources/software/modules/Plugins.Essentials</PackageProjectUrl>
     <RepositoryUrl>https://github.com/VnUgE/Plugins.Essentials/tree/master/plugins/VNLib.Plugins.Essentials.Accounts.Registration</RepositoryUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
