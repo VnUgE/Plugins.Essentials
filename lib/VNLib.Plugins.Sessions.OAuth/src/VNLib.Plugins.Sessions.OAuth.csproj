@@ -2,10 +2,8 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <Nullable>enable</Nullable>
     <AssemblyName>VNLib.Plugins.Sessions.OAuth</AssemblyName>
     <RootNamespace>VNLib.Plugins.Sessions.OAuth</RootNamespace>
-    <GenerateDocumentationFile>True</GenerateDocumentationFile>
     <!-- Enable dynamic loading for direct loading -->
     <EnableDynamicLoading>true</EnableDynamicLoading>
   </PropertyGroup>

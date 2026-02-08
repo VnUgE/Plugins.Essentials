@@ -2,11 +2,9 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <Nullable>enable</Nullable>
     <RootNamespace>VNLib.Plugins.Sessions.Cache.Client</RootNamespace>
     <AssemblyName>VNLib.Plugins.Sessions.Cache.Client</AssemblyName>
     <NeutralLanguage>en-US</NeutralLanguage>
-    <GenerateDocumentationFile>True</GenerateDocumentationFile>
     <RunAnalyzersDuringBuild>false</RunAnalyzersDuringBuild>
   </PropertyGroup>
 

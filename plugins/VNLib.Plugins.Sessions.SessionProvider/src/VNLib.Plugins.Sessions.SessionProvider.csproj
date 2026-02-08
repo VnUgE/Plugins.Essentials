@@ -2,10 +2,8 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <Nullable>enable</Nullable>
     <RootNamespace>VNLib.Plugins.Sessions</RootNamespace>
     <AssemblyName>SessionProvider</AssemblyName>
-    <GenerateDocumentationFile>True</GenerateDocumentationFile>
     <RunAnalyzersDuringBuild>false</RunAnalyzersDuringBuild>    
     <!-- Resolve nuget dll files and store them in the output dir -->
     <EnableDynamicLoading>true</EnableDynamicLoading>

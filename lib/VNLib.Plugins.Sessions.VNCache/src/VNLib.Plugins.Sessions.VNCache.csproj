@@ -2,11 +2,9 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <Nullable>enable</Nullable>
     <RootNamespace>VNLib.Plugins.Sessions.VNCache</RootNamespace>
     <AssemblyName>VNLib.Plugins.Sessions.VNCache</AssemblyName>
     <EnableDynamicLoading>true</EnableDynamicLoading>
-    <GenerateDocumentationFile>True</GenerateDocumentationFile>
   </PropertyGroup>
 
   <PropertyGroup>

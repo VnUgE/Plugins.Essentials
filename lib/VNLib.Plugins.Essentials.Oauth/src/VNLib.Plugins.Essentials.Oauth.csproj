@@ -2,11 +2,9 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <Nullable>enable</Nullable>
     <AssemblyName>VNLib.Plugins.Essentials.OAuth</AssemblyName>
     <RootNamespace>VNLib.Plugins.Essentials.Oauth</RootNamespace>
     <NeutralLanguage>en-US</NeutralLanguage>
-    <GenerateDocumentationFile>True</GenerateDocumentationFile>
     <!-- This library isn't meant to load dynamically, there are no entrypoints -->
   </PropertyGroup>
 

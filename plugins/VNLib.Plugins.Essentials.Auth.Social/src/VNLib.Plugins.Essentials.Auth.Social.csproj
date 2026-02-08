@@ -2,10 +2,8 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <Nullable>enable</Nullable>
     <RootNamespace>VNLib.Plugins.Essentials.Auth.Social</RootNamespace>
     <AssemblyName>VNLib.Plugins.Essentials.Auth.Social</AssemblyName>
-    <GenerateDocumentationFile>True</GenerateDocumentationFile>
     <NeutralLanguage>en-US</NeutralLanguage>
     <EnableDynamicLoading>true</EnableDynamicLoading>
   </PropertyGroup>

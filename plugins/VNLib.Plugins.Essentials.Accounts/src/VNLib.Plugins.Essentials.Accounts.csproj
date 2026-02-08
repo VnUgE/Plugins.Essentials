@@ -2,11 +2,9 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <Nullable>enable</Nullable>
     <RootNamespace>VNLib.Plugins.Essentials.Accounts</RootNamespace>
     <AssemblyName>Essentials.Accounts</AssemblyName>
     <NeutralLanguage>en-US</NeutralLanguage>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <!--Enable dynamic loading-->
     <EnableDynamicLoading>true</EnableDynamicLoading>
