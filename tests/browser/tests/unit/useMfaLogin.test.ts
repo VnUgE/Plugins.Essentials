@@ -16,8 +16,7 @@ describe('MFA Login - Unit Tests', () => {
 
   describe('useMfaLogin - API Structure', () => {
     it('should create MFA login manager with correct methods', () => {
-      const mfaLogin: MfaLoginManager = useMfaLogin({
-        config,
+      const mfaLogin: MfaLoginManager = useMfaLogin(config, {
         handlers: [totpMfaProcessor(), fidoMfaProcessor()]
       })
 
@@ -34,8 +33,7 @@ describe('MFA Login - Unit Tests', () => {
     })
 
     it('should verify loaded TOTP and FIDO processors are supported', () => {
-      const { isSupported } = useMfaLogin({
-        config,
+      const { isSupported } = useMfaLogin(config, {
         handlers: [totpMfaProcessor(), fidoMfaProcessor()]
       })
 
@@ -46,8 +44,7 @@ describe('MFA Login - Unit Tests', () => {
     })
 
     it('should return false for unsupported MFA methods', () => {
-      const { isSupported } = useMfaLogin({
-        config,
+      const { isSupported } = useMfaLogin(config, {
         handlers: [totpMfaProcessor()] // Only TOTP loaded
       })
 
@@ -56,8 +53,7 @@ describe('MFA Login - Unit Tests', () => {
     })
 
     it('should handle empty handlers array', () => {
-      const { isSupported } = useMfaLogin({
-        config,
+      const { isSupported } = useMfaLogin(config, {
         handlers: []
       })
 
@@ -67,8 +63,7 @@ describe('MFA Login - Unit Tests', () => {
     })
 
     it('should correctly identify MFA continuation responses', () => {
-      const { isMfaResponse } = useMfaLogin({
-        config,
+      const { isMfaResponse } = useMfaLogin(config, {
         handlers: [totpMfaProcessor(), fidoMfaProcessor()]
       })
 
@@ -92,8 +87,7 @@ describe('MFA Login - Unit Tests', () => {
     })
 
     it('should handle MFA response with empty methods array', () => {
-      const { isMfaResponse } = useMfaLogin({
-        config,
+      const { isMfaResponse } = useMfaLogin(config, {
         handlers: [totpMfaProcessor()]
       })
 

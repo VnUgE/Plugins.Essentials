@@ -10,7 +10,7 @@ describe('OTP Login - E2E Tests', () => {
     const { getData: getAccStatus } = useAccountRpc(vnlib)
     const { sendRequest, getData: getMfaData } = useMfaApi(vnlib)
     const { addOrUpdate, removeKey } = useOtpApi({ sendRequest })
-    const { login: otpLogin, isEnabled } = useOtpLogin({ config: vnlib })
+    const { login: otpLogin, isEnabled } = useOtpLogin(vnlib)
 
     // Hardcoded test key pair for OTP login
     // Public key will be registered, private key will be used to sign JWTs

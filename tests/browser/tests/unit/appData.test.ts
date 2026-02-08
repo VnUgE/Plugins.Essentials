@@ -13,11 +13,10 @@ describe('App Data API - Unit Tests', () => {
   describe('useAppDataApi - API Structure', () => {
     it('should create app data API with correct methods', () => {
       const options: AppDataApiOptions = {
-        endpoint: '/app-data',
-        config: vnlib
+        endpoint: '/app-data'
       }
 
-      const api: UserAppDataApi = useAppDataApi(options)
+      const api: UserAppDataApi = useAppDataApi(vnlib, options)
 
       expect(api).toBeDefined()
 
@@ -35,30 +34,27 @@ describe('App Data API - Unit Tests', () => {
       // Plain string endpoint
       const options1: AppDataApiOptions = {
         endpoint: '/app-data',
-        config: vnlib
       }
 
-      const api1 = useAppDataApi(options1)
+      const api1 = useAppDataApi(vnlib, options1)
       expect(api1).toBeDefined()
 
       // MaybeRef allows string or Ref<string> at runtime
       // Type test verifies compile-time acceptance
       const options2: AppDataApiOptions = {
         endpoint: '/app-data',
-        config: vnlib
       }
 
-      const api2 = useAppDataApi(options2)
+      const api2 = useAppDataApi(vnlib, options2)
       expect(api2).toBeDefined()
     })
 
     it('should work with plain string endpoint', () => {
       const options: AppDataApiOptions = {
-        endpoint: '/custom-endpoint',
-        config: vnlib
+        endpoint: '/custom-endpoint'
       }
 
-      const api = useAppDataApi(options)
+      const api = useAppDataApi(vnlib, options)
 
       expect(api).toBeDefined()
     })

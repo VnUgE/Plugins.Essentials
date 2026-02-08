@@ -15,11 +15,10 @@ describe('Helper Functions - Unit Tests', () => {
     it('should create RPC client with correct methods', () => {
       const rpcArgs: RpcMethodArgs = {
         version: '2.0.0',
-        config: vnlib,
         endpoint: () => '/rpc'
       }
 
-      const client: RpcClient<'test.method'> = useJrpc<'test.method'>(rpcArgs)
+      const client: RpcClient<'test.method'> = useJrpc<'test.method'>(vnlib, rpcArgs)
 
       expect(client).toBeDefined()
 
@@ -33,22 +32,20 @@ describe('Helper Functions - Unit Tests', () => {
     it('should support version 1.0.0', () => {
       const rpcArgs: RpcMethodArgs = {
         version: '1.0.0',
-        config: vnlib,
         endpoint: () => '/rpc'
       }
 
-      const client = useJrpc(rpcArgs)
+      const client = useJrpc(vnlib, rpcArgs)
       expect(client).toBeDefined()
     })
 
     it('should support version 2.0.0', () => {
       const rpcArgs: RpcMethodArgs = {
         version: '2.0.0',
-        config: vnlib,
         endpoint: () => '/rpc'
       }
 
-      const client = useJrpc(rpcArgs)
+      const client = useJrpc(vnlib, rpcArgs)
       expect(client).toBeDefined()
     })
 
@@ -57,11 +54,10 @@ describe('Helper Functions - Unit Tests', () => {
 
       const rpcArgs: RpcMethodArgs = {
         version: '2.0.0',
-        config: vnlib,
         endpoint: () => currentEndpoint
       }
 
-      const client = useJrpc(rpcArgs)
+      const client = useJrpc(vnlib, rpcArgs)
       expect(client).toBeDefined()
 
       // Endpoint can change dynamically
@@ -74,24 +70,20 @@ describe('Helper Functions - Unit Tests', () => {
 
       const rpcArgs: RpcMethodArgs = {
         version: '2.0.0',
-        config: vnlib,
         endpoint: () => '/api/rpc'
       }
 
-      const client: RpcClient<MyMethods> = useJrpc<MyMethods>(rpcArgs)
-
+      const client: RpcClient<MyMethods> = useJrpc<MyMethods>(vnlib, rpcArgs)
       expect(client).toBeDefined()
     })
 
     it('should have correct RpcMethodArgs structure', () => {
       const args: RpcMethodArgs = {
         version: '2.0.0',
-        config: vnlib,
         endpoint: () => '/test'
       }
 
       expect(args.version).toBe('2.0.0')
-      expect(args.config).toBe(vnlib)
 
       expect(args.endpoint).toBeTypeOf('function')
       expect(args.endpoint()).toBe('/test')

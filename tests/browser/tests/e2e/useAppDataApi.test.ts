@@ -16,10 +16,7 @@ describe('App-Data API - E2E Tests', () => {
     const { login, logout } = useAccount(vnlib)
     const { getData } = useAccountRpc(vnlib);
 
-    const appData = useAppDataApi({
-        config: vnlib,
-        endpoint: '/app-data'
-    })
+    const appData = useAppDataApi(vnlib, { endpoint: '/app-data' })
 
     describe('Before a user accesses app-data', () => {
         it('Logs the user into their account', async () => {
