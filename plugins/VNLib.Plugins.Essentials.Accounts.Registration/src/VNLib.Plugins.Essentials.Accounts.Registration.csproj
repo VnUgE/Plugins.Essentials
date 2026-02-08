@@ -2,7 +2,6 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <Nullable>enable</Nullable>
     <RootNamespace>VNLib.Plugins.Essentials.Accounts.Registration</RootNamespace>
     <AssemblyName>Essentials.EmailRegistration</AssemblyName>
     <GenerateDocumentationFile>False</GenerateDocumentationFile>
@@ -14,6 +13,17 @@
     <AnalysisLevel Condition="'$(BuildingInsideVisualStudio)' == true">latest-all</AnalysisLevel>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="ErrorProne.NET.CoreAnalyzers" Version="0.8.0-beta.1">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="ErrorProne.NET.Structs" Version="0.6.1-beta.1">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
   <PropertyGroup>
     <Title>VNLib.Plugins.Essentials.Accounts.Registration</Title>
     <PackageId>VNLib.Plugins.Essentials.Accounts.Registration</PackageId>
@@ -21,7 +31,7 @@
     <Company>Vaughn Nugent</Company>
     <Product>Essentials email registration plugin</Product>
     <Description>An essentials plugin that provides endpoints for registering, local user accounts via transactional emails</Description>
-    <Copyright>Copyright © 2024 Vaughn Nugent</Copyright>
+    <Copyright>Copyright © 2026 Vaughn Nugent</Copyright>
     <PackageProjectUrl>https://www.vaughnnugent.com/resources/software/modules/Plugins.Essentials</PackageProjectUrl>
     <RepositoryUrl>https://github.com/VnUgE/Plugins.Essentials/tree/master/plugins/VNLib.Plugins.Essentials.Accounts.Registration</RepositoryUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
