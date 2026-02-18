@@ -1,5 +1,5 @@
 
-// Copyright (c) 2025 Vaughn Nugent
+// Copyright (c) 2026 Vaughn Nugent
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -18,8 +18,6 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import { type MaybeRef } from 'vue'
-import { get } from '@vueuse/core'
 import { useAxios } from '../axios'
 import type { ApiConfig, WebMessage } from '../types'
 
@@ -88,8 +86,8 @@ interface GetUrl{
  * Configuration for constructing an app-data API client.
  */
 export interface AppDataApiOptions {
-    /** App-data service endpoint URL (may be reactive for multi-tenant scenarios). */
-    readonly endpoint: MaybeRef<string>;
+    /** App-data service endpoint URL */
+    readonly endpoint: string;
 }
 
 /**
@@ -110,7 +108,7 @@ export const useAppDataApi = (config: ApiConfig, options: AppDataApiOptions): Us
     const getUrl = ({ flush, noCache, scope }: GetUrl) => {
         const fl = flush ? '&flush=true' : ''
         const nc = noCache ? '&no_cache=true' : ''
-        return `${get(endpoint)}?scope=${scope}${nc}${fl}`
+        return `${endpoint}?scope=${scope}${nc}${fl}`
     }
 
     return {
