@@ -22,8 +22,7 @@
     }
   },
   "scripts": {
-    "build": "tsc",
-    "clean": "if exist dist ( rd /S /Q lib)"
+    "build": "tsc"
   },
   "license": "MIT",
   "dependencies": {
@@ -34,7 +33,7 @@
   },
   "peerDependencies": {
     "@vue/reactivity": "^3.x",
-    "@vueuse/core": "^13.x"
+    "@vueuse/core": "^14.x"
   },
   "peerDependenciesMeta": {
     "@vue/reactivity": {

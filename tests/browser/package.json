@@ -7,9 +7,9 @@
     "test:unit": "vitest run --no-color --config=vitest.unit.ts",
     "test:e2e": "vitest run --no-color --config=vitest.e2e.ts",
     "test:dev": "vitest --config=vitest.e2e.ts",
-    "test:ci": "vitest run --no-color --config=vitest.headless.ts"
+    "test:ci": "vitest run --no-color --config=vitest.unit.ts"
   },
-  "repository": "https://git.vaughnnugent.com/cgit/vnuge/plugins.essentials/tree/tests/api-tests",
+  "repository": "https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/tree/tests/browser",
   "author": "Vaughn Nugent",
   "license": "ISC",
   "devDependencies": {

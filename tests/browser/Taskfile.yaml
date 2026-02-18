@@ -37,11 +37,10 @@ tasks:
     vars:
       TAR_FILES:
         tests
-        setup.ts
+        *.ts
         package.json
         package-lock.json
         tsconfig.json
-        vitest.config.ts
 
     cmds:
     - cmd: mkdir -p {{ .BINARY_DIR }}
