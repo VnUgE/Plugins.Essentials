@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Vaughn Nugent
+// Copyright (c) 2026 Vaughn Nugent
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -17,13 +17,16 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import axiosDefault from 'axios';
-import { merge } from 'lodash-es';
-import type { StorageLikeAsync } from '@vueuse/core';
-import type { ApiConfig, ApiConfigInternal, ApiConfigOverrides } from './types';
+import axiosDefault, { Axios } from 'axios';
+import { defaultTo, merge } from 'lodash-es';
 import { getDefaultSessionConfig } from './session';
 import { getDefaultAccountConfig } from './account';
-import { getDefaultAxiosRequestConfig, type AxiosConfig } from './axios';
+import type { 
+    ApiConfig, 
+    ApiConfigInternal, 
+    ApiConfigOverrides, 
+    StorageLikeAsync 
+} from './types';
 
 /**
  * Symbol key for accessing internal shared state on ApiConfig instances.
@@ -58,30 +61,8 @@ export const getInternalState = <T>(config: ApiConfig, key: string, factory: () 
 
 const DEFAULT_TOKEN_HEADER = 'X-Web-Token';
 
-const resolveAxiosConfig = (overrides?: ApiConfigOverrides['axios']): AxiosConfig => {
-
-    if (overrides?.instance) {
-        return {
-            instance: overrides.instance,
-            tokenHeader: overrides.tokenHeader ?? DEFAULT_TOKEN_HEADER
-        } satisfies AxiosConfig;
-    }
-
-    // No instrance, so create one and assign defaults
-    const mergedRequestConfig = merge({}, getDefaultAxiosRequestConfig(), overrides?.axiosConfig);
-
-    // If no instances was provided by the user create a new one
-    const axios = axiosDefault.create(mergedRequestConfig);
-
-    // User callback to configure
-    if(overrides?.configureInstance){
-        overrides.configureInstance(axios);
-    }
-
-    return {
-        instance: axios,
-        tokenHeader: overrides?.tokenHeader ?? DEFAULT_TOKEN_HEADER
-    } satisfies AxiosConfig;
+const resolveDefaultAxios = (instance?: ApiConfigOverrides['axios']): Axios => {
+    return defaultTo(instance, axiosDefault);
 };
 
 const resolveDefaultStorage = (): StorageLikeAsync => {
@@ -130,8 +111,9 @@ const resolveDefaultStorage = (): StorageLikeAsync => {
 export const createApiConfig = (overrides?: ApiConfigOverrides): ApiConfig => {
     
     const config: ApiConfigInternal = {
+        tokenHeader: defaultTo(overrides?.tokenHeader, DEFAULT_TOKEN_HEADER),
         session: merge({}, getDefaultSessionConfig(), overrides?.session),
-        axios: resolveAxiosConfig(overrides?.axios),
+        axios: resolveDefaultAxios(overrides?.axios),
         account: merge({}, getDefaultAccountConfig(), overrides?.account),
         storage: overrides?.storage ?? resolveDefaultStorage(),
         debugLog: overrides?.debugLog,

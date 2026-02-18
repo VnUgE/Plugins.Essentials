@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Vaughn Nugent
+// Copyright (c) 2026 Vaughn Nugent
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -25,7 +25,6 @@
 export { createApiConfig } from './default/config';
 export { getDefaultSessionConfig } from './default/session';
 export { getDefaultAccountConfig } from './default/account';
-export { getDefaultAxiosRequestConfig } from './default/axios';
 
 // Core types
 export type { 
@@ -83,7 +82,7 @@ export {
 
 export { 
     useAxios, 
-    type AxiosConfig 
+    createAxios 
 } from './default/axios';
 
 /*************************

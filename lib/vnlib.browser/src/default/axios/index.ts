@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Vaughn Nugent
+// Copyright (c) 2026 Vaughn Nugent
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -18,35 +18,10 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import { isObjectLike, merge } from 'lodash-es'
-import { type Axios, type AxiosResponse, type CreateAxiosDefaults, type AxiosRequestConfig } from 'axios'
-import axios from 'axios'
+import axiosGlobal from 'axios'
+import type { Axios, AxiosResponse, AxiosRequestConfig } from 'axios'
 import type { ApiConfig } from '../types'
 import { useSession } from '../session'
-import { getInternalState } from '../config'
-
-/**
- * Axios configuration used by VNLib interceptors. Stores a concrete instance
- * and metadata required by request decorators.
- */
-export interface AxiosConfig {
-    /**
-     * Pre-configured axios instance that interceptors will attach to.
-     */
-    readonly instance: Axios;
-    /**
-     * Header name used to send the OTP token.
-     */
-    readonly tokenHeader: string;
-}
-
-/**
- * Default axios request configuration for VNLib API clients (timeout, credentials).
- * @returns Default axios configuration with 60-second timeout
- */
-export const getDefaultAxiosRequestConfig = (): CreateAxiosDefaults => ({
-    timeout: 60 * 1000,
-    withCredentials: false
-});
 
 /**
  * Creates request interceptor that injects OTP tokens into authenticated requests.
@@ -58,7 +33,7 @@ export const getDefaultAxiosRequestConfig = (): CreateAxiosDefaults => ({
 const createRequestInterceptor = (apiConfig: ApiConfig) => {
     const { generateOneTimeToken } = useSession(apiConfig);
 
-    const { tokenHeader } = apiConfig.axios;
+    const { tokenHeader } = apiConfig;
 
     return async (request: any) => {
 
@@ -108,71 +83,54 @@ const createResponseInterceptor = () => {
     };
 };
 
+interface AxiosInstanceInternal extends Axios {
+    /**
+     * Internal flag to track if VNLib interceptors have been added to 
+     * this instance. This ensures interceptors are only applied once per
+     * instance.
+     */
+    __vnlib_interceptors_added__?: boolean;
+}
+
 /**
- * Retrieves or initializes the axios instance configured in ApiConfig.
- * Attaches OTP token injection and WebMessage helper interceptors on first use.
- * Safe to call multiple times - interceptors are applied once per config instance.
- * 
- * @example
- * ```typescript
- * // Basic usage with shared instance
- * const axios = useAxios(config);
- * await axios.get('/api/users');
- * 
- * // Upload with progress tracking
- * const axiosWithProgress = useAxios(config, {
- *   onUploadProgress: (event) => {
- *     const progress = (event.loaded / event.total) * 100;
- *     console.log(`Upload: ${progress}%`);
- *   }
- * });
- * await axiosWithProgress.post('/upload', formData);
- * 
- * // Download with cancellation
- * const controller = new AbortController();
- * const axiosWithCancel = useAxios(config, {
- *   signal: controller.signal,
- *   onDownloadProgress: (event) => {
- *     console.log(`Downloaded: ${event.loaded} bytes`);
- *   }
- * });
- * await axiosWithCancel.get('/large-file');
- * // Later: controller.abort()
- * ```
- * 
+ * Returns the shared axios instance preconfigured for use with VNLib 
+ * backend server plugins.
+ *
  * @param config - Api configuration instance with axios settings
- * @param options - Optional custom axios configuration (progress callbacks, signal, timeout, etc.)
- * @returns Configured axios instance with VNLib interceptors attached
+ * @returns The shared axios instance
  */
-export const useAxios = (config: ApiConfig, options?: AxiosRequestConfig): Axios => {
+export const useAxios = (config: ApiConfig): Axios => {
+    const defaultInstance = config.axios as AxiosInstanceInternal;
 
-    // User spcified overrides
-    if (options) {
-        // Create a new axios instance with merged defaults
-        const mergedConfig = merge({}, config.axios.instance.defaults, options);
-        const instance = axios.create(mergedConfig);
-
-        instance.interceptors.request.use(createRequestInterceptor(config));
-        instance.interceptors.response.use(createResponseInterceptor());
-
-        return instance;
-    } else {
-        // Cache a set of instances for checking if interceptors have 
-        // been added already
-        const configuredInstances = getInternalState(
-            config,
-            'axios:state:instances',
-            () => new WeakSet<Axios>()
-        )
-
-        const defaultInstance = config.axios.instance;
-
-        if (!configuredInstances.has(defaultInstance)) {
-            defaultInstance.interceptors.request.use(createRequestInterceptor(config));
-            defaultInstance.interceptors.response.use(createResponseInterceptor());
-            configuredInstances.add(defaultInstance);
-        }
-
-        return defaultInstance;
+    if (!defaultInstance.__vnlib_interceptors_added__) {
+        defaultInstance.interceptors.request.use(createRequestInterceptor(config));
+        defaultInstance.interceptors.response.use(createResponseInterceptor());
+        defaultInstance.__vnlib_interceptors_added__ = true;
     }
+
+    return defaultInstance;
+};
+
+/**
+ * Creates a new axios instance derived from the config's shared instance, with
+ * the supplied options merged in. VNLib configuration variables are merged
+ * overrides for the shared instance's defaults. It's safe to use with VNLib
+ * backend plugins.
+ *
+ * Use this instead of `useAxios` when you need per-request options such as an
+ * `AbortSignal`, custom timeout, or progress callbacks. Cache the returned instance
+ * yourself if the same options are reused across calls.
+ *
+ * @param config - Api configuration instance with axios settings
+ * @param options - Axios request config merged over the shared instance's defaults
+ * @returns A new axios instance with VNLib interceptors attached
+ */
+export const createAxios = (config: ApiConfig, options: AxiosRequestConfig): Axios => {
+    const mergedConfig = merge({}, config.axios.defaults, options);
+    const instance = axiosGlobal.create(mergedConfig);
+
+    instance.interceptors.request.use(createRequestInterceptor(config));
+    instance.interceptors.response.use(createResponseInterceptor());
+
+    return instance;
 };

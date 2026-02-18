@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Vaughn Nugent
+// Copyright (c) 2026 Vaughn Nugent
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -17,8 +17,7 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import type { Axios, AxiosInstance, AxiosRequestConfig } from "axios";
-import type { AxiosConfig } from "./axios";
+import type { Axios } from "axios";
 import type { AccountRpcApiConfig } from "./account/types";
 import type { SessionConfig } from "./session";
 
@@ -121,17 +120,16 @@ export interface StorageLikeAsync {
     removeItem: (key: string) => Awaitable<void>;
 }
 
-
-
 /**
  * Aggregate API configuration passed to all composables. All defaults are
  * local to the module and merged during creation.
  */
 export interface ApiConfig {
     readonly session: SessionConfig;
-    readonly axios: AxiosConfig;
+    readonly axios: Axios;
     readonly account: AccountRpcApiConfig;
     readonly storage: StorageLikeAsync;
+    readonly tokenHeader: string;
     /**
      * Optional debug logger callback for internal library diagnostics.
      * If provided, the library will call this function with debug messages.
@@ -170,8 +168,8 @@ export interface ApiConfigInternal extends ApiConfig {
  * All properties are optional; unspecified values use sensible defaults.
  * 
  * @remarks
- * Pass to {@link createApiConfig} to customize HTTP client, storage, endpoints, and security.
- * Useful for testing, multi-tenant applications, or non-standard server configurations.
+ * Pass to {@link createApiConfig} to customize application shared
+ * configuration. 
  * 
  * @example
  * // Minimal configuration (uses all defaults)
@@ -195,73 +193,29 @@ export interface ApiConfigInternal extends ApiConfig {
 export interface ApiConfigOverrides {
     /**
      * Partial session configuration overrides.
-     * Merged with defaults from {@link getDefaultSessionConfig}.
-     * 
-     * @example
-     * session: {
-     *   browserIdSize: 48, // Increase from default 32 bytes
-     *   signatureAlgorithm: 'HS512' // Upgrade from HS256
-     * }
      */
     readonly session?: Partial<SessionConfig>;
     
     /**
      * Axios HTTP client configuration.
-     * Provide a pre-configured instance or customize request defaults.
-     * 
+     *
+     * `tokenHeader` applies regardless of which branch is used.
+     * Provide either `instance` (pre-built) or `axiosConfig`/`configureInstance`
+     * (let the library build one) — not both at the same time.
+     *
      * @remarks
-     * If `instance` is provided, `axiosConfig` and `configureInstance` are ignored.
-     * The library adds request/response interceptors for OTP token injection.
+     * The library attaches OTP token injection interceptors after your
+     * `configureInstance` callback runs, so custom interceptors are ordered first.
      */
-    readonly axios?: {
-        /**
-         * Pre-configured Axios instance to use instead of creating a new one.
-         * Useful for sharing instances or applying custom interceptors.
-         * 
-         * @remarks
-         * When provided, the library will provision the instance to work with VNLib APIs.
-         */
-        readonly instance?: Axios;
-        
-        /**
-         * HTTP header name for sending one-time password tokens.
-         * Server must be configured to validate this header.
-         * 
-         * @defaultValue 'X-Web-Token'
-         */
-        readonly tokenHeader?: string;
-        
-        /**
-         * Axios creation options when no instance is provided.
-         * Merged with defaults.
-         * 
-         * @example
-         * axiosConfig: {
-         *   timeout: 30000,
-         *   baseURL: 'https://api.example.com',
-         *   headers: { 'X-Custom-Header': 'value' }
-         * }
-         */
-        readonly axiosConfig?: AxiosRequestConfig;
-        
-        /**
-         * Callback to configure the Axios instance before library interceptors are added.
-         * Only called when no custom instance is provided.
-         * 
-         * @param axios - The newly created Axios instance
-         * @returns The configured instance (usually the same reference)
-         * 
-         * @example
-         * configureInstance: (axios) => {
-         *   axios.interceptors.request.use(config => {
-         *     config.headers['X-Custom'] = 'value';
-         *     return config;
-         *   });
-         *   return axios;
-         * }
-         */
-        readonly configureInstance?: (axios: AxiosInstance) => AxiosInstance;
-    };
+    readonly axios?: Axios 
+    
+    /**
+      * HTTP header name used to send the per-request OTP token.
+      * Must match the header your server validates.
+      *
+      * @defaultValue 'X-Web-Token'
+      */
+    readonly tokenHeader?: string;
     
     /**
      * Account/profile RPC endpoint configuration.
