@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { 
   createApiConfig,
   type ApiConfig,
@@ -45,15 +45,15 @@ describe('API Configuration - Unit Tests', () => {
       expect(config.account.endpointUrl).toBeTypeOf('string')
     })
 
-    it('should have axios config with instance and token header', () => {
+    it('should have axios instance and token header at config root', () => {
       const config = createApiConfig()
       
       expect(config.axios).toBeDefined()
-      expect(config.axios.instance).toBeDefined()
+      expect(config.axios.get).toBeDefined()   // it's an Axios instance directly
       
-      expect(config.axios.tokenHeader).toBeDefined()
-      expect(config.axios.tokenHeader).toBeTypeOf('string')
-      expect(config.axios.tokenHeader).toBe('X-Web-Token')
+      expect(config.tokenHeader).toBeDefined()
+      expect(config.tokenHeader).toBeTypeOf('string')
+      expect(config.tokenHeader).toBe('X-Web-Token')
     })
 
     it('should have storage implementation', async () => {
@@ -121,63 +121,31 @@ describe('API Configuration - Unit Tests', () => {
   })
 
   describe('createApiConfig - Override Axios Config', () => {
-    it('should accept custom axios instance', () => {
+    it('should accept a pre-built axios instance', () => {
       const customAxios = axios.create({ baseURL: 'https://example.com' })
       
-      const overrides: ApiConfigOverrides = {
-        axios: {
-          instance: customAxios
-        }
-      }
+      const config = createApiConfig({ axios: customAxios })
       
-      const config = createApiConfig(overrides)
-      
-      expect(config.axios.instance).toBe(customAxios)
-      expect(config.axios.tokenHeader).toBe('X-Web-Token')
+      expect(config.axios).toBe(customAxios)
+      expect(config.tokenHeader).toBe('X-Web-Token')
     })
 
-    it('should override token header name', () => {
-      const overrides: ApiConfigOverrides = {
-        axios: {
-          tokenHeader: 'X-Custom-Token'
-        }
-      }
+    it('should accept a custom token header name', () => {
+      const config = createApiConfig({ tokenHeader: 'X-Custom-Token' })
       
-      const config = createApiConfig(overrides)
-      
-      expect(config.axios.tokenHeader).toBe('X-Custom-Token')
+      expect(config.tokenHeader).toBe('X-Custom-Token')
     })
 
-    it('should merge axios request config when no instance provided', () => {
-      const overrides: ApiConfigOverrides = {
-        axios: {
-          axiosConfig: {
-            baseURL: 'https://api.example.com',
-            timeout: 5000
-          }
-        }
-      }
-      
-      const config = createApiConfig(overrides)
-      
-      expect(config.axios.instance).toBeDefined()
-      expect(config.axios.instance.defaults.baseURL).toBe('https://api.example.com')
-      expect(config.axios.instance.defaults.timeout).toBe(5000)
-    })
+    it('should carry custom axios instance defaults through to useAxios', () => {
+      const customAxios = axios.create({
+        baseURL: 'https://api.example.com',
+        timeout: 5000
+      })
 
-    it('should call configureInstance callback when provided', () => {
-      const configureSpy = vi.fn()
+      const config = createApiConfig({ axios: customAxios })
       
-      const overrides: ApiConfigOverrides = {
-        axios: {
-          configureInstance: configureSpy
-        }
-      }
-      
-      const config = createApiConfig(overrides)
-      
-      expect(configureSpy).toHaveBeenCalledOnce()
-      expect(configureSpy).toHaveBeenCalledWith(config.axios.instance)
+      expect(config.axios.defaults.baseURL).toBe('https://api.example.com')
+      expect(config.axios.defaults.timeout).toBe(5000)
     })
   })
 
@@ -226,8 +194,8 @@ describe('API Configuration - Unit Tests', () => {
       expect(config1.session.browserIdSize).toBe(32)
       expect(config2.session.browserIdSize).toBe(64)
       
-      // Should not share axios instances
-      expect(config1.axios.instance).not.toBe(config2.axios.instance)
+      // By default both configs share the global axios singleton.
+      // Pass axios.create() to each createApiConfig() call if per-config isolation is needed.
     })
 
     it('should not mutate original override objects', () => {

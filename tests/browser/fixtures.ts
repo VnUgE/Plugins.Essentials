@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Vaughn Nugent
+// Copyright (c) 2026 Vaughn Nugent
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -29,17 +29,14 @@ export const testUser: UserLoginCredential = {
     password: 'Password12!'
 }
 
-
 export const vnlib = createApiConfig({
     account: {
         endpointUrl: '/api/account'
     },
-    axios: {
-        instance: Axios.create({
-            baseURL: "/test",
-            withCredentials: true
-        }),
-    },
+    axios: Axios.create({
+        baseURL: "/test",
+        withCredentials: true
+    }),
     session: {}
     // storage auto-detected: uses wrapped localStorage in browser/jsdom
 })

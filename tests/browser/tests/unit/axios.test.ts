@@ -1,10 +1,10 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach } from 'vitest';
 import {
   useAxios,
-  getDefaultAxiosRequestConfig,
+  createAxios,
   createApiConfig,
-  type AxiosConfig
 } from '@vnuge/vnlib.browser'
+import axios from 'axios'
 
 describe('Axios Integration - Unit Tests', () => {
 
@@ -15,122 +15,78 @@ describe('Axios Integration - Unit Tests', () => {
     config = createApiConfig()
   })
 
-  describe('getDefaultAxiosRequestConfig', () => {
-    it('should return default axios request config', () => {
-      const defaultConfig = getDefaultAxiosRequestConfig()
+  describe('useAxios - Shared Instance', () => {
+    it('should return an axios instance with standard HTTP methods', () => {
+      const instance = useAxios(config)
 
-      expect(defaultConfig).toBeDefined()
-
-      expect(defaultConfig.timeout).toBeDefined()
-      expect(defaultConfig.timeout).toBeTypeOf('number')
-
-      expect(defaultConfig.withCredentials).toBeDefined()
-      expect(defaultConfig.withCredentials).toBeTypeOf('boolean')
+      expect(instance).toBeDefined()
+      expect(instance.get).toBeDefined()
+      expect(instance.post).toBeDefined()
+      expect(instance.put).toBeDefined()
+      expect(instance.delete).toBeDefined()
+      expect(instance.interceptors).toBeDefined()
     })
 
-    it('should have expected timeout value', () => {
-      const defaultConfig = getDefaultAxiosRequestConfig()
-      expect(defaultConfig.timeout).toBe(60000) // 60 seconds
+    it('should return the same instance on repeated calls (interceptors applied once)', () => {
+      const first = useAxios(config)
+      const second = useAxios(config)
+
+      expect(second).toBe(first)
     })
 
-    it('should have withCredentials set to false', () => {
-      const defaultConfig = getDefaultAxiosRequestConfig()
-      expect(defaultConfig.withCredentials).toBe(false)
-    })
-  })
+    it('should use the provided axios instance', () => {
+      const customInstance = axios.create({ baseURL: 'https://custom.example.com' })
+      const customConfig = createApiConfig({ axios: customInstance })
 
-  describe('useAxios - API Structure', () => {
-    it('should return axios instance from config', () => {
-      const axios = useAxios(config)
+      const result = useAxios(customConfig)
 
-      expect(axios).toBeDefined()
-      expect(axios.get).toBeDefined()
-      expect(axios.post).toBeDefined()
-      expect(axios.put).toBeDefined()
-      expect(axios.delete).toBeDefined()
-      expect(axios.interceptors).toBeDefined()
-    })
-
-    it('should configure interceptors only once per instance', () => {
-      const axios = useAxios(config)
-
-      // Call useAxios again with same config
-      const axios2 = useAxios(config)
-
-      // Should return same instance (due to config.axios.instance being reused)
-      expect(axios2).toBe(axios)
-
-      // Verify interceptors are configured (both exist)
-      expect(axios.interceptors.request).toBeDefined()
-      expect(axios.interceptors.response).toBeDefined()
-    })
-
-    it('should accept custom axios instance', () => {
-      const customAxiosConfig = createApiConfig({
-        axios: {
-          axiosConfig: {
-            baseURL: 'https://custom.example.com'
-          }
-        }
-      })
-
-      const axios = useAxios(customAxiosConfig)
-
-      expect(axios).toBeDefined()
-      expect(axios.defaults.baseURL).toBe('https://custom.example.com')
+      expect(result).toBe(customInstance)
+      expect(result.defaults.baseURL).toBe('https://custom.example.com')
     })
   })
 
-  describe('AxiosConfig Type', () => {
-    it('should have correct structure', () => {
-      const axiosConfig: AxiosConfig = config.axios
-
-      expect(axiosConfig.instance).toBeDefined()
-
-      expect(axiosConfig.tokenHeader).toBeDefined()
-      expect(axiosConfig.tokenHeader).toBeTypeOf('string')
-      expect(axiosConfig.tokenHeader).toBe('X-Web-Token')
-    })
-
-    it('should support custom token header', () => {
-      const customConfig = createApiConfig({
-        axios: {
-          tokenHeader: 'X-Custom-OTP'
-        }
+  describe('createAxios - Per-Call Instance', () => {
+    it('should create a new instance with request options merged in', () => {
+      const instance = createAxios(config, {
+        baseURL: 'https://api.example.com',
+        timeout: 30000
       })
 
-      expect(customConfig.axios.tokenHeader).toBe('X-Custom-OTP')
+      expect(instance).toBeDefined()
+      expect(instance.defaults.baseURL).toBe('https://api.example.com')
+      expect(instance.defaults.timeout).toBe(30000)
+    })
+
+    it('should return a distinct instance on every call', () => {
+      const a = createAxios(config, { timeout: 5000 })
+      const b = createAxios(config, { timeout: 5000 })
+
+      expect(a).not.toBe(b)
+    })
+
+    it('should have interceptors applied on the new instance', () => {
+      const instance = createAxios(config, {})
+
+      expect(instance.interceptors.request).toBeDefined()
+      expect(instance.interceptors.response).toBeDefined()
+    })
+
+    it('should not share interceptor state with the config shared instance', () => {
+      const shared = useAxios(config)
+      const perCall = createAxios(config, {})
+
+      expect(perCall).not.toBe(shared)
     })
   })
 
-  describe('Request Config Merging', () => {
-    it('should merge custom axios config with defaults', () => {
-      const customConfig = createApiConfig({
-        axios: {
-          axiosConfig: {
-            baseURL: 'https://api.example.com',
-            timeout: 30000
-          }
-        }
-      })
-
-      const axios = useAxios(customConfig)
-
-      expect(axios.defaults.baseURL).toBe('https://api.example.com')
-      expect(axios.defaults.timeout).toBe(30000)
+  describe('Token Header', () => {
+    it('should default to X-Web-Token', () => {
+      expect(config.tokenHeader).toBe('X-Web-Token')
     })
 
-    it('should allow configureInstance callback', () => {
-      const configureSpy = vi.fn((instance) => instance)
-
-      const customConfig = createApiConfig({
-        axios: {
-          configureInstance: configureSpy
-        }
-      })
-
-      expect(configureSpy).toHaveBeenCalledOnce()
-      expect(configureSpy).toHaveBeenCalledWith(customConfig.axios.instance)
+    it('should accept a custom token header name', () => {
+      const customConfig = createApiConfig({ tokenHeader: 'X-Custom-OTP' })
+      expect(customConfig.tokenHeader).toBe('X-Custom-OTP')
     })
   })
 
