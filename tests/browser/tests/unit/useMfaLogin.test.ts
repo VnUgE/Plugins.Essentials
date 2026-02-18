@@ -32,7 +32,7 @@ describe('MFA Login - Unit Tests', () => {
       expect(mfaLogin.isMfaResponse).toBeTypeOf('function')
     })
 
-    it('should verify loaded TOTP and FIDO processors are supported', () => {
+    it('should verify TOTP is supported and FIDO requires WebAuthn (unavailable in jsdom)', () => {
       const { isSupported } = useMfaLogin(config, {
         handlers: [totpMfaProcessor(), fidoMfaProcessor()]
       })
