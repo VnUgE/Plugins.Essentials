@@ -18,8 +18,8 @@ jobs:
     remoteUrl: https://github.com/VnUgE/Plugins.Essentials.git
     userName: VnUgE
     passwordSecret: github-access-token
-    force: false
-    condition: SUCCESSFUL
+    force: true
+    condition: ALWAYS
     optional: false
   - type: PushRepository
     name: Codeberg push sync
@@ -27,7 +27,7 @@ jobs:
     userName: VnUgE
     passwordSecret: codeberg-access-token
     force: true
-    condition: SUCCESSFUL
+    condition: ALWAYS
     optional: false
   triggers:
   - type: TagCreateTrigger
