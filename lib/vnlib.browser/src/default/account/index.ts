@@ -1,5 +1,5 @@
 
-// Copyright (c) 2025 Vaughn Nugent
+// Copyright (c) 2026 Vaughn Nugent
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -18,7 +18,7 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import { filter, isNil, get, some } from 'lodash-es'
+import { isNil, get, some } from 'lodash-es'
 import { useSession, type TokenResponse } from '../session'
 import { useAxios } from '../axios'
 import type { ApiConfig, WebMessage } from '../types'
@@ -73,7 +73,7 @@ export const useAccountRpc = <TMethod extends string>(config: ApiConfig): Accoun
     }
 
     const isMethodEnabled = ({ rpc_methods }: Pick<AccountRpcGetResult, 'rpc_methods'>, method: TMethod): boolean => {
-        return filter(rpc_methods, { method }).length > 0;
+        return some(rpc_methods, { method });
     }
 
     return { getData, exec, isMethodEnabled }

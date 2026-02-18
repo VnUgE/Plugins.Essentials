@@ -34,7 +34,8 @@ export type {
     ApiConfig,
     ApiConfigOverrides,
     Awaitable,
-    ConfigScopeToken
+    ConfigScopeToken,
+    StorageLikeAsync
 } from './default/types';
 
 /*************************
