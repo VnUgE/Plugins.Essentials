@@ -25,9 +25,6 @@
 export type { UseApiCallArgs, UseApiCallReturn } from './vue/useApiCall';
 export { useApiCall } from './vue/useApiCall';
 
-// useAppDataStorage - StorageLikeAsync adapter for UserAppDataApi
-export { useAppDataAsyncStorage } from './vue/useAppDataStorage';
-
 // toast - Agnostic toast notification system
 export type { 
     ToastAdapter, 
