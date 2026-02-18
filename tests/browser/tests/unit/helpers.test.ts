@@ -1,11 +1,9 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import {
   useJrpc,
-  createStorageSlot,
   debugLog,
   type RpcClient,
   type RpcMethodArgs,
-  type AsyncStorageItem
 } from '@vnuge/vnlib.browser'
 import { vnlib } from '../../fixtures';
 
@@ -90,119 +88,6 @@ describe('Helper Functions - Unit Tests', () => {
     })
   })
 
-  describe('createStorageSlot - Async Storage', () => {
-    let mockStorage: {
-      getItem: (key: string) => Promise<string | null>
-      setItem: (key: string, value: string) => Promise<void>
-      removeItem: (key: string) => Promise<void>
-    }
-
-    beforeEach(() => {
-      mockStorage = {
-        getItem: vi.fn().mockResolvedValue(null) as any,
-        setItem: vi.fn().mockResolvedValue(undefined) as any,
-        removeItem: vi.fn().mockResolvedValue(undefined) as any
-      }
-    })
-
-    it('should create storage slot with getter/setter for each property', () => {
-      type Settings = {
-        theme: string
-        notifications: boolean
-      }
-
-      const defaultValue: Settings = {
-        theme: 'light',
-        notifications: true
-      }
-
-      const slot: AsyncStorageItem<Settings> = createStorageSlot(
-        mockStorage,
-        'settings',
-        defaultValue
-      )
-
-      expect(slot).toBeDefined()
-
-      expect(slot.theme).toBeDefined()
-      expect(slot.theme.get).toBeDefined()
-      expect(slot.theme.get).toBeTypeOf('function')
-      expect(slot.theme.set).toBeDefined()
-      expect(slot.theme.set).toBeTypeOf('function')
-
-      expect(slot.notifications).toBeDefined()
-      expect(slot.notifications.get).toBeDefined()
-      expect(slot.notifications.get).toBeTypeOf('function')
-      expect(slot.notifications.set).toBeDefined()
-      expect(slot.notifications.set).toBeTypeOf('function')
-    })
-
-    it('should work with complex object types', () => {
-      type UserPrefs = {
-        profile: {
-          name: string
-          email: string
-        }
-        settings: {
-          darkMode: boolean
-          fontSize: number
-        }
-      }
-
-      const defaultValue: UserPrefs = {
-        profile: { name: '', email: '' },
-        settings: { darkMode: false, fontSize: 14 }
-      }
-
-      const slot: AsyncStorageItem<UserPrefs> = createStorageSlot(
-        mockStorage,
-        'user-prefs',
-        defaultValue
-      )
-
-      expect(slot.profile).toBeDefined()
-      expect(slot.settings).toBeDefined()
-    })
-
-    it('should work with primitive types', () => {
-      type SimpleData = {
-        count: number
-        message: string
-        enabled: boolean
-      }
-
-      const defaultValue: SimpleData = {
-        count: 0,
-        message: 'default',
-        enabled: false
-      }
-
-      const slot = createStorageSlot(mockStorage, 'simple', defaultValue)
-
-      expect(slot.count).toBeDefined()
-      expect(slot.message).toBeDefined()
-      expect(slot.enabled).toBeDefined()
-    })
-
-    it('should provide AsyncStorageItem with correct type projection', async () => {
-      type Data = { value: number }
-      const slot: AsyncStorageItem<Data> = createStorageSlot(
-        mockStorage,
-        'test',
-        { value: 42 }
-      )
-
-      // Verify type structure at runtime
-      expect(slot.value).toBeDefined()
-
-      expect(slot.value.get).toBeTypeOf('function')
-      expect(slot.value.set).toBeTypeOf('function')
-
-      // Verify get returns a Promise
-      const getPromise = slot.value.get()
-      expect(getPromise).toBeInstanceOf(Promise)
-    })
-  })
 
   describe('debugLog - Debug Logging', () => {
     it('should be a function', () => {
@@ -268,11 +153,9 @@ describe('Helper Functions - Unit Tests', () => {
       // Verify type exports are available at compile time
       const _rpcClient: RpcClient<string> = {} as RpcClient<string>
       const _rpcArgs: RpcMethodArgs = {} as RpcMethodArgs
-      const _storageItem: AsyncStorageItem<{ test: string }> = {} as AsyncStorageItem<{ test: string }>
 
       expect(_rpcClient).toBeDefined()
       expect(_rpcArgs).toBeDefined()
-      expect(_storageItem).toBeDefined()
     })
 
     it('should verify RpcClient generic type parameter', () => {
@@ -281,18 +164,6 @@ describe('Helper Functions - Unit Tests', () => {
       const _client: RpcClient<CustomMethods> = {} as RpcClient<CustomMethods>
 
       expect(_client).toBeDefined()
-    })
-
-    it('should verify AsyncStorageItem type projection', () => {
-      type TestData = {
-        prop1: string
-        prop2: number
-      }
-
-      const _item: AsyncStorageItem<TestData> = {} as AsyncStorageItem<TestData>
-
-      // Type system should project each property into get/set pair
-      expect(_item).toBeDefined()
     })
   })
 })

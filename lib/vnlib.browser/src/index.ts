@@ -209,9 +209,6 @@ export type {
 
 export { useJrpc } from './default/helpers/jrpc';
 
-export type { AsyncStorageItem } from './default/helpers/storage';
-export { createStorageSlot } from './default/helpers/storage';
-
 export type { CryptoContext } from './default/helpers/webcrypto';
 export {
     isCryptoSupported,
