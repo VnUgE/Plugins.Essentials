@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Vaughn Nugent
+// Copyright (c) 2026 Vaughn Nugent
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -17,11 +17,11 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+import { find } from 'lodash-es';
 import { useAccountRpc } from '../account';
 import type { ApiConfig } from '../types';
 import type { MfaMethod } from "./login"
 import type { AccountRpcGetResult, AccountRpcResponse } from '../account/types';
-import { find } from 'lodash-es';
 
 /**
  * Server representation of a single MFA method for the current user.
@@ -51,7 +51,6 @@ export interface MfaRequestJson extends Record<string, any>{
     /** Optional password to satisfy sensitive operations. */
     readonly password?: string;
 }
-
 
 /**
  * Represents the server API for interacting with the user's
