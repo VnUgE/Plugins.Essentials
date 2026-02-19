@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.5] - 2026-02-19
+
+### Added
+
+- Add `run_db_init` config flag to app-data plugin for optional SQL schema initialization - (appdata) [08b1465](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=08b146579fcec3088ed5fc4576221d0be19e5474)
+- Improve app-data plugin configuration validation with clearer error messages - (AppData) [27f682e](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=27f682e9a1fe4645369f9454e90e35b206e55861)
+- Add `isMfaLoginSupported()` helper to public browser api - (browser) [971f612](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=971f612e3dc674c60df38ca70efc4540da7ba08a)
+- Expose optional `errors` field on `SocialOAuthMethod` - (browser) [54628ea](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=54628ea5b79a188819bf21878b07061a5217526f)
+- Add `./vue` subpath export (`@vnuge/vnlib.browser/vue`) containing `useApiCall` and `createToaster` composables; Vue consumers should import from this subpath going forward - (browser) [ab312ca](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=ab312ca7e5a9f10fa01c4e97fe2d0c9db617a8aa)
+- New exports from the browser library architecture overhaul: `createApiConfig()`, `createAxios()`, `isLoggedIn()`, `isLocalAccount()`, `useJrpc()`, `getDefaultSessionConfig()`, `getDefaultAccountConfig()`, and web crypto helpers (`isCryptoSupported`, `getCryptoContext`, `hmacSignAsync`, `decryptAsync`, `getRandomHex`) - (browser) [ab312ca](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=ab312ca7e5a9f10fa01c4e97fe2d0c9db617a8aa)
+
+### Changed
+
+- Update npm packages - (deps) [13a3435](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=13a3435ba36fdc6514602fed674648767da500dd)
+- Update Yubico.YubiKey to v1.15.1 - (deps) [5af7240](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=5af72409a4cebb1457b2aab5a2e50e80c2ac267d)
+- Update MSTest to v4.1 - (deps) [273c9c7](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=273c9c71b1dea46ee16386ce8526df3ccd2bdefd)
+- Update vnlib.core to v0.1.5 - (deps) [e4f1dfc](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=e4f1dfcaf2bab6847abfcf34ab264c2c16dbbc2b)
+- `vue` and `@vueuse/core` demoted to optional peer dependencies; the core library no longer requires a Vue runtime - (browser) [ab312ca](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=ab312ca7e5a9f10fa01c4e97fe2d0c9db617a8aa)
+
+### Fixed
+
+- Fix password validation regex using a deprecated extensions API - (accounts) [9625a90](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=9625a908146dd2a45d24552bac39c8f8dd5f6a3d)
+- Fix XML route store listener not unsubscribed on plugin unload, causing a strong reference that prevented GC - (router) [e6b12cf](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=e6b12cfb472e0ac92457c267e40b8547572e341b)
+- Fix OTP authentication token finalization - (browser) [9cde3b5](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=9cde3b5213d67331c1ccc9cd79e8dae426ee59eb)
+
+### Removed
+
+- Remove `Nullable` and `GenerateDocumentationFile` properties from project files - [9fa42bc](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=9fa42bc3630ec9606701f83e1db44adc614a76c6)
+- **Breaking:** Remove `configureApi()` global singleton — replace calls with `createApiConfig()` - (browser) [ab312ca](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=ab312ca7e5a9f10fa01c4e97fe2d0c9db617a8aa)
+- **Breaking:** Remove `useAppDataStorage` and `useAsyncStorageSlot` from the public api; these were Vue-coupled helpers superseded by the framework-agnostic `useAppDataApi` - (browser) [79b0635](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=79b0635e74af3e3ff567ec41d4ef6db5a20bfff0)
+
+### Refactor
+
+- **Breaking:** Migrate vnlib.browser to a framework-agnostic architecture; source reorganized under `default/`, all public exports are now explicit named exports rather than barrel re-exports - (browser) [ab312ca](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=ab312ca7e5a9f10fa01c4e97fe2d0c9db617a8aa)
+- **Breaking:** Unify all public composable function signatures to accept an explicit `ApiConfig` argument instead of reading from global state - (browser) [b6dd9c7](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=b6dd9c77f639c3e02c4d5f012848b73ae5708416)
+- Refactor axios helpers and `useAppDataApi` to be framework-agnostic with no vuejs/vueuse type dependencies - (browser) [c631f8f](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=c631f8f2255ebe359e304b58830e79383c99d272)
+
 ## [0.1.4] - 2026-01-10
 
 ### Changed
@@ -168,6 +205,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Breaking Change:** Disable users auto "migrate" & add json config type - [a5fa032](https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/commit/?id=a5fa032810c4f5e4afde43cea157e28fa1547561)
 
+[0.1.5]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.5&id2=v0.1.4
 [0.1.4]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.4&id2=v0.1.4-rc.1
 [0.1.4-rc.1]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.4-rc.1&id2=v0.1.3
 [0.1.3]: https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/diff?id=v0.1.3&id2=v0.1.2

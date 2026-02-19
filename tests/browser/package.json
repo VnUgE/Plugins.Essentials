@@ -1,0 +1,32 @@
+{
+  "name": "@vnuge/vnlib.plugins.essentials.tests.api",
+  "description": "Basic api testing for plugins.essentials.accounts",
+  "copyright": "Copyright \u00A9 2026 Vaughn Nugent",
+  "type": "module",
+  "scripts": {
+    "test:unit": "vitest run --no-color --config=vitest.unit.ts",
+    "test:e2e": "vitest run --no-color --config=vitest.e2e.ts",
+    "test:dev": "vitest --config=vitest.e2e.ts",
+    "test:ci": "vitest run --no-color --config=vitest.unit.ts"
+  },
+  "repository": "https://git.vaughnnugent.com/cgit/vnuge/plugins-essentials.git/tree/tests/browser",
+  "author": "Vaughn Nugent",
+  "license": "ISC",
+  "devDependencies": {
+    "@vitest/browser": "^4.0.18",
+    "@vitest/browser-webdriverio": "^4.0.18",
+    "jsdom": "^28.0.0",
+    "vitest": "^4.0.18",
+    "webdriverio": "^9.23.3"
+  },
+  "dependencies": {
+    "@simplewebauthn/browser": "^13.2.2",
+    "@vnuge/vnlib.browser": "../../lib/vnlib.browser",
+    "@vueuse/core": "^14.2.0",
+    "axios": "^1.13.4",
+    "axios-cookiejar-support": "^6.0.5",
+    "jose": "^6.1.3",
+    "lodash-es": "^4.17.23",
+    "vue": "^3.x"
+  }
+}

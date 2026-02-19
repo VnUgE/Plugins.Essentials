@@ -2,11 +2,9 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <Nullable>enable</Nullable>
     <RootNamespace>VNLib.Plugins.Essentials.Accounts.AppData</RootNamespace>
     <AssemblyName>Essentials.AppData</AssemblyName>
     <NeutralLanguage>en-US</NeutralLanguage>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <!--Enable dynamic loading-->
     <EnableDynamicLoading>true</EnableDynamicLoading>
   </PropertyGroup>
@@ -20,7 +18,7 @@
     <Authors>Vaughn Nugent</Authors>
     <Company>Vaughn Nugent</Company>
     <Product>Essentials Account-Based client data storage</Product>
-    <Copyright>Copyright © 2025 Vaughn Nugent</Copyright>
+    <Copyright>Copyright © 2026 Vaughn Nugent</Copyright>
     <PackageProjectUrl>https://www.vaughnnugent.com/resources/software/modules/Plugins.Essentials</PackageProjectUrl>
     <RepositoryUrl>https://github.com/VnUgE/Plugins.Essentials/tree/master/plugins/VNLib.Plugins.Essentials.Accounts.AppData</RepositoryUrl>
     <Description>An Essentials plugin that provides endpoints for web-application synchronized storage such as user preferences</Description>

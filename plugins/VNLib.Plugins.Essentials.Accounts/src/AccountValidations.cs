@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2024 Vaughn Nugent
+* Copyright (c) 2026 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts
@@ -29,31 +29,33 @@ using VNLib.Plugins.Extensions.Validation;
 namespace VNLib.Plugins.Essentials.Accounts
 {
     public static class AccountValidations
-    {
+    {      
+
         /// <summary>
-        /// Central password requirement validator
+        /// Central password requirement validator. 
+        /// Enforces minimum length and character-class composition requirements.
         /// </summary>
         public static IValidator<string> PasswordValidator { get; } = GetPassVal();
 
         public static IValidator<AccountData> AccountDataValidator { get; } = GetAcVal();
-     
 
-        static IValidator<string> GetPassVal()
+
+        private static InlineValidator<string> GetPassVal()
         {
-            InlineValidator<string> passVal = new();
+            InlineValidator<string> passVal = [];
 
             passVal.RuleFor(static password => password)
                 .NotEmpty()
                 .Length(min: 8, max: 100)
-                .Password()
-                .WithMessage(errorMessage: "Password does not meet minium requirements");
+                .Matches(@"^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$ %^&*-])")
+                .WithMessage(errorMessage: "Password does not meet minimum requirements");
             
             return passVal;
         }
 
-        static IValidator<AccountData> GetAcVal()
+        static InlineValidator<AccountData> GetAcVal()
         {
-            InlineValidator<AccountData> adv = new ();
+            InlineValidator<AccountData> adv = [];
 
             //Validate city
 

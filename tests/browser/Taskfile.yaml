@@ -1,0 +1,186 @@
+# https://taskfile.dev
+
+#Called by the vnbuild system to produce builds for my website
+#https://www.vaughnnugent.com/resources/software
+
+version: '3'
+
+vars:
+  BINARY_DIR: '{{ .BINARY_DIR | default "bin" }}'
+
+tasks:
+
+  build:
+    cmds:
+      - cmd: echo "building project {{ .PROJECT_NAME }}"
+
+  test:
+    desc: 'Run all tests (unit + e2e) - currently only runs unit tests until e2e infrastructure is ready'
+    deps:
+     #- dev-server-fetch
+     #- dev-plugins-fetch
+    cmds:
+      # Build the TypeScript library
+      - cmd: cd '../../lib/vnlib.browser' && npm install
+      - cmd: cd '../../lib/vnlib.browser' && npm run build
+      - cmd: npm install
+
+      # Validate the server can start with test config (exits immediately if successful)
+      #- task: dev-server-run
+      #  vars: { OPTIONS: "--dev-test --no-plugins" }
+
+      # Run CI tests - vitest will spawn the server as a child process via test-server.ts
+      - cmd: npm run test:unit
+      # - cmd: npm run test:ci
+
+  postbuild_success:
+    vars:
+      TAR_FILES:
+        tests
+        *.ts
+        package.json
+        package-lock.json
+        tsconfig.json
+
+    cmds:
+    - cmd: mkdir -p {{ .BINARY_DIR }}
+    #tgz the source files
+    - cmd: tar{{ if eq OS "windows" }}.exe{{ end }}
+        -czf {{ .BINARY_DIR }}/src.tgz {{ .TAR_FILES }}
+
+#Remove the output dirs on clean
+  clean:
+    dir: '{{ .USER_WORKING_DIR }}'
+    ignore_error: true
+    cmds:
+     - for: ['bin/', 'node_modules/']
+       cmd: powershell rm -Recurse '{{ .ITEM }}'
+
+  dev-server-fetch:
+    internal: false
+    dir: '..'
+    status:
+      - test '{{ .USER_WORKING_DIR }}/../temp/webserver/VNLib.WebServer.dll' 
+    cmds:
+     #build a local copy of the webserver
+     - cmd: cd ../../core/apps/VNLib.WebServer &&
+        task build-debug -- 
+        --no-restore
+        --nologo
+        --output "{{ .USER_WORKING_DIR }}/../temp/webserver" 
+        --verbosity quiet
+
+  dev-plugins-fetch:
+    internal: false
+    vars:
+      OUTPUT_DIR: '{{ .USER_WORKING_DIR }}/../temp/plugins'
+    cmds:
+     - task: dev-build-plugin 
+       vars: 
+         ASM_NAME: 'Essentials.Accounts'
+         PLUGIN_NAME: 'VNLib.Plugins.Essentials.Accounts' 
+         SRC_DIR: '../plugins/VNLib.Plugins.Essentials.Accounts'
+         OUTPUT_DIR: '{{ .OUTPUT_DIR }}'
+
+     - task: dev-build-plugin
+       vars: 
+         ASM_NAME: 'Essentials.AppData'
+         PLUGIN_NAME: 'VNLib.Plugins.Essentials.Accounts.AppData' 
+         SRC_DIR: '../plugins/VNLib.Plugins.Essentials.Accounts.AppData'
+         OUTPUT_DIR: '{{ .OUTPUT_DIR }}'
+
+     - task: dev-build-plugin
+       vars: 
+         ASM_NAME: 'Essentials.Auth.Social'
+         SRC_DIR: '../plugins/VNLib.Plugins.Essentials.Auth.Social'
+         PLUGIN_NAME: 'VNLib.Plugins.Essentials.Auth.Social' 
+         OUTPUT_DIR: '{{ .OUTPUT_DIR }}/assets'
+     
+     - task: dev-build-plugin
+       vars: 
+         ASM_NAME: 'PageRouter'
+         SRC_DIR: '../plugins/VNLib.Plugins.Essentials.Content.Routing'
+         PLUGIN_NAME: 'VNLib.Plugins.Essentials.Content.Routing' 
+         OUTPUT_DIR: '{{ .OUTPUT_DIR }}'
+
+     - task: dev-build-plugin
+       vars: 
+         ASM_NAME: 'Essentials.Oauth.ClientApps'
+         SRC_DIR: '../plugins/VNLib.Plugins.Essentials.Oauth.ClientApps'
+         PLUGIN_NAME: 'VNLib.Plugins.Essentials.Oauth.ClientApps' 
+         OUTPUT_DIR: '{{ .OUTPUT_DIR }}'
+    
+     - task: dev-build-plugin
+       vars: 
+         ASM_NAME: 'SessionProvider'
+         SRC_DIR: '../plugins/VNLib.Plugins.Sessions.SessionProvider'
+         PLUGIN_NAME: 'VNLib.Plugins.Sessions.SessionProvider' 
+         OUTPUT_DIR: '{{ .OUTPUT_DIR }}'
+
+     - task: dev-build-plugin
+       vars: 
+         PLUGIN_NAME: 'VNLib.Plugins.Sessions.VNCache' 
+         SRC_DIR: '../lib/VNLib.Plugins.Sessions.VNCache'
+         OUTPUT_DIR: '{{ .OUTPUT_DIR }}/assets'
+
+     - task: dev-build-plugin
+       vars: 
+         PLUGIN_NAME: 'VNLib.Plugins.Sessions.Oauth' 
+         SRC_DIR: '../lib/VNLib.Plugins.Sessions.Oauth'
+         OUTPUT_DIR: '{{ .OUTPUT_DIR }}/assets'
+
+     - task: dev-build-plugin
+       vars: 
+         PLUGIN_NAME: 'VNLib.Plugins.Essentials.Users' 
+         SRC_DIR: '../lib/VNLib.Plugins.Essentials.Users'
+         OUTPUT_DIR: '{{ .OUTPUT_DIR }}/assets'
+
+     - task: dev-build-plugin
+       vars: 
+         PLUGIN_NAME: 'VNLib.Plugins.Extensions.Loading.Sql.SQLite' 
+         SRC_DIR: '../../VNLib.Plugins.Extensions/lib/sql-providers/sqlite/VNLib.Plugins.Extensions.Loading.Sql.SQLite/src'
+         OUTPUT_DIR: '{{ .OUTPUT_DIR }}/assets'
+
+     - task: dev-build-plugin
+       vars: 
+         SRC_DIR: '../../VNLib.Data.Caching/lib/VNLib.Plugins.Extensions.VNCache/src'
+         PLUGIN_NAME: 'VNLib.Plugins.Extensions.VNCache' 
+         OUTPUT_DIR: '{{ .OUTPUT_DIR }}/assets'
+
+     - task: dev-build-plugin
+       vars: 
+         SRC_DIR: '../../VNLib.Data.Caching/plugins/VNLib.Data.Caching.Providers.VNCache/src'
+         PLUGIN_NAME: 'VNLib.Data.Caching.Providers.VNCache' 
+         OUTPUT_DIR: '{{ .OUTPUT_DIR }}/assets'
+
+     - task: dev-setup-argon2
+
+  dev-setup-argon2:
+    internal: false
+    vars:
+      BUILD_DIR: '{{ .USER_WORKING_DIR }}/../temp/lib/argon2'
+    cmds:
+      - cmd: mkdir -p '{{ .BUILD_DIR }}'
+      - cmd: cd ../../../core/lib/Utils.Cryptography/argon2 &&
+         task 
+         'CMAKE_BUILD_TYPE=debug'
+         'CMAKE_BUILD_DIR="{{ .BUILD_DIR }}"'
+
+  dev-build-plugin:
+    internal: true
+    dir: '..'
+    requires: { PLUGIN_NAME, OUTPUT_DIR, SRC_DIR }
+    vars:
+      ASM_NAME: '{{ coalesce .ASM_NAME .PLUGIN_NAME }}'
+    cmds:
+     - cmd: mkdir -p '{{ .OUTPUT_DIR }}'
+
+     - cmd: cp -f 'config/{{ .ASM_NAME }}.json' 'temp/plugins/{{ .ASM_NAME }}/{{ .ASM_NAME }}.json'
+       ignore_error: true
+
+     - cmd: cd '{{ .SRC_DIR }}' && 
+        task 'CONFIGURATION=debug' 
+        --
+        --nologo
+        --no-restore
+        --output '{{ .OUTPUT_DIR }}/{{ .ASM_NAME }}'

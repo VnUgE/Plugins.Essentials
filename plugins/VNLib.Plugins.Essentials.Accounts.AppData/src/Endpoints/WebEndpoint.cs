@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright (c) 2025 Vaughn Nugent
+* Copyright (c) 2026 Vaughn Nugent
 * 
 * Library: VNLib
 * Package: VNLib.Plugins.Essentials.Accounts.AppData
@@ -27,6 +27,7 @@ using System.Net;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 using VNLib.Net.Http;
 using VNLib.Hashing.Checksums;
@@ -36,6 +37,8 @@ using VNLib.Plugins.Extensions.Loading;
 using VNLib.Plugins.Extensions.Validation;
 using VNLib.Plugins.Extensions.Loading.Routing;
 using VNLib.Plugins.Extensions.Loading.Routing.Mvc;
+
+using FluentValidation;
 
 using VNLib.Plugins.Essentials.Accounts.AppData.Model;
 using VNLib.Plugins.Essentials.Accounts.AppData.Stores;
@@ -49,11 +52,8 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Endpoints
     [ConfigurationName("web_endpoint")]
     internal sealed class WebEndpoint(PluginBase plugin, IConfigScope config) : IHttpController
     {
-        private const int DefaultMaxDataSize = 8 * 1024;
-
         private readonly StorageManager _store = plugin.GetOrCreateSingleton<StorageManager>();
-        private readonly int MaxDataSize = config.GetValueOrDefault("max_data_size", DefaultMaxDataSize);
-        private readonly string[] AllowedScopes = config.GetRequiredProperty<string[]>("allowed_scopes");
+        private readonly EndpointConfigJson _config = config.DeserialzeAndValidate<EndpointConfigJson>();
 
         ///<inheritdoc/>
         public ProtectionSettings GetProtectionSettings() => default;
@@ -120,7 +120,7 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Endpoints
 
             FileUpload data = entity.Files[0];
 
-            if (webm.AssertError(data.Length <= MaxDataSize, ["Data too large"]))
+            if (webm.AssertError(data.Length <= _config.MaxDataSize, ["Data too large"]))
             {
                 return VirtualClose(entity, webm, HttpStatusCode.RequestEntityTooLarge);
             }
@@ -193,15 +193,54 @@ namespace VNLib.Plugins.Essentials.Accounts.AppData.Endpoints
             return VirtualClose(entity, HttpStatusCode.Accepted);
         }
 
-        private bool IsScopeAllowed(string scopeId)
-        {
-            return AllowedScopes.Contains(scopeId, StringComparer.OrdinalIgnoreCase);
-        }
+        private bool IsScopeAllowed(string scopeId) 
+            => _config.AllowedScopes.Contains(scopeId, StringComparer.OrdinalIgnoreCase);
 
         private static string? GetScopeId(HttpEntity entity)
             => entity.QueryArgs.GetValueOrDefault("scope");
 
         private static bool NoCacheQuery(HttpEntity entity)
             => entity.QueryArgs.ContainsKey("no_cache");
+
+        /// <summary>
+        /// Configuration model for the web endpoint with validation rules
+        /// </summary>
+        private sealed class EndpointConfigJson : IOnConfigValidation
+        {
+            /// <summary>
+            /// Maximum allowed size for uploaded data in bytes. Must be between 1 and 65536.
+            /// Defaults to 8KB.
+            /// </summary>
+            [JsonPropertyName("max_data_size")]
+            public int MaxDataSize { get; set; } = 8 * 1024;
+
+            /// <summary>
+            /// Array of allowed scope identifiers that clients can access.
+            /// Scope IDs must be non-empty and contain no whitespace.
+            /// </summary>
+            [JsonPropertyName("allowed_scopes")]
+            public string[] AllowedScopes { get; set; } = [];
+
+            public void OnValidate()
+            {
+                InlineValidator<EndpointConfigJson> validator = [];
+
+                validator.RuleFor(x => x.MaxDataSize)
+                    .InclusiveBetween(1, 64 * 1024)
+                    .WithMessage("Config property 'max_data_size' must be between 1 and 65536 bytes");
+
+                validator.RuleFor(x => x.AllowedScopes)
+                    .NotNull()
+                    .WithMessage("Config property 'allowed_scopes' must not be empty");
+
+                validator.RuleForEach(x => x.AllowedScopes)
+                    .NotEmpty()
+                    .WithMessage("Config property 'allowed_scopes' contains a null or empty string")
+                    .Matches(@"^\S+$")
+                    .WithMessage("Config property 'allowed_scopes' contains an invalid scope id");
+
+                validator.ValidateAndThrow(this);
+            }
+        }
     }
 }
