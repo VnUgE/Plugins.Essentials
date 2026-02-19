@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { useAccount, useAccountRpc, useFidoApi, useMfaApi, useOtpApi, useTotpApi } from '@vnuge/vnlib.browser'
+import { isLoggedIn, useAccount, useAccountRpc, useFidoApi, useMfaApi, useOtpApi, useTotpApi } from '@vnuge/vnlib.browser'
 import { vnlib, testUser } from '../../fixtures'
 
 describe('MFA API - E2E Tests', () => {
@@ -18,20 +18,17 @@ describe('MFA API - E2E Tests', () => {
     })
 
     it('Ensures the server returns an authenticated status result', async () => {
-      const { status, rpc_methods } = await getAccStatus();
-      expect(status)
-        .toMatchObject({
-          authenticated: true,
-          is_local_account: true
-        });
+      const status  = await getAccStatus();
+      expect(isLoggedIn(status))
+        .toBe(true);
 
-      expect(isEnabled({ rpc_methods }))
+      expect(isEnabled(status))
         .toBe(true)
     })
 
     it('Ensures the server supports mfa', async () => {
-      const { rpc_methods } = await getAccStatus();
-      expect(isEnabled({ rpc_methods }))
+      const status = await getAccStatus();
+      expect(isEnabled(status))
         .toBe(true);
     })
   })

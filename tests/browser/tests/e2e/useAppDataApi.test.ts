@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { useAccount, useAppDataApi, useAccountRpc } from '@vnuge/vnlib.browser'
+import { useAccount, useAppDataApi, useAccountRpc, isLoggedIn } from '@vnuge/vnlib.browser'
 import { vnlib, testUser } from '../../fixtures'
 
 interface TestAppData {
@@ -16,7 +16,7 @@ describe('App-Data API - E2E Tests', () => {
     const { login, logout } = useAccount(vnlib)
     const { getData } = useAccountRpc(vnlib);
 
-    const appData = useAppDataApi(vnlib, { endpoint: '/app-data' })
+    const appData = useAppDataApi(vnlib, { endpoint: '/api/app-data' })
 
     describe('Before a user accesses app-data', () => {
         it('Logs the user into their account', async () => {
@@ -26,12 +26,9 @@ describe('App-Data API - E2E Tests', () => {
         })
 
         it('Ensures the server returns an authenticated status result', async () => {
-            const { status } = await getData();
-            expect(status)
-                .toMatchObject({
-                    authenticated: true,
-                    is_local_account: true
-                });
+            const status = await getData();
+            expect(isLoggedIn(status))
+                .toBe(true);
         })
     })
 
