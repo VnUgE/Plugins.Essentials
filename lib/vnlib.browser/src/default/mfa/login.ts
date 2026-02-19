@@ -18,10 +18,10 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import { decodeJwt, type JWTPayload } from "jose";
-import { isArray, map, mapKeys, without } from 'lodash-es';
+import { find, isArray, map, mapKeys, without } from 'lodash-es';
 import { debugLog } from "../helpers/debugLog";
 import { useAccountRpc, useAccount } from "../account";
-import type { ExtendedLoginResponse, UserLoginCredential } from "../account/types";
+import type { AccountRpcGetResult, ExtendedLoginResponse, UserLoginCredential } from "../account/types";
 import type { TokenResponse } from "../session";
 import type { ApiConfig, WebMessage } from "../types";
 
@@ -294,4 +294,13 @@ export const useMfaLogin = (config: ApiConfig, options: MfaLoginOptions): MfaLog
     }
 
     return { login, isSupported, isMfaResponse }
+}
+
+/**
+ * Checks if MFA login is supported by the server based on the available RPC methods.
+ * @param getData - Account RPC data containing available methods
+ * @returns True if MFA login is supported on the server
+ */
+export const isMfaLoginSupported = (getData: Pick<AccountRpcGetResult, 'rpc_methods'>): boolean => {
+    return find(getData.rpc_methods, m => m.method === 'mfa.login') !== undefined;
 }

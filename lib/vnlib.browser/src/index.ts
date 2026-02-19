@@ -119,7 +119,7 @@ export type {
     MfaUpgradeState
 } from './default/mfa/login';
 
-export { useMfaLogin } from './default/mfa/login';
+export { useMfaLogin, isMfaLoginSupported } from './default/mfa/login';
 
 export type {
     MfaApi,
