@@ -67,11 +67,6 @@ export interface ServerValidationError{
 export type Awaitable<T> = T | Promise<T>;
 
 /**
- * Legacy scope token used by deprecated global config helpers. Avoid for new code.
- */
-export type ConfigScopeToken = symbol;
-
-/**
  * Storage interface for persisting session state and credentials.
  * Compatible with browser localStorage, sessionStorage, or custom async storage.
  * Supports both synchronous and asynchronous implementations via Awaitable return types.

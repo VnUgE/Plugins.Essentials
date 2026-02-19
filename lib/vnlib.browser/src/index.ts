@@ -33,7 +33,6 @@ export type {
     ApiConfig,
     ApiConfigOverrides,
     Awaitable,
-    ConfigScopeToken,
     StorageLikeAsync
 } from './default/types';
 
@@ -125,8 +124,7 @@ export type {
     MfaApi,
     MfaGetResponse,
     MfaMethodResponse,
-    MfaRequestJson,
-    UserArg
+    MfaRequestJson
 } from './default/mfa/config';
 
 export { 

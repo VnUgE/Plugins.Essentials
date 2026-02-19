@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Vaughn Nugent
+// Copyright (c) 2026 Vaughn Nugent
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -260,7 +260,7 @@ export const useOauthLogin = (config: ApiConfig, _options?: OauthLoginOptions): 
 
     return {
         getPortals,
-        beginLoginFlow: (beginLoginFlow as any),
+        beginLoginFlow: beginLoginFlow as SocialLoginApi['beginLoginFlow'],
         completeLogin,
         logout,
         isEnabled

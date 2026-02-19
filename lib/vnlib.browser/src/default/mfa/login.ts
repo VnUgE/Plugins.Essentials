@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Vaughn Nugent
+// Copyright (c) 2026 Vaughn Nugent
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -19,6 +19,7 @@
 
 import { decodeJwt, type JWTPayload } from "jose";
 import { find, isArray, map, mapKeys, without } from 'lodash-es';
+import type { AuthenticationResponseJSON } from "@simplewebauthn/browser";
 import { debugLog } from "../helpers/debugLog";
 import { useAccountRpc, useAccount } from "../account";
 import type { AccountRpcGetResult, ExtendedLoginResponse, UserLoginCredential } from "../account/types";
@@ -36,7 +37,7 @@ export interface MfaSubmission {
     /**
      * FIDO security key credential.
      */
-    readonly fido?: any;
+    readonly fido?: AuthenticationResponseJSON;
 }
 
 /**

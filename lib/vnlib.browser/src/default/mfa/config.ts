@@ -23,8 +23,6 @@ import type { MfaMethod } from "./login"
 import type { AccountRpcGetResult, AccountRpcResponse } from '../account/types';
 import { find } from 'lodash-es';
 
-export type UserArg = object;
-
 /**
  * Server representation of a single MFA method for the current user.
  */
